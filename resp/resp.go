@@ -47,10 +47,10 @@ type Resp interface {
 
 // PaginationResult  分页结果
 type PaginationResult struct {
-	Total     int64       `json:"total"`
-	PageSize  int         `json:"page_size"`
-	PageIndex int         `json:"page_index"`
-	Data      interface{} `json:"data"`
+	Total     int64       `json:"total"`      // 总条数
+	PageSize  int         `json:"page_size"`  // 页大小
+	PageIndex int         `json:"page_index"` // 页索引
+	Data      interface{} `json:"data"`       // 数据
 }
 
 // Result 返回结果
@@ -69,11 +69,6 @@ func (r *Result) WithMessage(message string) Resp {
 
 func (r *Result) WithCode(code int) Resp {
 	r.Code = code
-	return r
-}
-
-func (r *Result) WithPage(result *PaginationResult) Resp {
-	r.Data = result
 	return r
 }
 
