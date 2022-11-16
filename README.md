@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v1.0.0-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v1.0.1-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构
 
@@ -9,14 +9,14 @@
 - Get
 
 ```shell
-go get github.com/archine/gin-plus@v1.0.0
+go get github.com/archine/gin-plus@v1.0.1
 ```
 
 - Mod
 
 ```shell
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus v1.0.0
+github.com/archine/gin-plus v1.0.1
 # 命令行在该项目目录下执行
 go mod tidy
 ```

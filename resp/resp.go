@@ -37,14 +37,20 @@ var CodeMsgMap = map[int]string{
 type Resp interface {
 	// WithMessage 设置错误信息
 	WithMessage(message string) Resp
-	// WithPage 设置分页数据
-	WithPage(data interface{}, current int, pageRows int, totalCount int) Resp
 	// WithCode 设置业务状态码
 	WithCode(code int) Resp
 	// WithData 设置返回数据
 	WithData(data interface{}) Resp
 	// To 返回
 	To()
+}
+
+// PaginationResult  分页结果
+type PaginationResult struct {
+	Total     int64       `json:"total"`
+	PageSize  int         `json:"page_size"`
+	PageIndex int         `json:"page_index"`
+	Data      interface{} `json:"data"`
 }
 
 // Result 返回结果
@@ -66,14 +72,8 @@ func (r *Result) WithCode(code int) Resp {
 	return r
 }
 
-func (r *Result) WithPage(data interface{}, current int, pageRows int, totalCount int) Resp {
-	m := map[string]interface{}{
-		"total":      totalCount,
-		"page_index": current,
-		"page_size":  pageRows,
-		"data":       data,
-	}
-	r.Data = m
+func (r *Result) WithPage(result *PaginationResult) Resp {
+	r.Data = result
 	return r
 }
 
@@ -188,11 +188,6 @@ func Ok(ctx *gin.Context) {
 // Json 正常请求返回Json数据
 func Json(ctx *gin.Context, data interface{}) {
 	InitResp(ctx, http.StatusOK).WithCode(0).WithData(data).To()
-}
-
-// Page 正常请求返回分页数据
-func Page(ctx *gin.Context, data interface{}, current int, pageRows int, totalCount int) {
-	InitResp(ctx, http.StatusOK).WithCode(0).WithPage(data, current, pageRows, totalCount).To()
 }
 
 // SeverError 服务器级别异常返回
