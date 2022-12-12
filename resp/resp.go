@@ -57,8 +57,8 @@ type PaginationResult struct {
 type Result struct {
 	ctx      *gin.Context `json:"-"`
 	httpCode int          `json:"-"`             // http状态码
-	Code     int          `json:"code"`          // 业务状态码,业务自己定
-	Message  string       `json:"message"`       // 业务提示信息
+	Code     int          `json:"err_code"`      // 业务状态码,业务自己定
+	Message  string       `json:"err_msg"`       // 业务提示信息
 	Data     interface{}  `json:"ret,omitempty"` // 响应数据
 }
 
@@ -78,6 +78,7 @@ func (r *Result) WithData(data interface{}) Resp {
 }
 
 func (r *Result) To() {
+	r.ctx.Set("businessCode", r.Code)
 	r.ctx.JSON(r.httpCode, r)
 }
 

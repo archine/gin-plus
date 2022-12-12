@@ -109,13 +109,15 @@ func (c *Controller) GlobalFunc(funcs ...gin.HandlerFunc) *Controller {
 // @param setGlobalFunc: Whether to set global func
 // @return this
 func (c *Controller) Api(httpMethod, apiPath string, apiFunc gin.HandlerFunc, setGlobalFunc bool) *Controller {
-	m := &method{
-		httpMethod:    httpMethod,
-		path:          c.prefix + apiPath,
-		setGlobalFunc: setGlobalFunc,
-		apiFunc:       []gin.HandlerFunc{apiFunc},
+	if apiFunc != nil {
+		m := &method{
+			httpMethod:    httpMethod,
+			path:          c.prefix + apiPath,
+			setGlobalFunc: setGlobalFunc,
+			apiFunc:       []gin.HandlerFunc{apiFunc},
+		}
+		c.putMethods(m)
 	}
-	c.putMethods(m)
 	return c
 }
 
@@ -128,15 +130,18 @@ func (c *Controller) ApiGroup(httpMethod string, apiInfos []*ApiInfo) *Controlle
 	if len(apiInfos) == 0 {
 		return c
 	}
-	methodGroup := make([]*method, len(apiInfos))
-	for i, info := range apiInfos {
+	methodGroup := make([]*method, 0, len(apiInfos))
+	for _, info := range apiInfos {
+		if info.ApiFunc == nil {
+			continue
+		}
 		m := &method{
 			httpMethod:    httpMethod,
 			path:          c.prefix + info.Path,
 			setGlobalFunc: info.SetGlobalFunc,
 			apiFunc:       []gin.HandlerFunc{info.ApiFunc},
 		}
-		methodGroup[i] = m
+		methodGroup = append(methodGroup, m)
 	}
 	c.putMethods(methodGroup...)
 	return c

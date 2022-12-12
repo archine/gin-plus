@@ -23,10 +23,10 @@ const (
 	reset   = "\033[0m"
 )
 
-type HjLogFormat struct {
+type LogFormat struct {
 }
 
-func (h *HjLogFormat) Format(entry *log.Entry) ([]byte, error) {
+func (h *LogFormat) Format(entry *log.Entry) ([]byte, error) {
 	timestamp := entry.Time.Format("2006-01-02 15:04:05")
 	sprintf := fmt.Sprintf("====> [%s] %s[%s]%s %s \n", timestamp, getLevelColor(entry.Level), strings.ToUpper(entry.Level.String()), reset, entry.Message)
 	return []byte(sprintf), nil
@@ -39,8 +39,10 @@ func InitLog(levelString string) {
 		log.Fatalf("init logger module failed, invalid logger level: %s", levelString)
 	}
 	log.SetLevel(level)
-	log.SetFormatter(&HjLogFormat{})
+	log.SetFormatter(&LogFormat{})
 }
+
+var printHealth = true
 
 // LogMiddleware Log print
 func LogMiddleware() gin.HandlerFunc {
@@ -52,6 +54,16 @@ func LogMiddleware() gin.HandlerFunc {
 		reqMethod := c.Request.Method
 		reqUrl := c.Request.RequestURI
 		statusCode := c.Writer.Status()
+		if strings.Contains(reqUrl, "health") {
+			if !printHealth {
+				return
+			}
+			printHealth = false
+		}
+		businessCode, exists := c.Get("businessCode")
+		if exists {
+			statusCode = businessCode.(int)
+		}
 		log.Infof("| %s %3d %s | %13v |%s %s %s  %s ", getStatusColor(statusCode), statusCode, reset, processTime, getMethodColor(reqMethod), reqMethod, reset, reqUrl)
 	}
 }
@@ -92,12 +104,8 @@ func getMethodColor(method string) string {
 
 func getStatusColor(code int) string {
 	switch {
-	case code >= http.StatusOK && code < http.StatusMultipleChoices:
+	case code == 0 || code == 200:
 		return green
-	case code >= http.StatusMultipleChoices && code < http.StatusBadRequest:
-		return white
-	case code >= http.StatusBadRequest && code < http.StatusInternalServerError:
-		return yellow
 	default:
 		return red
 	}
