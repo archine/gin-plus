@@ -1,6 +1,6 @@
 ![](https://img.shields.io/badge/version-v1.0.3-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
-> 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构
+> 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构。IoC的具体使用请参考文档: [点击跳转](https://github.com/archine/ioc)
 
 ## 一、前言
 
@@ -453,8 +453,56 @@ func (t *TestController) hello(ctx *gin.Context) {
 ```
 
 > 其他的错误请求，都和 3、4 案例一样，满足条件会返回给你 true，直接return 即可 结束该API，前端会收到响应，这里就不一一举例了
+## 四、插件
+### 1、全局异常捕获
+对一次完整的 gin 链路处理过程中的全部 painc 进行捕获，用法参考
 
-## 四、拓展
+```go
+package main
+
+import (
+	"github.com/archine/gin-plus/plugin"
+	"github.com/gin-gonic/gin"
+	_ "hj-common-test/gintest/controller"
+	"log"
+)
+
+func main() {
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
+	engine.Use(plugin.GlobalExceptionInterceptor) // 加入插件
+
+	if err := engine.Run(":8080"); err != nil {
+		log.Fatalf(err.Error())
+	}
+}
+
+```
+### 2、日志
+美化控制台打印日志
+```go
+package main
+
+import (
+	"github.com/archine/gin-plus/plugin"
+	"github.com/gin-gonic/gin"
+	"github.com/archine/gin-plus/mvc"
+	_ "hj-common-test/gintest/controller"
+	"log"
+)
+
+func main() {
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
+	plugin.InitLog("debug") // 配置日志级别
+	engine.Use(plugin.LogMiddleware()) // 加入插件
+
+	if err := engine.Run(":8080"); err != nil {
+		log.Fatalf(err.Error())
+	}
+}
+```
+## 五、拓展
 
 ### gin参数校验
 
