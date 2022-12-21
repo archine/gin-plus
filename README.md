@@ -1,6 +1,7 @@
 ![](https://img.shields.io/badge/version-v1.0.3-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
-> 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构。IoC的具体使用请参考文档: [点击跳转](https://github.com/archine/ioc)
+> 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构。IoC的具体使用请参考文档: [点击跳转](https://github.com/archine/ioc)。
+> 在使用过程中，建议搭配 Goland 中的 IoCer 插件使用，可以帮你少些一些重复代码，[插件地址](https://plugins.jetbrains.com/plugin/20652-iocer)
 
 ## 一、前言
 
@@ -288,7 +289,7 @@ func (t *TestController) hello(ctx *gin.Context) {
 ```
 ### 7、搭配依赖注入
 
-这里为了方便，依赖的属性直接和 controller 定义在一个文件里，依赖注入不熟悉用法的话前往: [IOC文档](http://gitlab.avatarworks.com/servers/component/hj-ioc)
+这里为了方便，依赖的属性直接和 controller 定义在一个文件里，依赖注入不熟悉用法的话前往: [IOC文档](https://github.com/archine/ioc)
 
 ```go
 package controller
