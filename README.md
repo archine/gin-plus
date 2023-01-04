@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v1.0.3-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v1.0.4-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin框架基础包，集成了IOC 和 MVC，默认提供了一些插件，统一返回结构。IoC的具体使用请参考文档: [点击跳转](https://github.com/archine/ioc)。
 > 在使用过程中，建议搭配 Goland 中的 IoCer 插件使用，可以帮你少些一些重复代码，[插件地址](https://plugins.jetbrains.com/plugin/20652-iocer)
@@ -10,14 +10,14 @@
 - Get
 
 ```shell
-go get github.com/archine/gin-plus@v1.0.3
+go get github.com/archine/gin-plus@v1.0.4
 ```
 
 - Mod
 
 ```shell
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus v1.0.3
+github.com/archine/gin-plus v1.0.4
 # 命令行在该项目目录下执行
 go mod tidy
 ```

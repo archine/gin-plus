@@ -204,6 +204,9 @@ func getValidMsg(err error, obj interface{}) string {
 	if errs, ok := err.(validator.ValidationErrors); ok {
 		log.Error(err)
 		getObj := reflect.TypeOf(obj)
+		if getObj.Kind() == reflect.Ptr {
+			getObj = getObj.Elem()
+		}
 		for _, e := range errs {
 			if f, exist := getObj.FieldByName(e.Field()); exist {
 				message := f.Tag.Get(e.Tag() + "Msg")
