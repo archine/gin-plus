@@ -1,9 +1,9 @@
-module github.com/archine/gin-plus
+module github.com/archine/gin-plus/v2
 
 go 1.18
 
 require (
-	github.com/archine/ioc v1.0.0
+	github.com/archine/ioc v1.0.1
 	github.com/gin-gonic/gin v1.8.1
 	github.com/sirupsen/logrus v1.9.0
 )

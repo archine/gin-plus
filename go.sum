@@ -1,5 +1,5 @@
-github.com/archine/ioc v1.0.0 h1:UZJiMcNImwNySyDGeHNr7IQ2V8l9oCornrFyCrkit2M=
-github.com/archine/ioc v1.0.0/go.mod h1:VTtX1hL4nkWJrvc6QbqXaOLLSnk3P0KTWh71nwRpJHM=
+github.com/archine/ioc v1.0.1 h1:YHMAo/WSjQ+e2XU7PA7XAhOnNBQiZ0+yM/cAhdT1EUU=
+github.com/archine/ioc v1.0.1/go.mod h1:VTtX1hL4nkWJrvc6QbqXaOLLSnk3P0KTWh71nwRpJHM=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

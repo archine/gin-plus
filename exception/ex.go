@@ -1,4 +1,4 @@
-package plugin
+package exception
 
 import (
 	"github.com/archine/gin-plus/v2/resp"
@@ -20,4 +20,11 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 		}
 	}()
 	context.Next()
+}
+
+// OrThrow if err not nil, panic
+func OrThrow(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
