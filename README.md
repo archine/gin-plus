@@ -24,8 +24,7 @@ go mod tidy
 - **（1）Goland运行**
 
 运行前，需要做如下配置
-![](https://img-blog.csdnimg.cn/cda984ba4c93467d906de2c3c11fda71.gif)
-
+![output](https://user-images.githubusercontent.com/35919643/212001335-2687b71b-cb02-4820-8864-ffc5e3e92943.gif)
 
 - **（2）其他方式运行**
 
