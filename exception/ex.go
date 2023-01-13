@@ -5,13 +5,21 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"runtime"
 )
+
+func printStack() {
+	var buf [4096]byte
+	n := runtime.Stack(buf[:], false)
+	log.Errorf("[painc] %s\n", string(buf[:n]))
+}
 
 // GlobalExceptionInterceptor Global exception interceptor
 func GlobalExceptionInterceptor(context *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			if s, ok := r.(error); ok {
+				printStack()
 				resp.SeverError(context, s)
 				return
 			}
