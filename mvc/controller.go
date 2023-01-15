@@ -45,6 +45,9 @@ func Register(controller abstractController) {
 // @param globalFunc: global api func, the highest priority
 // @param controllerDir: controller file directory
 func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, globalFunc ...gin.HandlerFunc) {
+	if len(apiInfo) == 0 {
+		panic("invalid api info...")
+	}
 	ginProxy := reflect.ValueOf(e)
 	for _, controller := range controllerCache {
 		if autowired {
@@ -55,7 +58,8 @@ func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, 
 		controllerProxy := reflect.ValueOf(controller)
 		for i := 0; i < controllerTypeOf.NumMethod(); i++ {
 			methodProxy := controllerTypeOf.Method(i)
-			if info, ok := apiInfo[methodProxy.Name]; ok {
+			methodFullName := controllerTypeOf.Elem().Name() + "/" + methodProxy.Name
+			if info, ok := apiInfo[methodFullName]; ok {
 				controllerFuncs := controller.CallBefore(methodProxy.Name)
 				for _, methodInfo := range info {
 					ginMethod := ginProxy.MethodByName(methodInfo.Method)
@@ -76,9 +80,13 @@ func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, 
 					args = append(args, controllerProxy.MethodByName(methodProxy.Name))
 					ginMethod.Call(args)
 				}
-				delete(apiInfo, methodProxy.Name)
+				delete(apiInfo, methodFullName)
 			}
 		}
+		if len(controllerCache) == 1 {
+			controllerCache = nil
+			return
+		}
+		controllerCache = controllerCache[1:]
 	}
-	controllerCache = nil
 }

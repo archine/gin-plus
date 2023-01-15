@@ -6,7 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,29 +20,34 @@ type MethodInfo struct {
 	GlobalFunc bool   // Whether load global func
 }
 
-func Parse(dir string) {
-	p, err := filepath.Abs(dir)
-	if err != nil {
-		panic(err)
+// Parse parse apis in multiple paths
+func Parse(dirs ...string) {
+	if dirs == nil {
+		dirs = append(dirs, "controller")
 	}
-	info := parseApiInfo(p)
-	tmpl, err := template.New("api").Parse(AstTempStr)
-	exception.OrThrow(err)
-	f, _ := os.Create("base/template.go")
-	exception.OrThrow(tmpl.Execute(f, info))
+	var info map[string][]*MethodInfo
+	for i, dir := range dirs {
+		absPath, err := filepath.Abs(dir)
+		exception.OrThrow(err)
+		info = parseApiInfo(absPath)
+		if i == 0 {
+			process("base/template.go", AstTempStr, info)
+		} else {
+			AstTempStr = strings.Replace(AstTempStr, "Ast", fmt.Sprintf("Ast%d", i), 1)
+			process(fmt.Sprintf("base/template%d.go", i), AstTempStr, info)
+		}
+	}
 }
 
 func parseApiInfo(dir string) map[string][]*MethodInfo {
-	pkgs, err := parser.ParseDir(token.NewFileSet(), dir, func(info fs.FileInfo) bool {
-		return !info.IsDir()
-	}, parser.ParseComments)
+	pkgs, err := parser.ParseDir(token.NewFileSet(), dir, nil, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
 	data := make(map[string][]*MethodInfo)
 	prefix := ""
 	for _, v := range pkgs {
-		for _, file := range v.Files {
+		for fileName, file := range v.Files {
 			prefix = ""
 			for _, decl := range file.Decls {
 				switch t := decl.(type) {
@@ -55,52 +60,81 @@ func parseApiInfo(dir string) map[string][]*MethodInfo {
 						if strings.HasPrefix(comment.Text, "@BasePath") {
 							prefix = comment.Text[10:strings.LastIndex(comment.Text, ")")]
 							prefix = strings.ReplaceAll(prefix, "\"", "")
+							if !strings.HasPrefix(prefix, "/") {
+								prefix = "/" + prefix
+							}
 							break
 						}
 						continue
 					}
 				case *ast.FuncDecl:
-					if t.Doc == nil || t.Name.Name == "CallBefore" || t.Name.Name == "PostConstruct" {
+					if t.Doc == nil || len(t.Recv.List) == 0 || t.Name.Name == "PostConstruct" || t.Name.Name == "CallBefore" {
 						continue
 					}
-					if _, ok := data[t.Name.Name]; ok {
-						panic("Duplicate method name: " + t.Name.Name)
+					var parent string // Which controller does it belong to
+					for _, f := range t.Recv.List {
+						switch ft := f.Type.(type) {
+						case *ast.StarExpr:
+							parent = ft.X.(*ast.Ident).Name
+						}
 					}
 					var methods []*MethodInfo
 					for _, comment := range t.Doc.List {
 						comment.Text = removePrefix(comment.Text)
-						if strings.HasPrefix(comment.Text, "@") {
+						if strings.HasPrefix(comment.Text, "@POST") ||
+							strings.HasPrefix(comment.Text, "@GET") ||
+							strings.HasPrefix(comment.Text, "@DELETE") ||
+							strings.HasPrefix(comment.Text, "@PUT") ||
+							strings.HasPrefix(comment.Text, "@PATCH") ||
+							strings.HasPrefix(comment.Text, "@OPTIONS") ||
+							strings.HasPrefix(comment.Text, "@HEAD") {
+
+							startIndex := strings.Index(comment.Text, "(")
+							endIndex := strings.Index(comment.Text, ")")
+							if startIndex == -1 || endIndex == -1 {
+								log.Fatalf("[%s] %s: invalid api definition, example: @GET(path=\"/test\", globalFunc=true)", fileName, t.Name.Name)
+							}
 							m := &MethodInfo{
 								Method:     comment.Text[1:strings.Index(comment.Text, "(")],
 								GlobalFunc: true,
 							}
-							comment.Text = comment.Text[strings.Index(comment.Text, "(")+1 : strings.Index(comment.Text, ")")]
+
+							comment.Text = comment.Text[startIndex+1 : endIndex]
 							arr := strings.Split(comment.Text, ",")
-							for _, s := range arr {
-								if strings.HasPrefix(s, "path=") {
-									m.ApiPath = path.Join(prefix, strings.ReplaceAll(s[5:], "\"", ""))
-									continue
-								}
-								if strings.HasPrefix(s, "globalFunc=") {
-									globalFunc := s[11:]
+							if strings.HasPrefix(arr[0], "path=") {
+								m.ApiPath = path.Join(prefix, strings.ReplaceAll(arr[0][5:], "\"", ""))
+							} else {
+								log.Fatalf("[%s] %s invalid path parameter. Must start with path=", fileName, t.Name.Name)
+							}
+							if len(arr) > 1 {
+								if strings.HasPrefix(arr[1], "globalFunc=") {
+									globalFunc := arr[1][11:]
 									if globalFunc == "true" {
 										m.GlobalFunc = true
 									} else if globalFunc == "false" {
 										m.GlobalFunc = false
 									} else {
-										panic(fmt.Sprintf("globalFunc accepts values of true or false: %s", t.Name.Name))
+										log.Fatalf("[%s] %s invalid global func value, accept only true or false", fileName, t.Name.Name)
 									}
 								}
 							}
 							methods = append(methods, m)
 						}
 					}
-					data[t.Name.Name] = methods
+					data[parent+"/"+t.Name.Name] = methods
 				}
 			}
 		}
 	}
 	return data
+}
+
+func process(fileName, astTemplate string, apiInfo map[string][]*MethodInfo) {
+	tmpl, err := template.New("api").Parse(astTemplate)
+	f, err := os.Create(fileName)
+	defer f.Close()
+	exception.OrThrow(err)
+	exception.OrThrow(tmpl.Execute(f, apiInfo))
 }
 
 func removePrefix(text string) string {
