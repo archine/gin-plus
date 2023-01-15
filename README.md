@@ -3,6 +3,7 @@
 > 📢📢📢 Gin增强版，集成了IOC、MVC设计思想，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
 ## 一、前言
+如果访问 github 网络不是很好，建议前往在线文档：[在线文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
 ### 1、安装
 
 - Get
@@ -355,7 +356,7 @@ func (t *TestController) PostConstruct() {
 }
 ```
 ### 7、全局异常捕获
-在开发中，处理 **error **是个让人头大的问题，很多开发者都是通过一层层的 return，这其实代码很不美观，这里我们提供了全局异常捕获，会对 API 整个调用链进行异常捕获。这时，在碰到 **error **时，可直接采用 panic 的方式，框架中提供了 exception.OrThrow(err)来进行 err 不为 nil 时抛出，💡 如果安装了 IoCer 插件，可输入 **thr** 进行快速生成。下面为应用的例子
+在开发中，处理 **error** 是个让人头大的问题，很多开发者都是通过一层层的 return，这其实代码很不美观，这里我们提供了全局异常捕获，会对 API 整个调用链进行异常捕获。这时，在碰到 **error**时，可直接采用 panic 的方式，框架中提供了 exception.OrThrow(err)来进行 err 不为 nil 时抛出，💡 如果安装了 IoCer 插件，可输入 **thr** 进行快速生成。下面为应用的例子
 
 ```go
 package main
@@ -498,7 +499,7 @@ func (t *TestController) Hello(ctx *gin.Context) {
 ```
 ### 3、参数校验
 对结构体参数进行绑定校验。当我们有多个条件时，我们可以为每个条件单独定义错误信息，格式为条件+Msg，例如：minMsg ，如果未找到，则取 msg，如果也未找到，会使用参数校验默认的 英文信息。项目中通过
-`resp.ParamValid()`调用
+`resp.ParamValid()`调用。更多参数校验的关键字， [请参考](https://pkg.go.dev/github.com/go-playground/validator)
 
 ```go
 package controller
@@ -582,9 +583,3 @@ func (t *TestController) Hello(ctx *gin.Context) {
 
 
 **框架使用Demo地址**：[点击前往](https://github.com/archine/gin-plus-demo)
-
-## 拓展
-
-### gin参数校验
-
-看了下网上，这篇文章介绍的比较详细，可以参考: [🔖点击前往](https://blog.csdn.net/IT_DREAM_ER/article/details/106649622)
