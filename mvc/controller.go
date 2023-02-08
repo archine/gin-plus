@@ -4,6 +4,7 @@ import (
 	"github.com/archine/gin-plus/v2/ast"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 )
 
@@ -46,7 +47,7 @@ func Register(controller abstractController) {
 // @param controllerDir: controller file directory
 func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, globalFunc ...gin.HandlerFunc) {
 	if len(apiInfo) == 0 {
-		panic("invalid api info...")
+		log.Warn("no available api found")
 	}
 	ginProxy := reflect.ValueOf(e)
 	for _, controller := range controllerCache {
