@@ -41,9 +41,7 @@ func Parse(dirs ...string) {
 
 func parseApiInfo(dir string) map[string][]*MethodInfo {
 	pkgs, err := parser.ParseDir(token.NewFileSet(), dir, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
-	}
+	exception.OrThrow(err)
 	data := make(map[string][]*MethodInfo)
 	prefix := ""
 	for _, v := range pkgs {
@@ -89,6 +87,9 @@ func parseApiInfo(dir string) map[string][]*MethodInfo {
 							strings.HasPrefix(comment.Text, "@OPTIONS") ||
 							strings.HasPrefix(comment.Text, "@HEAD") {
 
+							if rune(t.Name.Name[0]) > 90 {
+								log.Fatalf("[%s] %s: invalid api function name. name first word must be uppercase", fileName, t.Name.Name)
+							}
 							startIndex := strings.Index(comment.Text, "(")
 							endIndex := strings.Index(comment.Text, ")")
 							if startIndex == -1 || endIndex == -1 {
@@ -121,7 +122,9 @@ func parseApiInfo(dir string) map[string][]*MethodInfo {
 							methods = append(methods, m)
 						}
 					}
-					data[parent+"/"+t.Name.Name] = methods
+					if methods != nil {
+						data[parent+"/"+t.Name.Name] = methods
+					}
 				}
 			}
 		}
