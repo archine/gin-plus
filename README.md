@@ -21,9 +21,10 @@ go mod tidy
 ```
 - 安装 ast 解析工具
 ```shell
+# 可将 latest 指定为具体版本
 go install github.com/archine/gin-plus/v2/ast/mvc@latest
 ```
->  v2.0.5 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
+>  v2.1.0 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
 
 使用时可以直接在命令行执行
 ```
@@ -67,7 +68,7 @@ func main() {
 | @OPTIONS(path="/hello") | Options 请求 | 暂无 |
 | @BasePath("/hello") | 基础路径 | 空白处输入 basep |
 
-> ❗ v2.0.5 版本开始 API 定义移除了 GlobalFunc 参数
+> ❗ v2.1.0 版本开始 API 定义移除了 GlobalFunc 参数
 ### 1、快速开始
 
 - controller接口
@@ -91,7 +92,7 @@ func (t *TestController) Hello(ctx *gin.Context) {
 	resp.Ok(ctx)
 }
 ```
-> ❗ v2.0.5 版本开始不需要手动在每个 Controller 中通过 init() 方法注册
+> ❗ v2.1.0 版本开始不需要手动在每个 Controller 中通过 init() 方法注册
 
 - 启动类
 ```go
