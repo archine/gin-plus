@@ -162,16 +162,16 @@ func recordProjectControllerAndApi(controllerNames []string, controllerAbs, pkg 
 	newFile := jen.NewFile(pkg)
 	newFile.HeaderComment("// ⚠️⛔ Auto generate code by hj-gin, Do not edit!!!")
 	newFile.HeaderComment("// All controller information and Api information for the current project is recorded here\n")
-	newFile.ImportName("github.com/archine/gin-plus//hj-gin/v2/mvc", "mvc")
-	newFile.ImportName("github.com/archine/gin-plus//hj-gin/v2/ast", "ast")
+	newFile.ImportName("github.com/archine/gin-plus/v2/mvc", "mvc")
+	newFile.ImportName("github.com/archine/gin-plus/v2/ast", "ast")
 	var registerCode []jen.Code
 	for _, controllerName := range controllerNames {
 		registerCode = append(registerCode, jen.Id(fmt.Sprintf("&%s{}", controllerName)))
 	}
 	newFile.Func().Id("init").Params().Block(
-		jen.Qual("github.com/archine/gin-plus//hj-gin/v2/mvc", "Register").Call(registerCode...),
-		jen.Qual("github.com/archine/gin-plus//hj-gin/v2/ast", "Apis").Op("=").Map(jen.String()).Index().Op("*").
-			Qual("github.com/archine/gin-plus//hj-gin/v2/ast", "MethodInfo").
+		jen.Qual("github.com/archine/gin-plus/v2/mvc", "Register").Call(registerCode...),
+		jen.Qual("github.com/archine/gin-plus/v2/ast", "Apis").Op("=").Map(jen.String()).Index().Op("*").
+			Qual("github.com/archine/gin-plus/v2/ast", "MethodInfo").
 			Values(jen.DictFunc(func(dict jen.Dict) {
 				for k, methodInfos := range apiCache {
 					dict[jen.Lit(k)] = jen.BlockFunc(func(group *jen.Group) {

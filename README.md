@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v2.0.5-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v2.0.7-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v2@v2.0.5
+go get github.com/archine/gin-plus/v2@v2.0.7
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v2 v2.0.5
+github.com/archine/gin-plus/v2 v2.0.7
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -36,7 +36,8 @@ mvc <scan dir>
 func main() {
     application.Default().Run()
 }
-```
+```    
+
 执行结束后，会在对应的扫描目录生成 controller_init.go 文件，请勿编辑 ❌，如果目录下的 API 定义发生了更改，如更换了 请求路径，请求方式等，一定要重新执行哦
 
 ### 2、🌱🌱运行前要做的事
