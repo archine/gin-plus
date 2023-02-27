@@ -3,7 +3,6 @@ module github.com/archine/gin-plus/v2
 go 1.18
 
 require (
-	github.com/archine/gin-plus/v2 v2.0.5
 	github.com/archine/ioc v1.0.1
 	github.com/dave/dst v0.27.2
 	github.com/dave/jennifer v1.6.0
