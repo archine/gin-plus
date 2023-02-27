@@ -24,7 +24,7 @@ go mod tidy
 # 可将 latest 指定为具体版本
 go install github.com/archine/gin-plus/v2/ast/mvc@latest
 ```
->  v2.1.0 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
+>  ❗ v2.1.0 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
 
 使用时可以直接在命令行执行
 ```
@@ -41,19 +41,13 @@ func main() {
 
 执行结束后，会在对应的扫描目录生成 controller_init.go 文件，请勿编辑 ❌，如果目录下的 API 定义发生了更改，如更换了 请求路径，请求方式等，一定要重新执行哦
 
-### 2、🌱🌱运行前要做的事
+### 2、🎁小技巧
 
-> 💡 首先需要安装上一步提到的 Ast 工具，无论是本机还是以后部署的服务器
+使用 Goland 进行开发时，可以按照下方的教程配置一下，就不需要每次修改了 API，都手动执行 ``go generate ``     
 
-- **（1）Goland运行**
-
-启动类加上``generate``语句（安装了 iocer 插件，输入 ``gg``可快速生成），可做如下配置，每次启动时，IDE 会自动帮我们调用``go generate``
 ![generate](https://user-images.githubusercontent.com/35919643/221461839-eea974bd-72f1-474c-b72a-3dccd55b797b.gif)
-
-- **（2）其他方式运行**
-
-在执行 ``go build`` 前，先执行 ``go generate``（项目中加入了 generate 语句） 或者命令行执行 ``mvc``
-
+      
+      
 ## 二、项目使用
 本框架声明 API 的方式非常简单，只需在方法的注释中通过如下方式进行声明即可，启动时会自动应用，**需要注意的是，API函数名必须大写**
 
