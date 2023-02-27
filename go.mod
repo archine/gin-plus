@@ -1,4 +1,4 @@
-module gin-plus
+module github.com/archine/gin-plus/v2
 
 go 1.18
 
