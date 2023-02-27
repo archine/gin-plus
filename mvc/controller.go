@@ -5,6 +5,7 @@ import (
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"net/http"
 	"reflect"
 )
 
@@ -16,37 +17,33 @@ var controllerCache []abstractController
 type abstractController interface {
 	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here
 	PostConstruct()
-
-	// CallBefore local function, scoped to the current controller, fired before calling the API
-	// @funcName API func name
-	CallBefore(funcName string) []gin.HandlerFunc
 }
 
 // Controller Declares the structure to be a controller
 // you can add api methods to it
-type Controller struct {
+type Controller struct{}
+
+func (c *Controller) PostConstruct() {}
+
+// Register controllers
+func Register(controller ...abstractController) {
+	controllerCache = append(controllerCache, controller...)
 }
 
-func (c *Controller) PostConstruct() {
-
-}
-
-func (c *Controller) CallBefore(funcName string) []gin.HandlerFunc {
-	return nil
-}
-
-// Register controller
-func Register(controller abstractController) {
-	controllerCache = append(controllerCache, controller)
+// IsController Determine whether it is controller
+func IsController(v interface{}) bool {
+	ct := reflect.TypeOf(v)
+	if ct.Kind() != reflect.Ptr {
+		return false
+	}
+	return ct.Implements(reflect.TypeOf((*abstractController)(nil)).Elem())
 }
 
 // Apply all apis to the gin engine
 // @param e: gin.Engine
 // @param autowired: whether enable autowired properties
-// @param globalFunc: global api func, the highest priority
-// @param controllerDir: controller file directory
-func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, globalFunc ...gin.HandlerFunc) {
-	if len(apiInfo) == 0 {
+func Apply(e *gin.Engine, autowired bool) {
+	if len(ast.Apis) == 0 {
 		log.Warn("no available api found")
 	}
 	ginProxy := reflect.ValueOf(e)
@@ -60,28 +57,14 @@ func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, 
 		for i := 0; i < controllerTypeOf.NumMethod(); i++ {
 			methodProxy := controllerTypeOf.Method(i)
 			methodFullName := controllerTypeOf.Elem().Name() + "/" + methodProxy.Name
-			if info, ok := apiInfo[methodFullName]; ok {
-				controllerFuncs := controller.CallBefore(methodProxy.Name)
+			if info, ok := ast.Apis[methodFullName]; ok {
 				for _, methodInfo := range info {
 					ginMethod := ginProxy.MethodByName(methodInfo.Method)
-					if !ginMethod.IsValid() {
-						panic("invalid gin method: " + methodInfo.Method)
-					}
 					args := []reflect.Value{reflect.ValueOf(methodInfo.ApiPath)}
-					if methodInfo.GlobalFunc {
-						for _, handlerFunc := range globalFunc {
-							args = append(args, reflect.ValueOf(handlerFunc))
-						}
-					}
-					if controllerFuncs != nil {
-						for _, handlerFunc := range controllerFuncs {
-							args = append(args, reflect.ValueOf(handlerFunc))
-						}
-					}
 					args = append(args, controllerProxy.MethodByName(methodProxy.Name))
 					ginMethod.Call(args)
 				}
-				delete(apiInfo, methodFullName)
+				delete(ast.Apis, methodFullName)
 			}
 		}
 		if len(controllerCache) == 1 {
@@ -90,4 +73,19 @@ func Apply(e *gin.Engine, autowired bool, apiInfo map[string][]*ast.MethodInfo, 
 		}
 		controllerCache = controllerCache[1:]
 	}
+}
+
+// MethodInterceptor API method interceptor.
+// You can do logical processing before and after method calls
+type MethodInterceptor interface {
+	// Predicate true means intercept
+	Predicate(request *http.Request) bool
+
+	// PreHandle triggered before method invocation.
+	// if you want to abort the current request, just call abort() and response inside the method
+	PreHandle(ctx *gin.Context)
+
+	// PostHandle triggered after method invocation.
+	// if you want to abort the current request, just call abort() and response inside the method
+	PostHandle(ctx *gin.Context)
 }

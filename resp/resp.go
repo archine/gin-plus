@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// 响应请求结果
+// Respond to the client assistant and return quickly
 
 const (
 	Success             = 0
@@ -35,31 +35,31 @@ var CodeMsgMap = map[int]string{
 }
 
 type Resp interface {
-	// WithMessage 设置错误信息
+	// WithMessage set the business message
 	WithMessage(message string) Resp
-	// WithCode 设置业务状态码
+	// WithCode set the business status code
 	WithCode(code int) Resp
-	// WithData 设置返回数据
+	// WithData set the response data
 	WithData(data interface{}) Resp
-	// To 返回
+	// To response client
 	To()
 }
 
-// PaginationResult  分页结果
+// PaginationResult  Paging result
 type PaginationResult struct {
-	Total     int64       `json:"total"`      // 总条数
-	PageSize  int         `json:"page_size"`  // 页大小
-	PageIndex int         `json:"page_index"` // 页索引
-	Data      interface{} `json:"data"`       // 数据
+	Total     int64       `json:"total"`      // Total count
+	PageSize  int         `json:"page_size"`  // Page size
+	PageIndex int         `json:"page_index"` // Current page index
+	Data      interface{} `json:"data"`       // Response data
 }
 
-// Result 返回结果
+// Result Return result
 type Result struct {
 	ctx      *gin.Context `json:"-"`
-	httpCode int          `json:"-"`             // http状态码
-	Code     int          `json:"err_code"`      // 业务状态码,业务自己定
-	Message  string       `json:"err_msg"`       // 业务提示信息
-	Data     interface{}  `json:"ret,omitempty"` // 响应数据
+	httpCode int          `json:"-"`             // http code
+	Code     int          `json:"err_code"`      // business code
+	Message  string       `json:"err_msg"`       // business message
+	Data     interface{}  `json:"ret,omitempty"` // Response data
 }
 
 func (r *Result) WithMessage(message string) Resp {
@@ -82,7 +82,7 @@ func (r *Result) To() {
 	r.ctx.JSON(r.httpCode, r)
 }
 
-// InitResp 初始化一个错误结构
+// InitResp initialize a custom structure
 func InitResp(ctx *gin.Context, httpCode int) *Result {
 	return &Result{
 		ctx:      ctx,
@@ -92,8 +92,8 @@ func InitResp(ctx *gin.Context, httpCode int) *Result {
 	}
 }
 
-// BadRequest 错误请求
-// 返回true表明停止继续向下执行
+// BadRequest business-related error returned.
+// true means that flag is satisfied
 func BadRequest(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[BadRequestError]
@@ -105,7 +105,8 @@ func BadRequest(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// DataExists 数据已存在
+// DataExists the data already exists, which is usually used when adding data.
+// true means that flag is satisfied
 func DataExists(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[DataExistsError]
@@ -117,7 +118,8 @@ func DataExists(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// ParamInvalid 参数无效
+// ParamInvalid parameter check type error.
+// true means that flag is satisfied
 func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[ParamValidError]
@@ -129,8 +131,8 @@ func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// ParamValid 结构体参数校验
-// 返回true表明 err 真实存在
+// ParamValid structure parameter validation type error.
+// true means that flag is satisfied
 func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 	if err == nil {
 		return false
@@ -139,8 +141,8 @@ func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 	return true
 }
 
-// NoPermission 无权限
-// 返回true表明 err 真实存在
+// NoPermission Insufficient permission error.
+// true means that flag is satisfied
 func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[NoPermissionError]
@@ -152,7 +154,8 @@ func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// NoLogin 当前未登录
+// NoLogin Not logged in.
+// true means that flag is satisfied
 func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[NoneLoginError]
@@ -164,7 +167,8 @@ func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// LoginExpired 登录过期
+// LoginExpired Login expired
+// true means that flag is satisfied
 func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
 		message := CodeMsgMap[TokenExpired]
@@ -176,17 +180,17 @@ func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// Ok 正常请求返回
+// Ok Normal request returned, no data
 func Ok(ctx *gin.Context) {
 	InitResp(ctx, http.StatusOK).WithCode(0).To()
 }
 
-// Json 正常请求返回Json数据
+// Json Normal request returned with data
 func Json(ctx *gin.Context, data interface{}) {
 	InitResp(ctx, http.StatusOK).WithCode(0).WithData(data).To()
 }
 
-// SeverError 服务器级别异常返回
+// SeverError Server level exception
 func SeverError(ctx *gin.Context, err error) bool {
 	if err == nil {
 		return false
@@ -196,7 +200,6 @@ func SeverError(ctx *gin.Context, err error) bool {
 	return true
 }
 
-// 获取校验错误信息
 func getValidMsg(err error, obj interface{}) string {
 	if obj == nil {
 		return err.Error()

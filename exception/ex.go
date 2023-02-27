@@ -9,12 +9,13 @@ import (
 )
 
 func printStack() {
-	var buf [4096]byte
+	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
 	log.Errorf("[painc] %s\n", string(buf[:n]))
 }
 
-// GlobalExceptionInterceptor Global exception interceptor
+// GlobalExceptionInterceptor gin global exception interceptor
+// Added via gin middleware
 func GlobalExceptionInterceptor(context *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {

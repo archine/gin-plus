@@ -1,6 +1,6 @@
-![](https://img.shields.io/badge/version-v2.0.4-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v2.0.5-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
-> 📢📢📢 Gin增强版，集成了IOC、MVC设计思想，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
+> 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
 ## 一、前言
 如果访问 github 网络不是很好，建议前往在线文档：[在线文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
@@ -8,56 +8,65 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v2@v2.0.4
+go get github.com/archine/gin-plus/v2@v2.0.5
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v2 v2.0.4
+github.com/archine/gin-plus/v2 v2.0.5
 
 # 命令行在该项目目录下执行
 go mod tidy
 ```
+- 安装 ast 解析工具
+```shell
+go install github.com/archine/gin-plus/v2/ast/mvc@latest
+```
+>  v2.0.5 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
 
-### 2、🌱🌱运行前置条件
+使用时可以直接在命令行执行
+```
+# 参数非必填，默认解析当前命令执行所在目录中的 controller 目录下的所有 go 文件
+mvc <scan dir>
+```
+也可通过在启动类上加上注释，这时候就可以通过 go generate来执行
+```
+//go:generate mvc <scan dir>
+func main() {
+    application.Default().Run()
+}
+```
+执行结束后，会在对应的扫描目录生成 controller_init.go 文件，请勿编辑 ❌，如果目录下的 API 定义发生了更改，如更换了 请求路径，请求方式等，一定要重新执行哦
+
+### 2、🌱🌱运行前要做的事
+
+> 💡 首先需要安装上一步提到的 Ast 工具，无论是本机还是以后部署的服务器
 
 - **（1）Goland运行**
 
-运行前，需要做如下配置
-![output](https://user-images.githubusercontent.com/35919643/212001335-2687b71b-cb02-4820-8864-ffc5e3e92943.gif)
+启动类加上``generate``语句（安装了 iocer 插件，输入 ``gg``可快速生成），可做如下配置，每次启动时，IDE 会自动帮我们调用``go generate``
+![generate](https://user-images.githubusercontent.com/35919643/221461839-eea974bd-72f1-474c-b72a-3dccd55b797b.gif)
 
 - **（2）其他方式运行**
 
-在执行 `go build` 前，必须先执行 `go generate`
+在执行 ``go build`` 前，先执行 ``go generate``（项目中加入了 generate 语句） 或者命令行执行 ``mvc``
 
-- **（3）项目结构**
-
-项目需要存在 base 目录，同时目录中需要存在 template.go 文件，文件初始化内容为
-```go
-package base
-
-// 自动生成,请不要编辑
-
-import "github.com/archine/gin-plus/v2/ast"
-
-var Ast = map[string][]*ast.MethodInfo{}
-```
 ## 二、项目使用
 本框架声明 API 的方式非常简单，只需在方法的注释中通过如下方式进行声明即可，启动时会自动应用，**需要注意的是，API函数名必须大写**
 
 | 定义方式🍑 | 描述🍎 | 快捷键🍓 |
 | --- | --- | --- |
-| @GET(path="/hello", globalFunc=true) | Get 请求 | 空白处输入 get |
-| @POST(path="/hello", globalFunc=true) | Post 请求 | 空白处输入 post |
-| @DELETE(path="/hello", globalFunc=true) | Delete 请求 | 空白处输入 del |
-| @PUT(path="/hello", globalFunc=true) | Put 请求 | 空白处输入 put |
-| @PATCH(path="/hello", globalFunc=true) | Patch 请求 | 暂无 |
-| @HEAD(path="/hello", globalFunc=true) | Head 请求 | 暂无 |
-| @OPTIONS(path="/hello", globalFunc=true) | Options 请求 | 暂无 |
+| @GET(path="/hello") | Get 请求 | 空白处输入 get |
+| @POST(path="/hello") | Post 请求 | 空白处输入 post |
+| @DELETE(path="/hello") | Delete 请求 | 空白处输入 del |
+| @PUT(path="/hello") | Put 请求 | 空白处输入 put |
+| @PATCH(path="/hello") | Patch 请求 | 暂无 |
+| @HEAD(path="/hello") | Head 请求 | 暂无 |
+| @OPTIONS(path="/hello") | Options 请求 | 暂无 |
 | @BasePath("/hello") | 基础路径 | 空白处输入 basep |
 
-其中 `globalFunc`参数为当前 API 是否需要应用全局函数，`true` 表示应用，`false` 表示不应用。
+> ❗ v2.0.5 版本开始 API 定义移除了 GlobalFunc 参数
 ### 1、快速开始
 
 - controller接口
@@ -65,54 +74,36 @@ var Ast = map[string][]*ast.MethodInfo{}
 package controller
 
 import (
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/resp"
+	"github.com/gin-gonic/gin"
+	"github.com/archine/gin-plus/v2/mvc"
+	"github.com/archine/gin-plus/v2/resp"
 )
 
 type TestController struct {
-    // 声明该结构体为控制器
-    mvc.Controller
-}
-
-func init() {
-    // 注册当前控制器到 MVC
-    mvc.Register(&TestController{})
+	// 声明该结构体为控制器
+	mvc.Controller
 }
 
 // Hello
-// @GET(path="/hello", globalFunc=true) 定义的 get 方法
+// @GET(path="/hello") 定义的 get 方法
 func (t *TestController) Hello(ctx *gin.Context) {
-    resp.Ok(ctx)
+	resp.Ok(ctx)
 }
 ```
+> ❗ v2.0.5 版本开始不需要手动在每个 Controller 中通过 init() 方法注册
 
 - 启动类
 ```go
 package main
 
 import (
-    _ "gin-plus-demo/controller"
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/ast"
-    "github.com/archine/gin-plus/v2/mvc"
-    "log"
-    "os"
+	_ "gin-plus-demo/controller"
+	"github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate go run main.go ast
+//go:generate mvc
 func main() {
-    if len(os.Args) > 1 && os.Args[1] == "ast" {
-         ast.Parse("controller") // 接口所在的目录,不填默认为controller，可多个
-         return
-    }
-    gin.SetMode(gin.ReleaseMode)
-    engine := gin.New()
-    // 将 gin 的引擎加入到 mvc 中，第二个参数为依赖注入的开关
-    mvc.Apply(engine, true, base.Ast)
-    if err := engine.Run(":4006"); err != nil {
-        log.Fatalf(err.Error())
-    }
+	application.Default().Run()
 }
 ```
 
@@ -121,30 +112,26 @@ func main() {
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/27837bfb5714484eac33932392929d7e.png)
 
 ### 2、方法路径前缀
-很多时候，我们需要对整个 Controller 里的所有 API 增加上固定的前缀，这时我们可在 Controller 的结构体注释中通过`@BasePath("/xxx")`来进行声明
+很多时候，我们需要对整个 Controller 里的所有 API 增加访问前缀，这时我们可在 Controller 的结构体注释中通过`@BasePath("/xxx")`来进行声明
 ```go
 package controller
 
 import (
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/resp"
+	"github.com/gin-gonic/gin"
+	"github.com/archine/gin-plus/v2/mvc"
+	"github.com/archine/gin-plus/v2/resp"
 )
 
 // TestController 增加固定路径前缀 /test
 // @BasePath("/test")
 type TestController struct {
-    mvc.Controller
-}
-
-func init() {
-    mvc.Register(&TestController{})
+	mvc.Controller
 }
 
 // Hello
-// @GET(path="/hello", globalFunc=true) 第一个接口
+// @GET(path="/hello") 第一个接口
 func (t *TestController) Hello(ctx *gin.Context) {
-    resp.Json(ctx, "hello world")
+	resp.Json(ctx, "hello world")
 }
 ```
 
@@ -153,137 +140,115 @@ func (t *TestController) Hello(ctx *gin.Context) {
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/5d84177e137f4033a7ec517e72579704.png)
 
 
-### 3、全局函数
-全局函数会生效于全部 Controller 中的所有 API，该函数会在调用具体 API 之前触发。这里我们就通过一个日志打印的函数来演示
+### 3、API 接口拦截器
+对项目 API 方法进行拦截，通过拦截器可以对访问进行逻辑化处理。如：登录校验、日志打印等等。。。。
 
 - controller
-
-这里我们定义两个 API，当我们访问时，都会打印全局函数中的日志，因为都进行了应用，第三个 API 设置为了 false，因此不会应用全局函数
 ```go
 package controller
 
 import (
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/resp"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/archine/gin-plus/v2/mvc"
 )
 
-type TestController struct {
-    mvc.Controller
+// UserController
+// @BasePath("/user")
+type UserController struct {
+	mvc.Controller
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
-// Hello
-// @GET(path="/hello", globalFunc=true) 第一个接口
-func (t *TestController) Hello(ctx *gin.Context) {
-    resp.Json(ctx, "hello world")
-}
-
-// Hello2
-// @GET(path="/hello_2", globalFunc=true) 第二个接口
-func (t *TestController) Hello2(ctx *gin.Context) {
-    resp.Ok(ctx)
-}
-
-// Hello3
-// @GET(path="/hello_3", globalFunc=false) 第三个接口，不应用全局函数
-func (t *TestController) Hello3(ctx *gin.Context) {
-    resp.Ok(ctx)
+// UserList
+// @GET(path="/list") API描述
+func (u *UserController) UserList(ctx *gin.Context) {
+	fmt.Println("正在执行API方法")
 }
 ```
+- 定义拦截器
+  需要实现 MethodInterceptor 接口
+```go
+package intercptor
 
-- 启动类
+type TestInterceptor struct {}
+
+// Predicate 过滤条件，true 表示拦截
+func (t *TestInterceptor) Predicate(request *http.Request) bool {
+    return true
+}
+
+// PreHandle 方法调用前
+func (t *TestInterceptor) PreHandle(ctx *gin.Context) {
+    // 方法中通过调用 ctx.Abort() 可中断当前客户端请求
+    // 😊 中断时记得响应给客户端哦
+    fmt.Println("前置处理器")
+}
+
+// PostHandle 访问调用后
+func (t *TestInterceptor) PostHandle(ctx *gin.Context) {
+    // 方法中通过调用 ctx.Abort() 可中断当前客户端请求
+    // 😊 中断时记得响应给客户端哦
+    fmt.Println("后置处理器")
+}
+```
+- 应用拦截器
+  只需要在启动类中添加进去即可，拦截器为可变参数，因此可以添加多个
 ```go
 package main
 
 import (
-    _ "gin-plus-demo/controller"
-    "github.com/gin-gonic/gin"
-    log "github.com/sirupsen/logrus"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/plugin"
-    "os"
+   _ "gin-plus-demo/controller"
+   "github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate go run main.go ast
+//go:generate mvc
 func main() {
-    if len(os.Args) > 1 && os.Args[1] == "ast" {
-        ast.Parse()
-        return
-    }
-    gin.SetMode(gin.ReleaseMode)
-    engine := gin.New()
-
-    // 第四个参数为可变参数，意味着你可以添加多个全局函数
-    mvc.Apply(engine, true, base.Ast, func(context *gin.Context) {
-        log.Info("我是全局函数")
-    })
-    if err := engine.Run(":4006"); err != nil {
-        log.Fatalf(err.Error())
-    }
+   application.Default().Run(&TestInterceptor{})
 }
 ```
-
 这时候，我们通过浏览器访问这三个 API，可以看到只有前两个 API 才会打印全局函数中的日志
 
-![在这里插入图片描述](https://img-blog.csdnimg.cn/7965aa43aa344b1192ce53d5bb38690a.png)
+![image](https://user-images.githubusercontent.com/35919643/221462946-92f04e47-c800-48dc-ac50-e0e261204320.png)
 
-
-### 4、局部函数
-此函数主要应用于某一个具体的 Controller，下面的例子中，定义了两个 API，这里演示只为 Hello函数增加，💡 如果安装了 IoCer 插件，可输入 **callb**进行快速生成
+### 4、依赖注入前事件
+在执行依赖注入前触发，此时项目运行环境中无任何 bean，意味着你不能在此步骤中处理任何要获取 bean 的逻辑。该事件为同步，因此 阻塞性事件需要通过新的 协程处理，否则会影响整个流程
 ```go
-package controller
+package main
 
 import (
-    "github.com/gin-gonic/gin"
-    log "github.com/sirupsen/logrus"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/resp"
+  _ "gin-plus-demo/controller"
+  "github.com/archine/gin-plus/v2/application"
 )
 
-type TestController struct {
-    mvc.Controller
-}
-
-func init() {
-    mvc.Register(&TestController{})
-}
-
-// CallBefore 前置处理
-func (t *TestController) CallBefore(funcName string) []gin.HandlerFunc {
-    if funcName == "Hello" { // 这里可通过函数名来控制具体给哪个函数增加局部函数
-        return []gin.HandlerFunc{func(context *gin.Context) {
-            log.Info("我是局部函数")
-        }}
-    }
-    return nil
-}
-
-// Hello
-// @GET(path="/hello", globalFunc=true) 第一个接口
-func (t *TestController) Hello(ctx *gin.Context) {
-    resp.Json(ctx, "hello world")
-}
-
-// Hello2
-// @GET(path="/hello_2", globalFunc=true) 第二个接口
-func (t *TestController) Hello2(ctx *gin.Context) {
-    resp.Ok(ctx)
+//go:generate mvc
+func main() {
+  application.Default().ApplyBefore(func() {
+    fmt.Println("注入前逻辑")
+  }).Run()
 }
 ```
 
-这时候通过浏览器访问这两个 API ，只有第一个 API 才会打印日志
+### 5、启动前事件
+项目运行最后一个事件， 依赖注入已执行完毕，即将启动，意味着你可以在这里执行任意逻辑。该事件为同步，因此 阻塞性事件需要通过新的 协程处理，否则会影响整个流程。 在启动类进行加入
+```go
+package main
 
-![在这里插入图片描述](https://img-blog.csdnimg.cn/4043eaa924a041439af1b3e5eaf72802.png)
+import (
+   _ "gin-plus-demo/controller"
+   "github.com/archine/gin-plus/v2/application"
+)
 
+//go:generate mvc
+func main() {
+    application.Default().StartAfter(func() {
+       fmt.Println("启动前逻辑")
+    }).Run()
+}
+```
+### 6、依赖注入
 
-### 5、依赖注入
-对结构体中的属性进行依赖注入，下面的例子中，我们为 controller 注入一个 mapper。对 **IoC** 不熟悉可前往文档查看: [👓点击前往](https://github.com/archine/ioc)
-
-- service
+对结构体中的属性进行依赖注入，下面的例子中，我们为 controller 注入一个 mapper。对 IoC 不熟悉可前往文档查看: 👓[点击前往](http://github.com/archine/ioc)
+* mapper
 ```go
 package mapper
 
@@ -292,16 +257,15 @@ import "github.com/archine/ioc"
 type TestMapper struct{}
 
 func (t *TestMapper) CreateBean() ioc.Bean {
-    return &TestMapper{}
+  return &TestMapper{}
 }
 
 // Say 测试依赖注入
 func (t *TestMapper) Say() string {
-    return "success"
+  return "success"
 }
 ```
-
-- controller
+* controller
 ```go
 package controller
 
@@ -319,105 +283,68 @@ type TestController struct {
     TestMapper *mapper.TestMapper `@autowired:""`
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
 // Hello
-// @GET(path="/hello", globalFunc=true) 第一个接口
+// @GET(path="/hello") 第一个接口
 func (t *TestController) Hello(ctx *gin.Context) {
     // 使用时直接调用即可
     resp.Json(ctx, t.TestMapper.Say())
 }
 ```
-### 6、后置处理器
-该处理器在 Controller 实例化结束且依赖注入完成后触发，我们可在该函数做其他的一些属性处理，这里例子为 赋值 controller 中的一些私有属性，💡 如果安装了 IoCer 插件，可输入 **pc** 进行快速生成
+### 7、Controller构造后置处理
+
+该处理器在 Controller 实例化结束且依赖注入完成后触发，我们可在该函数做其他的一些属性处理，这里例子为
+赋值 controller 中的一些私有属性，💡 如果安装了 IoCer 插件，可输入 pc 进行快速生成
 ```go
 package controller
 
 import (
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/mvc"
-    "github.com/archine/gin-plus/v2/resp"
+  "github.com/gin-gonic/gin"
+  "github.com/archine/gin-plus/v2/mvc"
+  "github.com/archine/gin-plus/v2/resp"
 )
 
 type TestController struct {
-    mvc.Controller
-    age int
-}
-
-func init() {
-    mvc.Register(&TestController{})
+  mvc.Controller
+  age int
 }
 
 // PostConstruct 初始化私有属性 age 的值
 func (t *TestController) PostConstruct() {
-    t.age = 100
+  t.age = 100
 }
 ```
-### 7、全局异常捕获
-在开发中，处理 **error** 是个让人头大的问题，很多开发者都是通过一层层的 return，这其实代码很不美观，这里我们提供了全局异常捕获，会对 API 整个调用链进行异常捕获。这时，在碰到 **error**时，可直接采用 panic 的方式，框架中提供了 exception.OrThrow(err)来进行 err 不为 nil 时抛出，💡 如果安装了 IoCer 插件，可输入 **thr** 进行快速生成。下面为应用的例子
 
+### 8、配置读取
+
+框架默认会读取项目同级目录的 app.yml 文件（可通过 -c 参数指定文件）
+* 基础配置
+```yaml
+log_level: debug # 默认 debug，支持 error、info、trace、warn、panic、fetal、debug
+port: 4006 # 默认 4006
+max_file_size: 104857600 # 默认 100m，单位字节
+```
+这些参数框架内部会解析，使用这些参数时，可通过 ``application.Env`` 来获取  
+
+- 自定义配置
+  实际开发中，项目配置往往不只是基础配置那些，可能还包括其他配置，这时我们需要在启动时调用 ``ReadConfig()``方法，参数为需要解析到哪个结构体中
 ```go
 package main
 
 import (
-    _ "gin-plus-demo/controller"
-    "github.com/gin-gonic/gin"
-    log "github.com/sirupsen/logrus"
-    "github.com/archine/gin-plus/v2/ast"
-    "github.com/archine/gin-plus/v2/exception"
-    "github.com/archine/gin-plus/v2/mvc"
-    "os"
+  _ "gin-plus-demo/controller"
+  "github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate go run main.go ast
-func main() {
-    if len(os.Args) > 1 && os.Args[1] == "ast" {
-        ast.Parse()
-        return
-    }
-    gin.SetMode(gin.ReleaseMode)
-    engine := gin.New()
-    // 加入全局异常处理器
-    engine.Use(exception.GlobalExceptionInterceptor)
-    mvc.Apply(engine, true, base.Ast)
-    if err := engine.Run(":4006"); err != nil {
-        log.Fatalf(err.Error())
-    }
+var Conf = &config{}
+
+type config struct {
+  // 读取配置文件中的 name 配置
+  Name string `mapstructure:"name"`
 }
-```
 
-### 8、日志插件
-更改 Gin 中默认得日志插件
-```go
-package main
-
-import (
-	"gin-plus-demo/base"
-	_ "gin-plus-demo/controller"
-	"github.com/gin-gonic/gin"
-	"github.com/archine/gin-plus/v2/ast"
-	"github.com/archine/gin-plus/v2/mvc"
-	"github.com/archine/gin-plus/v2/plugin"
-	"log"
-	"os"
-)
-
-//go:generate go run main.go ast
+//go:generate mvc
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "ast" {
-		ast.Parse()
-		return
-	}
-	plugin.InitLog("debug") // 先初始化日志级别
-	gin.SetMode(gin.ReleaseMode)
-	engine := gin.New()
-	engine.Use(plugin.LogMiddleware()) // 在运行前加入即可
-	mvc.Apply(engine, true, base.Ast)
-	if err := engine.Run(":4006"); err != nil {
-		log.Fatalf(err.Error())
-	}
+  application.Default().ReadConfig(Conf).Run()
 }
 ```
 ## 三、统一返回体
@@ -437,12 +364,8 @@ type TestController struct {
     mvc.Controller
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
 // Hello
-// @GET(path="/hello", globalFunc=true) Hello 第一个接口
+// @GET(path="/hello") Hello 第一个接口
 func (t *TestController) Hello(ctx *gin.Context) {
     // 快速返回
     resp.Ok(ctx)
@@ -464,7 +387,7 @@ package controller
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v2/v2/mvc"
+    "github.com/archine/gin-plus/v2/mvc"
     "github.com/archine/gin-plus/v2/resp"
 )
 
@@ -472,12 +395,8 @@ type TestController struct {
     mvc.Controller
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
 // Hello
-// @GET(path="/hello", globalFunc=true) 第一个接口
+// @GET(path="/hello") 第一个接口
 func (t *TestController) Hello(ctx *gin.Context) {
     i := 0
     // 第二个参数为一个 bool 值，满足才会进行错误返回
@@ -514,17 +433,13 @@ type TestController struct {
     mvc.Controller
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
 type User struct {
     Age  int    `json:"age" binding:"min=10" minMsg:"年龄最小为10"`
     Name string `json:"name" binding:"required" msg:"名字不能为空"`
 }
 
 // AddUser
-// @POST(path="/add_user", globalFunc=true) 添加用户
+// @POST(path="/user") 添加用户
 func (t *TestController) AddUser(ctx *gin.Context) {
     var arg User
     if resp.ParamValid(ctx, ctx.ShouldBindJSON(&arg), &arg) {
@@ -557,12 +472,8 @@ type TestController struct {
     mvc.Controller
 }
 
-func init() {
-    mvc.Register(&TestController{})
-}
-
 // Hello
-// @GET(path="/hello", globalFunc=true) 返回数据
+// @GET(path="/hello") 返回数据
 func (t *TestController) Hello(ctx *gin.Context) {
     resp.Json(ctx, "数据")
 }
