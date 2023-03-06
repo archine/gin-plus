@@ -236,7 +236,7 @@ import (
 
 //go:generate mvc
 func main() {
-    application.Default().StartAfter(func() {
+    application.Default().StartBefore(func() {
        fmt.Println("启动前逻辑")
     }).Run()
 }
