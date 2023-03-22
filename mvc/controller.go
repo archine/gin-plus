@@ -4,7 +4,6 @@ import (
 	"github.com/archine/gin-plus/v2/ast"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
 )
@@ -43,8 +42,13 @@ func IsController(v interface{}) bool {
 // @param e: gin.Engine
 // @param autowired: whether enable autowired properties
 func Apply(e *gin.Engine, autowired bool) {
-	if len(ast.Apis) == 0 {
-		log.Warn("no available api found")
+	if ast.Apis == nil {
+		for _, controller := range controllerCache {
+			if autowired {
+				ioc.Inject(controller)
+			}
+		}
+		return
 	}
 	ginProxy := reflect.ValueOf(e)
 	for _, controller := range controllerCache {

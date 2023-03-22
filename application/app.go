@@ -20,8 +20,8 @@ type App struct {
 	startBefore func()
 }
 
-// New a clean project
-func New() *App {
+// New Create a clean application, you can add some gin middlewares to the engine
+func New(middlewares ...gin.HandlerFunc) *App {
 	LoadApplicationConfigFile()
 	plugin.InitLog(Env.LogLevel)
 	if Env.LogLevel == "debug" {
@@ -30,13 +30,16 @@ func New() *App {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
+	if len(middlewares) > 0 {
+		engine.Use(middlewares...)
+	}
 	engine.MaxMultipartMemory = Env.MaxFileSize
 	engine.RemoveExtraSlash = true
 	ioc.SetBeans(engine)
 	return &App{e: engine}
 }
 
-// Default create a default project that integrates logging, exception interception, and cross-domain by default
+// Default Create a default application with log printing, exception interception, and cross-domain middleware
 func Default() *App {
 	LoadApplicationConfigFile()
 	plugin.InitLog(Env.LogLevel)
