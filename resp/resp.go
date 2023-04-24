@@ -11,28 +11,19 @@ import (
 // Respond to the client assistant and return quickly
 
 const (
-	Success             = 0
-	InternalServerError = -10500
-	BadRequestError     = -10400
-	TooManyRequestError = -10429
-	NoPermissionError   = -10401
-	NoneLoginError      = -10600
-	DataExistsError     = -10601
-	ParamValidError     = -10602
-	TokenExpired        = -10603
+	BAD_REQUEST_CODE      = -10400
+	NONE_LOGIN_CODE       = -10401
+	NO_PERMISSION_CODE    = -10403
+	TOO_MANY_REQUEST_CODE = -10429
+	INTERNAL_SERVER_CODE  = -10500
+	PARAM_FAILD_CODE      = -10600
 )
 
-var CodeMsgMap = map[int]string{
-	Success:             "ok",
-	InternalServerError: "系统出错,请联系管理员!",
-	BadRequestError:     "操作失败",
-	TooManyRequestError: "请求频繁,请稍后再试!",
-	NoPermissionError:   "权限不足",
-	NoneLoginError:      "当前未登录",
-	DataExistsError:     "数据已存在",
-	ParamValidError:     "参数错误",
-	TokenExpired:        "token已过期",
-}
+const (
+	NONE_LOGIN    = "Not currently logged in"
+	TOKEN_EXPIRED = "Token expired"
+	PARAM_FAILD   = "Parameter error"
+)
 
 type Resp interface {
 	// WithMessage set the business message
@@ -96,24 +87,13 @@ func InitResp(ctx *gin.Context, httpCode int) *Result {
 // true means that flag is satisfied
 func BadRequest(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := CodeMsgMap[BadRequestError]
+		resp := InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE)
 		if len(msg) > 0 {
-			message = msg[0]
+			resp.WithMessage(msg[0])
+		} else {
+			resp.WithMessage(http.StatusText(http.StatusBadRequest))
 		}
-		InitResp(ctx, http.StatusOK).WithCode(BadRequestError).WithMessage(message).To()
-	}
-	return flag
-}
-
-// DataExists the data already exists, which is usually used when adding data.
-// true means that flag is satisfied
-func DataExists(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		message := CodeMsgMap[DataExistsError]
-		if len(msg) > 0 {
-			message = msg[0]
-		}
-		InitResp(ctx, http.StatusOK).WithCode(DataExistsError).WithMessage(message).To()
+		resp.To()
 	}
 	return flag
 }
@@ -122,11 +102,11 @@ func DataExists(ctx *gin.Context, flag bool, msg ...string) bool {
 // true means that flag is satisfied
 func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := CodeMsgMap[ParamValidError]
+		message := PARAM_FAILD
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(ParamValidError).WithMessage(message).To()
+		InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(message).To()
 	}
 	return flag
 }
@@ -137,7 +117,7 @@ func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 	if err == nil {
 		return false
 	}
-	InitResp(ctx, http.StatusOK).WithCode(ParamValidError).WithMessage(getValidMsg(err, obj)).To()
+	InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(getValidMsg(err, obj)).To()
 	return true
 }
 
@@ -145,11 +125,11 @@ func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 // true means that flag is satisfied
 func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := CodeMsgMap[NoPermissionError]
+		resp := InitResp(ctx, http.StatusForbidden).WithCode(NO_PERMISSION_CODE)
 		if len(msg) > 0 {
-			message = msg[0]
+			resp.WithMessage(msg[0])
 		}
-		InitResp(ctx, http.StatusOK).WithCode(NoPermissionError).WithMessage(message).To()
+		resp.To()
 	}
 	return flag
 }
@@ -158,11 +138,11 @@ func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 // true means that flag is satisfied
 func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := CodeMsgMap[NoneLoginError]
+		message := NONE_LOGIN
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(NoneLoginError).WithMessage(message).To()
+		InitResp(ctx, http.StatusUnauthorized).WithCode(NONE_LOGIN_CODE).WithMessage(message).To()
 	}
 	return flag
 }
@@ -171,18 +151,18 @@ func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 // true means that flag is satisfied
 func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := CodeMsgMap[TokenExpired]
+		message := TOKEN_EXPIRED
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(TokenExpired).WithMessage(message).To()
+		InitResp(ctx, http.StatusUnauthorized).WithCode(NONE_LOGIN_CODE).WithMessage(message).To()
 	}
 	return flag
 }
 
 // Ok Normal request returned, no data
 func Ok(ctx *gin.Context) {
-	InitResp(ctx, http.StatusOK).WithCode(0).To()
+	InitResp(ctx, http.StatusOK).To()
 }
 
 // Json Normal request returned with data
@@ -191,13 +171,23 @@ func Json(ctx *gin.Context, data interface{}) {
 }
 
 // SeverError Server level exception
-func SeverError(ctx *gin.Context, err error) bool {
+func SeverError(ctx *gin.Context, err error, msg ...string) bool {
 	if err == nil {
 		return false
 	}
-	log.Error(err.Error())
-	InitResp(ctx, http.StatusOK).WithCode(InternalServerError).WithMessage(CodeMsgMap[InternalServerError]).To()
+	resp := InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE)
+	if len(msg) > 0 {
+		resp.WithMessage(msg[0])
+	} else {
+		resp.WithMessage(http.StatusText(http.StatusInternalServerError))
+	}
+	resp.To()
 	return true
+}
+
+// Custom User defined business code and message
+func Custom(ctx *gin.Context, httpCode int, msg string) {
+	InitResp(ctx, http.StatusOK).WithCode(httpCode).WithMessage(msg).To()
 }
 
 func getValidMsg(err error, obj interface{}) string {
@@ -224,5 +214,5 @@ func getValidMsg(err error, obj interface{}) string {
 		}
 	}
 	log.Error(err.Error())
-	return CodeMsgMap[ParamValidError]
+	return PARAM_FAILD
 }
