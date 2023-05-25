@@ -13,6 +13,7 @@ import (
 const (
 	BAD_REQUEST_CODE      = -10400
 	NONE_LOGIN_CODE       = -10401
+	LOGIN_TOKEN_EXPIRED   = -10402
 	NO_PERMISSION_CODE    = -10403
 	TOO_MANY_REQUEST_CODE = -10429
 	INTERNAL_SERVER_CODE  = -10500
@@ -125,7 +126,7 @@ func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 // true means that flag is satisfied
 func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		resp := InitResp(ctx, http.StatusForbidden).WithCode(NO_PERMISSION_CODE)
+		resp := InitResp(ctx, http.StatusOK).WithCode(NO_PERMISSION_CODE)
 		if len(msg) > 0 {
 			resp.WithMessage(msg[0])
 		}
@@ -155,7 +156,7 @@ func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusUnauthorized).WithCode(NONE_LOGIN_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusUnauthorized).WithCode(LOGIN_TOKEN_EXPIRED).WithMessage(message).To()
 	}
 	return flag
 }
