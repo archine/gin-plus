@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v2.1.2-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v2.1.4-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v2@v2.1.3
+go get github.com/archine/gin-plus/v2@v2.1.4
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v2 v2.1.3
+github.com/archine/gin-plus/v2 v2.1.4
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -414,7 +414,7 @@ func (t *TestController) Hello(ctx *gin.Context) {
 ```
 ### 3、参数校验
 对结构体参数进行绑定校验。当我们有多个条件时，我们可以为每个条件单独定义错误信息，格式为条件+Msg，例如：minMsg ，如果未找到，则取 msg，如果也未找到，会使用参数校验默认的 英文信息。项目中通过
-`resp.ParamValid()`调用。更多参数校验的关键字， [请参考](https://pkg.go.dev/github.com/go-playground/validator)
+``resp.ParamValidation()``调用，💡 如果安装了 IoCer 插件，可输入 **rp** 进行代码快速补全。更多参数校验的关键字， [请参考](https://pkg.go.dev/github.com/go-playground/validator)
 
 ```go
 package controller
@@ -438,7 +438,13 @@ type User struct {
 // @POST(path="/user") 添加用户
 func (t *TestController) AddUser(ctx *gin.Context) {
     var arg User
-    if resp.ParamValid(ctx, ctx.ShouldBindJSON(&arg), &arg) {
+    
+    // v2.1.4 开始标记为废弃，未来版本将删除，请使用下方的方法
+    //if resp.ParamValid(ctx, ctx.ShouldBindJSON(&arg), &arg) {
+    //    return
+    //}
+    
+    if !resp.ParamValidation(ctx, &arg) {
         return
     }
     resp.Ok(ctx)

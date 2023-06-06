@@ -60,7 +60,7 @@ func LogMiddleware() gin.HandlerFunc {
 			}
 			printHealth = false
 		}
-		businessCode, exists := c.Get("businessCode")
+		businessCode, exists := c.Get("bcode")
 		if exists {
 			statusCode = businessCode.(int)
 		}

@@ -20,12 +20,6 @@ const (
 	PARAM_FAILD_CODE      = -10600
 )
 
-const (
-	NONE_LOGIN    = "Not currently logged in"
-	TOKEN_EXPIRED = "Token expired"
-	PARAM_FAILD   = "Parameter error"
-)
-
 type Resp interface {
 	// WithMessage set the business message
 	WithMessage(message string) Resp
@@ -70,7 +64,7 @@ func (r *Result) WithData(data interface{}) Resp {
 }
 
 func (r *Result) To() {
-	r.ctx.Set("businessCode", r.Code)
+	r.ctx.Set("bcode", r.Code)
 	r.ctx.JSON(r.httpCode, r)
 }
 
@@ -99,11 +93,11 @@ func BadRequest(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// ParamInvalid parameter check type error.
-// true means that flag is satisfied
+// ParamInvalid invalid parameter.
+// If flag is true, the parameter is invalid, you can directly return to end the current method
 func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := PARAM_FAILD
+		message := "Invalid parameter"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
@@ -112,14 +106,24 @@ func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
 	return flag
 }
 
-// ParamValid structure parameter validation type error.
-// true means that flag is satisfied
+// Deprecated: please use ParamValidation. it will be removed in the future
 func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 	if err == nil {
 		return false
 	}
 	InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(getValidMsg(err, obj)).To()
 	return true
+}
+
+// ParamValidation parameter validation, return false means that the validation failed,
+// you can directly return to end the current method
+func ParamValidation(ctx *gin.Context, obj interface{}) bool {
+	err := ctx.ShouldBind(obj)
+	if err == nil {
+		return true
+	}
+	InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(getValidMsg(err, obj)).To()
+	return false
 }
 
 // NoPermission Insufficient permission error.
@@ -139,7 +143,7 @@ func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
 // true means that flag is satisfied
 func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := NONE_LOGIN
+		message := "Not currently logged in"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
@@ -152,7 +156,7 @@ func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
 // true means that flag is satisfied
 func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
 	if flag {
-		message := TOKEN_EXPIRED
+		message := "Token is expired"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
@@ -215,5 +219,5 @@ func getValidMsg(err error, obj interface{}) string {
 		}
 	}
 	log.Error(err.Error())
-	return PARAM_FAILD
+	return "Invalid parameter"
 }
