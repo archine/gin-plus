@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v2/banner"
 	"github.com/archine/gin-plus/v2/exception"
 	"github.com/archine/gin-plus/v2/mvc"
 	"github.com/archine/gin-plus/v2/plugin"
@@ -15,14 +16,16 @@ import (
 
 // App application instance
 type App struct {
-	e           *gin.Engine
-	applyBefore func()
-	startBefore func()
+	e            *gin.Engine
+	configReader *viper.Viper
+	applyBefore  func()
+	startBefore  func()
+	PrintBanner  string
 }
 
 // New Create a clean application, you can add some gin middlewares to the engine
-func New(middlewares ...gin.HandlerFunc) *App {
-	LoadApplicationConfigFile()
+func New(confReaderOptions []viper.Option, middlewares ...gin.HandlerFunc) *App {
+	configReader := LoadApplicationConfigFile(confReaderOptions)
 	plugin.InitLog(Env.LogLevel)
 	if Env.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -36,12 +39,12 @@ func New(middlewares ...gin.HandlerFunc) *App {
 	engine.MaxMultipartMemory = Env.MaxFileSize
 	engine.RemoveExtraSlash = true
 	ioc.SetBeans(engine)
-	return &App{e: engine}
+	return &App{e: engine, configReader: configReader, PrintBanner: banner.Banner}
 }
 
 // Default Create a default application with log printing, exception interception, and cross-domain middleware
-func Default() *App {
-	LoadApplicationConfigFile()
+func Default(confReaderOptions ...viper.Option) *App {
+	configReader := LoadApplicationConfigFile(confReaderOptions)
 	plugin.InitLog(Env.LogLevel)
 	if Env.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -64,13 +67,24 @@ func Default() *App {
 	engine.RemoveExtraSlash = true
 	ioc.SetBeans(engine)
 	return &App{
-		e: engine,
+		e:            engine,
+		configReader: configReader,
+		PrintBanner:  banner.Banner,
 	}
+}
+
+// Banner Sets the project startup banner
+func (a *App) Banner(banner string) *App {
+	a.PrintBanner = banner
+	return a
 }
 
 // Run the main program entry
 // interceptors: link{mvc.MethodInterceptor}
 func (a *App) Run(interceptors ...mvc.MethodInterceptor) {
+	if a.PrintBanner != "" {
+		fmt.Print(a.PrintBanner)
+	}
 	if a.applyBefore != nil {
 		a.applyBefore()
 	}
@@ -107,9 +121,9 @@ func (a *App) Run(interceptors ...mvc.MethodInterceptor) {
 }
 
 // ReadConfig Read configuration
-// v: config struct pointer
+// v config struct pointer
 func (a *App) ReadConfig(v interface{}) *App {
-	if err := viper.Unmarshal(v); err != nil {
+	if err := a.configReader.Unmarshal(v); err != nil {
 		log.Fatalf("read config error, %s", err.Error())
 	}
 	return a

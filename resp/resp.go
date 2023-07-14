@@ -79,31 +79,29 @@ func InitResp(ctx *gin.Context, httpCode int) *Result {
 }
 
 // BadRequest business-related error returned.
-// true means that flag is satisfied
-func BadRequest(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		resp := InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE)
+// Return true means the condition is true
+func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "操作失败"
 		if len(msg) > 0 {
-			resp.WithMessage(msg[0])
-		} else {
-			resp.WithMessage(http.StatusText(http.StatusBadRequest))
+			message = msg[0]
 		}
-		resp.To()
+		InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(message).To()
 	}
-	return flag
+	return condition
 }
 
 // ParamInvalid invalid parameter.
-// If flag is true, the parameter is invalid, you can directly return to end the current method
-func ParamInvalid(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		message := "Invalid parameter"
+//  Return true means the condition is true
+func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "参数无效"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
 		InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(message).To()
 	}
-	return flag
+	return condition
 }
 
 // Deprecated: please use ParamValidation. it will be removed in the future
@@ -115,8 +113,7 @@ func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
 	return true
 }
 
-// ParamValidation parameter validation, return false means that the validation failed,
-// you can directly return to end the current method
+// ParamValidation parameter validation, return false means that the validation failed
 func ParamValidation(ctx *gin.Context, obj interface{}) bool {
 	err := ctx.ShouldBind(obj)
 	if err == nil {
@@ -127,72 +124,70 @@ func ParamValidation(ctx *gin.Context, obj interface{}) bool {
 }
 
 // NoPermission Insufficient permission error.
-// true means that flag is satisfied
-func NoPermission(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		resp := InitResp(ctx, http.StatusOK).WithCode(NO_PERMISSION_CODE)
+// Return true means the condition is true
+func NoPermission(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "权限不足"
 		if len(msg) > 0 {
-			resp.WithMessage(msg[0])
+			message = msg[0]
 		}
-		resp.To()
+		InitResp(ctx, http.StatusOK).WithCode(NO_PERMISSION_CODE).WithMessage(message).To()
 	}
-	return flag
+	return condition
 }
 
 // NoLogin Not logged in.
-// true means that flag is satisfied
-func NoLogin(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		message := "Not currently logged in"
+// Return true means the condition is true
+func NoLogin(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "当前未登录"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
 		InitResp(ctx, http.StatusUnauthorized).WithCode(NONE_LOGIN_CODE).WithMessage(message).To()
 	}
-	return flag
+	return condition
 }
 
 // LoginExpired Login expired
-// true means that flag is satisfied
-func LoginExpired(ctx *gin.Context, flag bool, msg ...string) bool {
-	if flag {
-		message := "Token is expired"
+// Return true means the condition is true
+func LoginExpired(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "Token已过期"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
 		InitResp(ctx, http.StatusUnauthorized).WithCode(LOGIN_TOKEN_EXPIRED).WithMessage(message).To()
 	}
-	return flag
+	return condition
 }
 
-// Ok Normal request returned, no data
+// Ok Normal request with no data returned
 func Ok(ctx *gin.Context) {
 	InitResp(ctx, http.StatusOK).To()
 }
 
-// Json Normal request returned with data
+// Json Normal request with data returned
 func Json(ctx *gin.Context, data interface{}) {
 	InitResp(ctx, http.StatusOK).WithCode(0).WithData(data).To()
 }
 
-// SeverError Server level exception
-func SeverError(ctx *gin.Context, err error, msg ...string) bool {
-	if err == nil {
-		return false
+// SeverError Server exception
+// Return true means the condition is true
+func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
+	if condition {
+		message := "服务器异常,请联系管理员!"
+		if len(msg) > 0 {
+			message = msg[0]
+		}
+		InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE).WithMessage(message).To()
 	}
-	resp := InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE)
-	if len(msg) > 0 {
-		resp.WithMessage(msg[0])
-	} else {
-		resp.WithMessage(http.StatusText(http.StatusInternalServerError))
-	}
-	resp.To()
 	return true
 }
 
 // Custom User defined business code and message
-func Custom(ctx *gin.Context, httpCode int, msg string) {
-	InitResp(ctx, http.StatusOK).WithCode(httpCode).WithMessage(msg).To()
+func Custom(ctx *gin.Context, bCode int, msg string) {
+	InitResp(ctx, http.StatusOK).WithCode(bCode).WithMessage(msg).To()
 }
 
 func getValidMsg(err error, obj interface{}) string {
@@ -219,5 +214,5 @@ func getValidMsg(err error, obj interface{}) string {
 		}
 	}
 	log.Error(err.Error())
-	return "Invalid parameter"
+	return "参数无效"
 }

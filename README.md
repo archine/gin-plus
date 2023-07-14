@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v2.1.4-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v2.1.5-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v2@v2.1.4
+go get github.com/archine/gin-plus/v2@v2.1.5
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v2 v2.1.4
+github.com/archine/gin-plus/v2 v2.1.5
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -62,7 +62,6 @@ func main() {
 | @OPTIONS(path="/hello") | Options 请求 | 暂无 |
 | @BasePath("/hello") | 基础路径 | 空白处输入 basep |
 
-> ❗ v2.1.0 版本开始 API 定义移除了 GlobalFunc 参数
 ### 1、快速开始
 
 - controller接口
@@ -86,7 +85,6 @@ func (t *TestController) Hello(ctx *gin.Context) {
 	resp.Ok(ctx)
 }
 ```
-> ❗ v2.1.0 版本开始不需要手动在每个 Controller 中通过 init() 方法注册
 
 - 启动类
 ```go
@@ -104,8 +102,6 @@ func main() {
 ```
 
 这时候运行该项目，浏览器访问http://localhost:4006/hello即可
-
-![在这里插入图片描述](https://img-blog.csdnimg.cn/27837bfb5714484eac33932392929d7e.png)
 
 ### 2、方法路径前缀
 很多时候，我们需要对整个 Controller 里的所有 API 增加访问前缀，这时我们可在 Controller 的结构体注释中通过`@BasePath("/xxx")`来进行声明
@@ -161,14 +157,15 @@ func (u *UserController) UserList(ctx *gin.Context) {
 	fmt.Println("正在执行API方法")
 }
 ```
-- 定义拦截器
-  需要实现 MethodInterceptor 接口
+- 定义拦截器    
+
+需要实现 MethodInterceptor 接口
 ```go
 package intercptor
 
 type TestInterceptor struct {}
 
-// Predicate 过滤条件，true 表示拦截
+// Predicate 过滤条件，true 表示全部拦截
 func (t *TestInterceptor) Predicate(request *http.Request) bool {
     return true
 }
@@ -187,8 +184,9 @@ func (t *TestInterceptor) PostHandle(ctx *gin.Context) {
     fmt.Println("后置处理器")
 }
 ```
-- 应用拦截器
-  只需要在启动类中添加进去即可，拦截器为可变参数，因此可以添加多个
+- 应用拦截器     
+
+只需要在启动类中添加进去即可，拦截器为可变参数，因此可以添加多个
 ```go
 package main
 
@@ -319,10 +317,11 @@ log_level: debug # 默认 debug，支持 error、info、trace、warn、panic、f
 port: 4006 # 默认 4006
 max_file_size: 104857600 # 默认 100m，单位字节
 ```
-这些参数框架内部会解析，使用这些参数时，可通过 ``application.Env`` 来获取  
+这些参数框架内部会解析，使用这些参数时，可通过 ``application.Env`` 来获取。
 
-- 自定义配置
-  实际开发中，项目配置往往不只是基础配置那些，可能还包括其他配置，这时我们需要在启动时调用 ``ReadConfig()``方法，参数为需要解析到哪个结构体中
+- 自定义配置    
+
+实际开发中，项目配置往往不只是基础配置那些，可能还包括其他配置，这时我们需要在启动时调用 ``ReadConfig()``方法，参数为需要解析到哪个结构体中
 ```go
 package main
 
@@ -334,7 +333,7 @@ import (
 var Conf = &config{}
 
 type config struct {
-  // 读取配置文件中的 name 配置
+  // 读取配置文件中的 name 配置，安装了 iocer 插件的话输入 maps 可以快速补全后面的tag
   Name string `mapstructure:"name"`
 }
 
@@ -343,6 +342,66 @@ func main() {
   application.Default().ReadConfig(Conf).Run()
 }
 ```
+
+### 9、全局异常
+
+在开发过程中，我们可以通过全局异常的方式来快速结束此次客户端的请求。使用时我们可以在任意地方抛出一个 error ，此时会被异常拦截器捕获并响应给客户端。 抛出的 error 主要是两类，一个是自己业务相关的，另一个是自己无法预料的错误，案例如下
+
+- 业务异常    
+
+抛出一个 字符串 或者 BusinessException 会使用如下结构返回
+```json
+{
+  "err_code": -10400,
+  "err_msg": "操作失败"
+}
+```
+* 使用案例如下
+```go
+// 模拟抛出业务异常
+func (t *TestMapper) FindById(userid int) *User {
+  var u User
+  err := t.Db.Table("User").Where("id = ?", userid).Take(&u).Error
+  if err != nil {
+      if err == gorm.ErrRecordNotFound {
+        // 方式一
+        panic(exception.NewBusinessException("数据没找到"))
+        // 方式二
+        panic("数据未找到")
+      }
+      // 未知的错误，直接 panic，后面会介绍
+      panic(err)
+  }
+  return &u
+}
+```
+
+- 未知的错误   
+
+抛出非业务异常中声明的两类错误时，会使用如下结构，同时项目中会打印堆栈信息
+```js
+{
+    "err_code": -10500,
+    "err_msg": "服务器异常,请联系管理员!"
+}
+```
+* 使用案例如下
+```go
+// 方法一
+func (t *TestMapper) MethodA() {
+    err := t.Db.Create(&User{"张三"}).Error
+    if err != nil {
+        panic(err)
+    }
+}
+
+// 方法二
+func (t *TestMapper) MethodA() {
+    exception.OrThrow(t.Db.Create(&User{"张三"}).Error)
+}
+```
+> 💡 如果安装了 Iocer 插件，可通过输入 thr 代码快速补全 exception.OrThrow
+
 ## 三、统一返回体
 ### 1、快速返回
 返回 code 和 msg，常用于只告知客户端是否成功，项目中通过`resp.Ok()`调用，💡 如果安装了 IoCer 插件，可输入 **ro** 进行快速生成

@@ -4,7 +4,6 @@ import (
 	"github.com/archine/gin-plus/v2/resp"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"net/http"
 	"runtime"
 )
 
@@ -32,20 +31,19 @@ func printStack(err error) {
 func GlobalExceptionInterceptor(context *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			if s, ok := r.(BusinessException); ok {
-				resp.BadRequest(context, true, s.Error())
-				return
+			switch t := r.(type) {
+			case string:
+				resp.BadRequest(context, true, t)
+			case BusinessException:
+				resp.BadRequest(context, true, t.Error())
+			case error:
+				printStack(t)
+				resp.SeverError(context, true)
+			default:
+				log.Error(t)
+				resp.SeverError(context, true)
 			}
-			if s, ok := r.(error); ok {
-				printStack(s)
-				resp.SeverError(context, s)
-				return
-			}
-			log.Error(r)
-			resp.InitResp(context, http.StatusOK).
-				WithCode(resp.INTERNAL_SERVER_CODE).
-				WithMessage(http.StatusText(http.StatusInternalServerError)).
-				To()
+			return
 		}
 	}()
 	context.Next()

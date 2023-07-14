@@ -160,7 +160,7 @@ func recordProjectControllerAndApi(controllerNames []string, controllerAbs, pkg 
 		return
 	}
 	newFile := jen.NewFile(pkg)
-	newFile.HeaderComment("// ⚠️⛔ Auto generate code by hj-gin, Do not edit!!!")
+	newFile.HeaderComment("// ⚠️⛔ Auto generate code by gin-plus, Do not edit!!!")
 	newFile.HeaderComment("// All controller information and Api information for the current project is recorded here\n")
 	newFile.ImportName("github.com/archine/gin-plus/v2/mvc", "mvc")
 	newFile.ImportName("github.com/archine/gin-plus/v2/ast", "ast")
