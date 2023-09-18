@@ -12,9 +12,9 @@ import (
 var Env = &config{}
 
 type config struct {
-	LogLevel    string `mapstructure:"log_level"`     // The log level of project, default debug
-	Port        int    `mapstructure:"port"`          // Project run port, default 4006
-	MaxFileSize int64  `mapstructure:"max_file_size"` // Maximum file upload size，default 100Mb
+	LogLevel    string `mapstructure:"log_level"`     // 日志级别
+	Port        int    `mapstructure:"port"`          // 项目运行端口
+	MaxFileSize int64  `mapstructure:"max_file_size"` // 最大文件上传大小，byte
 }
 
 // LoadApplicationConfigFile load the application configuration file

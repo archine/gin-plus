@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -54,7 +55,8 @@ func LogMiddleware() gin.HandlerFunc {
 		reqMethod := c.Request.Method
 		reqUrl := c.Request.RequestURI
 		statusCode := c.Writer.Status()
-		if strings.Contains(reqUrl, "health") {
+		matched, _ := regexp.MatchString("^/.*/health$", reqUrl)
+		if matched {
 			if !printHealth {
 				return
 			}

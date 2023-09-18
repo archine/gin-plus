@@ -4,25 +4,47 @@ import (
 	"github.com/archine/gin-plus/v2/ast"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"reflect"
 )
 
-// Interface abstract top-level data structure
+// controller Top-level interface used to declare a structure as a controller.
+type abstractController interface {
+	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here.
+	PostConstruct()
+}
+
+/*
+Controller Default abstract controller implementation.
+
+	Simply integrate the default controller into your structure.
+
+Example:
+
+	type YourController struct {
+	   mvc.Controller
+	}
+
+	// Hello
+	// @GET(path="/hello") this is api method
+	func (y *YourController) Hello(ctx *gin.Context) {
+	   resp.Json(ctx, "Hello World")
+	}
+
+	// Access the API
+	curl http://localhost:4006/hello
+*/
+type Controller struct{}
+
+func (c *Controller) PostConstruct() {}
+
+// Annotations the annotation of Api method
+type Annotations map[string]string
 
 // Global controller cache
 var controllerCache []abstractController
 
-type abstractController interface {
-	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here
-	PostConstruct()
-}
-
-// Controller Declares the structure to be a controller
-// you can add api methods to it
-type Controller struct{}
-
-func (c *Controller) PostConstruct() {}
+// Annotations of each API
+var annotationCache map[string]Annotations
 
 // Register controllers
 func Register(controller ...abstractController) {
@@ -51,6 +73,7 @@ func Apply(e *gin.Engine, autowired bool) {
 		return
 	}
 	ginProxy := reflect.ValueOf(e)
+	annotationCache = make(map[string]Annotations)
 	for _, controller := range controllerCache {
 		if autowired {
 			ioc.Inject(controller)
@@ -62,13 +85,11 @@ func Apply(e *gin.Engine, autowired bool) {
 			methodProxy := controllerTypeOf.Method(i)
 			methodFullName := controllerTypeOf.Elem().Name() + "/" + methodProxy.Name
 			if info, ok := ast.Apis[methodFullName]; ok {
-				for _, methodInfo := range info {
-					ginMethod := ginProxy.MethodByName(methodInfo.Method)
-					args := []reflect.Value{reflect.ValueOf(methodInfo.ApiPath)}
-					args = append(args, controllerProxy.MethodByName(methodProxy.Name))
-					ginMethod.Call(args)
-				}
-				delete(ast.Apis, methodFullName)
+				ginMethod := ginProxy.MethodByName(info.Method)
+				args := []reflect.Value{reflect.ValueOf(info.ApiPath)}
+				args = append(args, controllerProxy.MethodByName(methodProxy.Name))
+				ginMethod.Call(args)
+				annotationCache[info.ApiPath] = info.Annotations
 			}
 		}
 		if len(controllerCache) == 1 {
@@ -77,19 +98,31 @@ func Apply(e *gin.Engine, autowired bool) {
 		}
 		controllerCache = controllerCache[1:]
 	}
+	ast.Apis = nil
 }
 
-// MethodInterceptor API method interceptor.
+// GetAnnotation Gets the specified annotation
+// Returns the value of this annotation, when the has is false mine this val is empty
+func GetAnnotation(ctx *gin.Context, annotationName string) (val string, has bool) {
+	anno, has := annotationCache[ctx.FullPath()]
+	if !has || len(anno) == 0 {
+		return "", false
+	}
+	val, has = anno[annotationName]
+	return
+}
+
+// MethodInterceptor API method interceptor
 // You can do logical processing before and after method calls
 type MethodInterceptor interface {
-	// Predicate true means intercept
-	Predicate(request *http.Request) bool
+	// Predicate true means intercept.
+	Predicate(ctx *gin.Context) bool
 
 	// PreHandle triggered before method invocation.
-	// if you want to abort the current request, just call abort() and response inside the method
+	// If you want to abort the current request, just call abort() and response inside the method
 	PreHandle(ctx *gin.Context)
 
 	// PostHandle triggered after method invocation.
-	// if you want to abort the current request, just call abort() and response inside the method
+	// If you want to abort the current request, just call abort() and response inside the method
 	PostHandle(ctx *gin.Context)
 }

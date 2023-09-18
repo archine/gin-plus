@@ -33,10 +33,10 @@ type Resp interface {
 
 // PaginationResult  Paging result
 type PaginationResult struct {
-	Total     int64       `json:"total"`      // Total count
-	PageSize  int         `json:"page_size"`  // Page size
-	PageIndex int         `json:"page_index"` // Current page index
-	Data      interface{} `json:"data"`       // Response data
+	Total     int64 `json:"total"`      // Total count
+	PageSize  int   `json:"page_size"`  // Page size
+	PageIndex int   `json:"page_index"` // Current page index
+	Data      any   `json:"data"`       // Response data
 }
 
 // Result Return result
@@ -45,7 +45,7 @@ type Result struct {
 	httpCode int          `json:"-"`             // http code
 	Code     int          `json:"err_code"`      // business code
 	Message  string       `json:"err_msg"`       // business message
-	Data     interface{}  `json:"ret,omitempty"` // Response data
+	Data     any          `json:"ret,omitempty"` // Response data
 }
 
 func (r *Result) WithMessage(message string) Resp {
@@ -58,7 +58,7 @@ func (r *Result) WithCode(code int) Resp {
 	return r
 }
 
-func (r *Result) WithData(data interface{}) Resp {
+func (r *Result) WithData(data any) Resp {
 	r.Data = data
 	return r
 }
@@ -92,7 +92,8 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 }
 
 // ParamInvalid invalid parameter.
-//  Return true means the condition is true
+//
+//	Return true means the condition is true
 func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
 		message := "参数无效"

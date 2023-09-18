@@ -1,6 +1,7 @@
 package exception
 
 import (
+	"bytes"
 	"github.com/archine/gin-plus/v2/resp"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -9,15 +10,12 @@ import (
 
 // BusinessException the service level exception, the service code is -10400, equivalent to resp.BadRequest
 type BusinessException struct {
-	message string
+	error
 }
 
-func (b BusinessException) Error() string {
-	return b.message
-}
-
-func NewBusinessException(msg string) BusinessException {
-	return BusinessException{message: msg}
+// SysException the system level exception, the service code is -10500, equivalent to resp.SeverError
+type SysException struct {
+	error
 }
 
 func printStack(err error) {
@@ -26,8 +24,16 @@ func printStack(err error) {
 	log.Errorf("%s %s", err.Error(), string(buf[:n]))
 }
 
+func printSimpleStack(err error) {
+	var buf [2048]byte
+	n := runtime.Stack(buf[:], false)
+	lines := bytes.Split(buf[:n], []byte("\n"))
+	log.Errorf("%s\n%s", err.Error(), string(bytes.Join(lines[9:11], []byte("\n"))))
+}
+
 // GlobalExceptionInterceptor gin global exception interceptor
-// Added via gin middleware
+// add via gin middleware.
+// an error of -10400 is thrown when the exception type is string and the BusinessException
 func GlobalExceptionInterceptor(context *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -35,7 +41,11 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 			case string:
 				resp.BadRequest(context, true, t)
 			case BusinessException:
+				printSimpleStack(t)
 				resp.BadRequest(context, true, t.Error())
+			case SysException:
+				printSimpleStack(t)
+				resp.SeverError(context, true)
 			case error:
 				printStack(t)
 				resp.SeverError(context, true)
@@ -49,9 +59,16 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 	context.Next()
 }
 
-// OrThrow if err not nil, panic
+// OrThrow If err not nil, a system-level exception is thrown.
 func OrThrow(err error) {
 	if err != nil {
-		panic(err)
+		panic(SysException{err})
+	}
+}
+
+// ThrowBusiness If err not nil, a business exception is thrown.
+func ThrowBusiness(err error) {
+	if err != nil {
+		panic(BusinessException{err})
 	}
 }
