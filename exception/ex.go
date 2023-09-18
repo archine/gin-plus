@@ -13,11 +13,6 @@ type BusinessException struct {
 	error
 }
 
-// SysException the system level exception, the service code is -10500, equivalent to resp.SeverError
-type SysException struct {
-	error
-}
-
 func printStack(err error) {
 	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
@@ -43,9 +38,6 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 			case BusinessException:
 				printSimpleStack(t)
 				resp.BadRequest(context, true, t.Error())
-			case SysException:
-				printSimpleStack(t)
-				resp.SeverError(context, true)
 			case error:
 				printStack(t)
 				resp.SeverError(context, true)
@@ -62,12 +54,12 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 // OrThrow If err not nil, a system-level exception is thrown.
 func OrThrow(err error) {
 	if err != nil {
-		panic(SysException{err})
+		panic(err)
 	}
 }
 
-// ThrowBusiness If err not nil, a business exception is thrown.
-func ThrowBusiness(err error) {
+// OrThrowBusiness If err not nil, a business-level exception is thrown.
+func OrThrowBusiness(err error) {
 	if err != nil {
 		panic(BusinessException{err})
 	}
