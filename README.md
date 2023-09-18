@@ -1,20 +1,20 @@
-![](https://img.shields.io/badge/version-v2.1.5-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v2.2.1-green.svg) &nbsp; ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
 ## 一、前言
-如果访问 github 网络不是很好，建议前往在线文档：[在线文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
+在线文档点击前往：[文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
 ### 1、安装
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v2@v2.1.5
+go get github.com/archine/gin-plus/v2@v2.2.1
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v2 v2.1.5
+github.com/archine/gin-plus/v2 v2.2.1
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -23,6 +23,9 @@ go mod tidy
 ```shell
 # 可将 latest 指定为具体版本
 go install github.com/archine/gin-plus/v2/ast/mvc@latest
+
+# v2.2.0 版本开始需要安装 mvc2
+go install github.com/archine/gin-plus/v2/ast/mvc2@latest
 ```
 >  ❗ v2.1.0 版本开始需要安装此工具，确保 gopath 的 bin 目录有加入到系统环境变量中     
 
@@ -30,10 +33,19 @@ go install github.com/archine/gin-plus/v2/ast/mvc@latest
 ```
 # 参数非必填，默认解析当前命令执行所在目录中的 controller 目录下的所有 go 文件
 mvc <scan dir>
+
+# v2.2.0 开始需要执行mvc2
+mvc2 <scan dir>
 ```
 也可通过在启动类上加上注释，这时候就可以通过 go generate来执行
 ```
 //go:generate mvc <scan dir>
+func main() {
+    application.Default().Run()
+}
+
+# v2.2.0 开始需要执行mvc2
+//go:generate mvc2 <scan dir>
 func main() {
     application.Default().Run()
 }
@@ -95,7 +107,7 @@ import (
 	"github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate mvc
+//go:generate mvc2
 func main() {
 	application.Default().Run()
 }
@@ -166,7 +178,7 @@ package intercptor
 type TestInterceptor struct {}
 
 // Predicate 过滤条件，true 表示全部拦截
-func (t *TestInterceptor) Predicate(request *http.Request) bool {
+func (t *TestInterceptor) Predicate(ctx *gin.Context) bool {
     return true
 }
 
@@ -195,7 +207,7 @@ import (
    "github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate mvc
+//go:generate mvc2
 func main() {
    application.Default().Run(&TestInterceptor{})
 }
@@ -214,9 +226,9 @@ import (
   "github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate mvc
+//go:generate mvc2
 func main() {
-  application.Default().ApplyBefore(func() {
+  application.Default().PreApply(func() {
     fmt.Println("注入前逻辑")
   }).Run()
 }
@@ -232,9 +244,9 @@ import (
    "github.com/archine/gin-plus/v2/application"
 )
 
-//go:generate mvc
+//go:generate mvc2
 func main() {
-    application.Default().StartBefore(func() {
+    application.Default().PreStart(func() {
        fmt.Println("启动前逻辑")
     }).Run()
 }
@@ -347,9 +359,9 @@ func main() {
 
 在开发过程中，我们可以通过全局异常的方式来快速结束此次客户端的请求。使用时我们可以在任意地方抛出一个 error ，此时会被异常拦截器捕获并响应给客户端。 抛出的 error 主要是两类，一个是自己业务相关的，另一个是自己无法预料的错误，案例如下
 
-- 业务异常    
+- 只返回错误信息    
 
-抛出一个 字符串 或者 BusinessException 会使用如下结构返回
+抛出一个 字符串 会使用如下结构返回
 ```json
 {
   "err_code": -10400,
@@ -364,9 +376,6 @@ func (t *TestMapper) FindById(userid int) *User {
   err := t.Db.Table("User").Where("id = ?", userid).Take(&u).Error
   if err != nil {
       if err == gorm.ErrRecordNotFound {
-        // 方式一
-        panic(exception.NewBusinessException("数据没找到"))
-        // 方式二
         panic("数据未找到")
       }
       // 未知的错误，直接 panic，后面会介绍
@@ -376,7 +385,7 @@ func (t *TestMapper) FindById(userid int) *User {
 }
 ```
 
-- 未知的错误   
+- 返回错误信息同时打印堆栈   
 
 抛出非业务异常中声明的两类错误时，会使用如下结构，同时项目中会打印堆栈信息
 ```js
@@ -387,7 +396,7 @@ func (t *TestMapper) FindById(userid int) *User {
 ```
 * 使用案例如下
 ```go
-// 方法一
+// 方法一，该方式状态码为 -10400
 func (t *TestMapper) MethodA() {
     err := t.Db.Create(&User{"张三"}).Error
     if err != nil {
@@ -395,12 +404,99 @@ func (t *TestMapper) MethodA() {
     }
 }
 
-// 方法二
+// 方法二,该方式状态码为 -10500
 func (t *TestMapper) MethodA() {
     exception.OrThrow(t.Db.Create(&User{"张三"}).Error)
 }
+
+// 方法三，该方式状态码为 -10400
+func (t *TestMapper) MethodA() {
+    exception.OrThrowBusiness(t.Db.Create(&User{"张三"}).Error)
+}
 ```
 > 💡 如果安装了 Iocer 插件，可通过输入 thr 代码快速补全 exception.OrThrow
+
+### 10、自定义注解
+在业务开发过程中，可能会遇到需要对某些 API 单独做一些额外的处理，例如：针对部分接口做日志记录、部分接口无需登录验证等等。。。这时就可以通过该方式来处理。
+定义方式如下面的代码块黄色标记处，我们可以定义非常之多的注解， 箭头右边为注解中的值，根据需要自行决定是否设置，没值时箭头可写可不写
+```go
+package controller
+
+type TestApi struct {
+    mvc.Controller
+}
+
+// Method1
+// @GET(path="/demo") 
+// @Public -> 1235455
+// @Log
+func (t *TestApi ) Method1(ctx *gin.Context) {
+    resp.Ok(ctx)
+}
+```
+下方的例子以登录拦截为例，放开带有指定注解的方法
+```go
+// LoginInterceptor 登录拦截器
+type LoginInterceptor struct{}
+
+func (l *LoginInterceptor) Predicate(ctx *gin.Context) bool {
+    _, has := mvc.GetAnnotation(ctx, "@Public") // 如果当前API带有 @Public 注解，则放开
+    return !has
+}
+
+func (l *LoginInterceptor) PreHandle(ctx *gin.Context) {}
+
+func (l *LoginInterceptor) PostHandle(ctx *gin.Context) {}
+```
+
+### 11、应用程序停止事件
+可在此事件中对服务停止的前后进行资源关闭等收尾工作，使用例子如下：
+```go
+package main
+
+import (
+    "demo/config"
+    _ "demo/controller"
+    "fmt"
+    "github.com/archine/gin-plus/v2/application"
+)
+
+//go:generate mvc2
+func main() {
+    application.
+       Default().
+       PreStop(func() {
+          // 该事件是在进行优雅关闭前的事件
+          fmt.Println("关闭前")
+       }).
+       PostStop(func() {
+          // 服务已经关闭，进程即将退出
+          fmt.Println("关闭后")
+       }).
+       Run()
+}
+```
+
+### 12、优雅关闭等待时间
+设置优雅关闭的最大等待时间，超过该时间会强制关闭，默认 3 秒
+```go
+package main
+
+import (
+    "demo/config"
+    _ "demo/controller"
+    "github.com/archine/gin-plus/v2/application"
+    "time"
+)
+
+//go:generate mvc2
+func main() {
+    application.
+       Default().
+       ExitDelay(5 * time.Second).
+       Run(&config.LoginInterceptor{})
+}
+```
 
 ## 三、统一返回体
 ### 1、快速返回
