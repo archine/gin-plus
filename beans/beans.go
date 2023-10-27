@@ -14,50 +14,67 @@ CopyProperties copy the source structure data to the target structure.
 Example:
 
 	type Src struct {
-	   Gender   int                  // The name of the field is used when not specified
-	   Age      int    `copy:"Age"`  // Specify field name
-	   Username string `copy:"-"`    // Ignore the copy by setting "-", or make the field private
+	    Gender   int                  // The name of the field is used when not specified
+	    Age      int    `copy:"Age"`  // Specify field name
+	    Username string `copy:"-"`    // Ignore the copy by setting "-", or make the field private
 	}
 
 	type Target struct {
-	   Age      int
-	   Username string
-	   Gender   int
+	    Age      int
+	    Username string
+	    Gender   int
 	}
 
 	err := Beans.CopyProperties(&src, &target)
 */
-func CopyProperties(src interface{}, target interface{}) error {
-	srcProxy := reflect.ValueOf(src)
-	srcTypeof := reflect.TypeOf(src)
-	if srcProxy.Kind() == reflect.Pointer {
-		srcProxy = srcProxy.Elem()
-		srcTypeof = srcTypeof.Elem()
+func CopyProperties(src any, target any) error {
+	srcType := reflect.TypeOf(src)
+	srcValue := reflect.ValueOf(src)
+	if srcValue.Kind() == reflect.Pointer {
+		srcValue = srcValue.Elem()
+		srcType = srcType.Elem()
 	}
-	if srcProxy.Kind() != reflect.Struct {
+	if srcValue.Kind() != reflect.Struct {
 		return errors.New("src must be a struct")
 	}
-	targetProxy := reflect.ValueOf(target).Elem()
-	if targetProxy.Kind() != reflect.Struct && targetProxy.Kind() != reflect.Pointer {
+	targetValue := reflect.ValueOf(target)
+	if targetValue.Kind() != reflect.Pointer {
 		return errors.New("target must be a struct pointer")
 	}
-	var filedName string
-	for i := 0; i < srcTypeof.NumField(); i++ {
-		f := srcTypeof.Field(i)
-		filedName = f.Tag.Get("copy")
-		switch filedName {
+	targetValue = targetValue.Elem()
+	if targetValue.Kind() != reflect.Struct {
+		return errors.New("target must be a struct pointer")
+	}
+	copyCore(srcType, srcValue, targetValue)
+	return nil
+}
+
+func copyCore(srcType reflect.Type, srcValue, targetValue reflect.Value) {
+	var fieldName string
+	for i := 0; i < srcType.NumField(); i++ {
+		f := srcType.Field(i)
+		if f.Anonymous && f.Type.Kind() == reflect.Struct {
+			copyCore(f.Type, srcValue.Field(i), targetValue)
+			continue
+		}
+		fieldName = f.Tag.Get("copy")
+		switch fieldName {
 		case "-":
 			continue
 		case "":
-			filedName = f.Name
+			fieldName = f.Name
 		}
-		targetField := targetProxy.FieldByName(filedName)
+		targetField := targetValue.FieldByName(fieldName)
 		if targetField.Kind() == reflect.Invalid {
 			continue
 		}
-		targetField.Set(srcProxy.Field(i))
+		fv := srcValue.Field(i)
+		if fv.Kind() != targetField.Kind() {
+			// Ignore fields of different types
+			continue
+		}
+		targetField.Set(fv)
 	}
-	return nil
 }
 
 /*

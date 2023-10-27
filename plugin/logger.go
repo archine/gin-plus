@@ -24,10 +24,10 @@ const (
 	reset   = "\033[0m"
 )
 
-type LogFormat struct {
+type HjLogFormat struct {
 }
 
-func (h *LogFormat) Format(entry *log.Entry) ([]byte, error) {
+func (h *HjLogFormat) Format(entry *log.Entry) ([]byte, error) {
 	timestamp := entry.Time.Format("2006-01-02 15:04:05")
 	sprintf := fmt.Sprintf("====> [%s] %s[%s]%s %s \n", timestamp, getLevelColor(entry.Level), strings.ToUpper(entry.Level.String()), reset, entry.Message)
 	return []byte(sprintf), nil
@@ -40,7 +40,7 @@ func InitLog(levelString string) {
 		log.Fatalf("init logger module failed, invalid logger level: %s", levelString)
 	}
 	log.SetLevel(level)
-	log.SetFormatter(&LogFormat{})
+	log.SetFormatter(&HjLogFormat{})
 }
 
 var printHealth = true
@@ -55,7 +55,7 @@ func LogMiddleware() gin.HandlerFunc {
 		reqMethod := c.Request.Method
 		reqUrl := c.Request.RequestURI
 		statusCode := c.Writer.Status()
-		matched, _ := regexp.MatchString("^/.*/health$", reqUrl)
+		matched, _ := regexp.MatchString(`^/(.*)?(health)$`, reqUrl)
 		if matched {
 			if !printHealth {
 				return

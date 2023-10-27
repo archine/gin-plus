@@ -2,7 +2,7 @@ package exception
 
 import (
 	"bytes"
-	"github.com/archine/gin-plus/v2/resp"
+	"github.com/archine/gin-plus/v3/resp"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"runtime"
@@ -10,6 +10,10 @@ import (
 
 // BusinessException the service level exception, the service code is -10400, equivalent to resp.BadRequest
 type BusinessException struct {
+	error
+}
+
+type SysException struct {
 	error
 }
 
@@ -38,6 +42,9 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 			case BusinessException:
 				printSimpleStack(t)
 				resp.BadRequest(context, true, t.Error())
+			case SysException:
+				printSimpleStack(t)
+				resp.SeverError(context, true)
 			case error:
 				printStack(t)
 				resp.SeverError(context, true)
@@ -51,14 +58,14 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 	context.Next()
 }
 
-// OrThrow If err not nil, a system-level exception is thrown.
+// OrThrow if err not nil, panic
 func OrThrow(err error) {
 	if err != nil {
-		panic(err)
+		panic(SysException{err})
 	}
 }
 
-// OrThrowBusiness If err not nil, a business-level exception is thrown.
+// OrThrowBusiness if err not nil, panic
 func OrThrowBusiness(err error) {
 	if err != nil {
 		panic(BusinessException{err})

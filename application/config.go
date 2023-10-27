@@ -2,7 +2,7 @@ package application
 
 import (
 	"flag"
-	"github.com/archine/ioc"
+	ioc "github.com/archine/ioc"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )

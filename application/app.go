@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/archine/gin-plus/v2/banner"
-	"github.com/archine/gin-plus/v2/exception"
-	"github.com/archine/gin-plus/v2/mvc"
-	"github.com/archine/gin-plus/v2/plugin"
+	"github.com/archine/gin-plus/v3/banner"
+	"github.com/archine/gin-plus/v3/exception"
+	"github.com/archine/gin-plus/v3/mvc"
+	"github.com/archine/gin-plus/v3/plugin"
 	"github.com/archine/ioc"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -69,7 +69,7 @@ func Default(confReaderOptions ...viper.Option) *App {
 	engine.Use(plugin.LogMiddleware())
 	engine.Use(exception.GlobalExceptionInterceptor)
 	engine.Use(cors.New(cors.Config{
-		AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS", "HEAD"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,

@@ -1,41 +1,11 @@
 package mvc
 
 import (
-	"github.com/archine/gin-plus/v2/ast"
+	"github.com/archine/ast-base/core"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
 	"reflect"
 )
-
-// controller Top-level interface used to declare a structure as a controller.
-type abstractController interface {
-	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here.
-	PostConstruct()
-}
-
-/*
-Controller Default abstract controller implementation.
-
-	Simply integrate the default controller into your structure.
-
-Example:
-
-	type YourController struct {
-	   mvc.Controller
-	}
-
-	// Hello
-	// @GET(path="/hello") this is api method
-	func (y *YourController) Hello(ctx *gin.Context) {
-	   resp.Json(ctx, "Hello World")
-	}
-
-	// Access the API
-	curl http://localhost:4006/hello
-*/
-type Controller struct{}
-
-func (c *Controller) PostConstruct() {}
 
 // Annotations the annotation of Api method
 type Annotations map[string]string
@@ -45,6 +15,17 @@ var controllerCache []abstractController
 
 // Annotations of each API
 var annotationCache map[string]Annotations
+
+type abstractController interface {
+	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here
+	PostConstruct()
+}
+
+// Controller Declares the structure to be a controller
+// you can add api methods to it
+type Controller struct{}
+
+func (c *Controller) PostConstruct() {}
 
 // Register controllers
 func Register(controller ...abstractController) {
@@ -64,7 +45,7 @@ func IsController(v interface{}) bool {
 // @param e: gin.Engine
 // @param autowired: whether enable autowired properties
 func Apply(e *gin.Engine, autowired bool) {
-	if ast.Apis == nil {
+	if core.Apis == nil {
 		for _, controller := range controllerCache {
 			if autowired {
 				ioc.Inject(controller)
@@ -79,18 +60,19 @@ func Apply(e *gin.Engine, autowired bool) {
 			ioc.Inject(controller)
 		}
 		controller.PostConstruct()
-		controllerTypeOf := reflect.TypeOf(controller)
+		controllerTypeOf := reflect.TypeOf(controller).Elem()
 		controllerProxy := reflect.ValueOf(controller)
-		for i := 0; i < controllerTypeOf.NumMethod(); i++ {
-			methodProxy := controllerTypeOf.Method(i)
-			methodFullName := controllerTypeOf.Elem().Name() + "/" + methodProxy.Name
-			if info, ok := ast.Apis[methodFullName]; ok {
-				ginMethod := ginProxy.MethodByName(info.Method)
-				args := []reflect.Value{reflect.ValueOf(info.ApiPath)}
-				args = append(args, controllerProxy.MethodByName(methodProxy.Name))
-				ginMethod.Call(args)
-				annotationCache[info.ApiPath] = info.Annotations
+		methodInfosAst := core.Apis[controllerTypeOf.Name()]
+		for _, m := range methodInfosAst {
+			mValueProxy := controllerProxy.MethodByName(m.Name)
+			if mValueProxy.Kind() == reflect.Invalid {
+				continue
 			}
+			ginMethod := ginProxy.MethodByName(m.Method)
+			args := []reflect.Value{reflect.ValueOf(m.ApiPath)}
+			args = append(args, mValueProxy)
+			ginMethod.Call(args)
+			annotationCache[m.ApiPath] = m.Annotations
 		}
 		if len(controllerCache) == 1 {
 			controllerCache = nil
@@ -98,7 +80,7 @@ func Apply(e *gin.Engine, autowired bool) {
 		}
 		controllerCache = controllerCache[1:]
 	}
-	ast.Apis = nil
+	core.Apis = nil // GC
 }
 
 // GetAnnotation Gets the specified annotation
@@ -115,14 +97,14 @@ func GetAnnotation(ctx *gin.Context, annotationName string) (val string, has boo
 // MethodInterceptor API method interceptor
 // You can do logical processing before and after method calls
 type MethodInterceptor interface {
-	// Predicate true means intercept.
+	// Predicate true means intercept
 	Predicate(ctx *gin.Context) bool
 
-	// PreHandle triggered before method invocation.
-	// If you want to abort the current request, just call abort() and response inside the method
+	// PreHandle triggered before method invocation
+	// if you want to abort the current request, just call abort() and response inside the method
 	PreHandle(ctx *gin.Context)
 
-	// PostHandle triggered after method invocation.
-	// If you want to abort the current request, just call abort() and response inside the method
+	// PostHandle triggered after method invocation
+	// if you want to abort the current request, just call abort() and response inside the method
 	PostHandle(ctx *gin.Context)
 }
