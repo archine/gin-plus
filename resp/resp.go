@@ -183,7 +183,7 @@ func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
 		}
 		InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE).WithMessage(message).To()
 	}
-	return true
+	return condition
 }
 
 // Custom User defined business code and message
