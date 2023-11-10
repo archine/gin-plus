@@ -30,6 +30,7 @@ type App struct {
 	postStopFunc func()
 	banner       string
 	exitDelay    time.Duration
+	Interceptors []mvc.MethodInterceptor
 }
 
 // New Create a clean application, you can add some gin middlewares to the engine
@@ -94,9 +95,16 @@ func (a *App) Banner(banner string) *App {
 	return a
 }
 
+// Interceptor Add a global interceptor
+func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
+	a.Interceptors = append(a.Interceptors, interceptor...)
+	return a
+}
+
 // Run the main program entry
 // interceptors: link{mvc.MethodInterceptor}
 func (a *App) Run(interceptors ...mvc.MethodInterceptor) {
+	a.Interceptors = append(a.Interceptors, interceptors...)
 	if a.banner != "" {
 		fmt.Print(a.banner)
 	}
@@ -105,18 +113,21 @@ func (a *App) Run(interceptors ...mvc.MethodInterceptor) {
 	}
 	if len(interceptors) > 0 {
 		a.e.Use(func(context *gin.Context) {
-			is := interceptors
-			for _, interceptor := range is {
+			var is []mvc.MethodInterceptor
+			for _, interceptor := range a.Interceptors {
 				if interceptor.Predicate(context) {
+					is = append(is, interceptor)
 					interceptor.PreHandle(context)
-					if context.IsAborted() {
-						break
-					}
-					context.Next()
-					interceptor.PostHandle(context)
-					if context.IsAborted() {
-						break
-					}
+				}
+				if context.IsAborted() {
+					return
+				}
+			}
+			context.Next()
+			for _, interceptor := range is {
+				interceptor.PostHandle(context)
+				if context.IsAborted() {
+					return
 				}
 			}
 		})

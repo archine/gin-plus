@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v3.0.0-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.21-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v3.x-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.21-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 > 📢📢📢 Gin增强版，集成了IOC、MVC，API定义采用 restful 风格。可帮你快速的进行 web 项目开发，搭配 [🍳Goland](https://plugins.jetbrains.com/plugin/20652-iocer/versions) 插件可以事半功倍哦！！！😀😀
 
@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v3@v3.0.0
+go get github.com/archine/gin-plus/v3@v3.0.1
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v3 v3.0.0
+github.com/archine/gin-plus/v3 v3.0.1
 
 # 命令行在该项目目录下执行
 go mod tidy

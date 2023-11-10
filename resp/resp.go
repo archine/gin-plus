@@ -92,7 +92,8 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 }
 
 // ParamInvalid invalid parameter.
-//  Return true means the condition is true
+//
+//	Return true means the condition is true
 func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
 		message := "参数无效"
@@ -182,7 +183,7 @@ func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
 		}
 		InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE).WithMessage(message).To()
 	}
-	return true
+	return condition
 }
 
 // Custom User defined business code and message
