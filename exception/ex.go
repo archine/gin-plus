@@ -45,7 +45,7 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 				log.Error(t)
 				resp.SeverError(context, true)
 			}
-			return
+			context.Abort()
 		}
 	}()
 	context.Next()
