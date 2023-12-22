@@ -1,6 +1,7 @@
 package resp
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	log "github.com/sirupsen/logrus"
@@ -91,9 +92,13 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 	return condition
 }
 
+// DirectBadRequest Directly return business-related errors.
+func DirectBadRequest(ctx *gin.Context, format string, args ...any) {
+	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprint(format, args)).To()
+}
+
 // ParamInvalid invalid parameter.
-//
-//	Return true means the condition is true
+// Return true means the condition is true
 func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
 		message := "参数无效"
@@ -103,15 +108,6 @@ func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 		InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(message).To()
 	}
 	return condition
-}
-
-// Deprecated: please use ParamValidation. it will be removed in the future
-func ParamValid(ctx *gin.Context, err error, obj interface{}) bool {
-	if err == nil {
-		return false
-	}
-	InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(getValidMsg(err, obj)).To()
-	return true
 }
 
 // ParamValidation parameter validation, return false means that the validation failed
@@ -186,9 +182,9 @@ func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
 	return condition
 }
 
-// Custom User defined business code and message
-func Custom(ctx *gin.Context, bCode int, msg string) {
-	InitResp(ctx, http.StatusOK).WithCode(bCode).WithMessage(msg).To()
+// DirectRespWithCode Respond directly and customize the business code
+func DirectRespWithCode(ctx *gin.Context, bCode int, format string, args ...any) {
+	InitResp(ctx, http.StatusOK).WithCode(bCode).WithMessage(fmt.Sprintf(format, args)).To()
 }
 
 func getValidMsg(err error, obj interface{}) string {
