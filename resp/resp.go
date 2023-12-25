@@ -94,7 +94,7 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 
 // DirectBadRequest Directly return business-related errors.
 func DirectBadRequest(ctx *gin.Context, format string, args ...any) {
-	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprint(format, args)).To()
+	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprintf(format, args)).To()
 }
 
 // ParamInvalid invalid parameter.
