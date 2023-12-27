@@ -94,7 +94,7 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 
 // DirectBadRequest Directly return business-related errors.
 func DirectBadRequest(ctx *gin.Context, format string, args ...any) {
-	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprintf(format, args)).To()
+	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprintf(format, args...)).To()
 }
 
 // ParamInvalid invalid parameter.
@@ -184,7 +184,7 @@ func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
 
 // DirectRespWithCode Respond directly and customize the business code
 func DirectRespWithCode(ctx *gin.Context, bCode int, format string, args ...any) {
-	InitResp(ctx, http.StatusOK).WithCode(bCode).WithMessage(fmt.Sprintf(format, args)).To()
+	InitResp(ctx, http.StatusOK).WithCode(bCode).WithMessage(fmt.Sprintf(format, args...)).To()
 }
 
 func getValidMsg(err error, obj interface{}) string {
