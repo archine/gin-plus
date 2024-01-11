@@ -2,9 +2,9 @@ package resp
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v3/plugin/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
 )
@@ -12,13 +12,12 @@ import (
 // Respond to the client assistant and return quickly
 
 const (
-	BAD_REQUEST_CODE      = -10400
-	NONE_LOGIN_CODE       = -10401
-	LOGIN_TOKEN_EXPIRED   = -10402
-	NO_PERMISSION_CODE    = -10403
-	TOO_MANY_REQUEST_CODE = -10429
-	INTERNAL_SERVER_CODE  = -10500
-	PARAM_FAILD_CODE      = -10600
+	BadRequestCode      = 40000
+	NonLoginCode        = 40001
+	TokenExpiredCode    = 40002
+	ForbiddenCode       = 40003
+	ParamValidationCode = 40010
+	SystemErrorCode     = 50000
 )
 
 type Resp interface {
@@ -87,25 +86,25 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusOK).WithCode(BadRequestCode).WithMessage(message).To()
 	}
 	return condition
 }
 
 // DirectBadRequest Directly return business-related errors.
 func DirectBadRequest(ctx *gin.Context, format string, args ...any) {
-	InitResp(ctx, http.StatusOK).WithCode(BAD_REQUEST_CODE).WithMessage(fmt.Sprintf(format, args...)).To()
+	InitResp(ctx, http.StatusOK).WithCode(BadRequestCode).WithMessage(fmt.Sprintf(format, args...)).To()
 }
 
 // ParamInvalid invalid parameter.
 // Return true means the condition is true
 func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
-		message := "参数无效"
+		message := "参数错误"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusOK).WithCode(ParamValidationCode).WithMessage(message).To()
 	}
 	return condition
 }
@@ -116,19 +115,19 @@ func ParamValidation(ctx *gin.Context, obj interface{}) bool {
 	if err == nil {
 		return true
 	}
-	InitResp(ctx, http.StatusOK).WithCode(PARAM_FAILD_CODE).WithMessage(getValidMsg(err, obj)).To()
+	InitResp(ctx, http.StatusOK).WithCode(ParamValidationCode).WithMessage(getValidMsg(err, obj)).To()
 	return false
 }
 
-// NoPermission Insufficient permission error.
+// Forbidden Insufficient permission error.
 // Return true means the condition is true
-func NoPermission(ctx *gin.Context, condition bool, msg ...string) bool {
+func Forbidden(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
 		message := "权限不足"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(NO_PERMISSION_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusOK).WithCode(ForbiddenCode).WithMessage(message).To()
 	}
 	return condition
 }
@@ -141,7 +140,7 @@ func NoLogin(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusUnauthorized).WithCode(NONE_LOGIN_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusUnauthorized).WithCode(NonLoginCode).WithMessage(message).To()
 	}
 	return condition
 }
@@ -154,7 +153,7 @@ func LoginExpired(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusUnauthorized).WithCode(LOGIN_TOKEN_EXPIRED).WithMessage(message).To()
+		InitResp(ctx, http.StatusUnauthorized).WithCode(TokenExpiredCode).WithMessage(message).To()
 	}
 	return condition
 }
@@ -177,7 +176,7 @@ func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx, http.StatusOK).WithCode(INTERNAL_SERVER_CODE).WithMessage(message).To()
+		InitResp(ctx, http.StatusOK).WithCode(SystemErrorCode).WithMessage(message).To()
 	}
 	return condition
 }
@@ -192,7 +191,7 @@ func getValidMsg(err error, obj interface{}) string {
 		return err.Error()
 	}
 	if errs, ok := err.(validator.ValidationErrors); ok {
-		log.Error(err)
+		logger.Log.Error(err.Error())
 		getObj := reflect.TypeOf(obj)
 		if getObj.Kind() == reflect.Ptr {
 			getObj = getObj.Elem()
@@ -210,6 +209,6 @@ func getValidMsg(err error, obj interface{}) string {
 			}
 		}
 	}
-	log.Error(err.Error())
-	return "参数无效"
+	logger.Log.Error(err.Error())
+	return "参数错误"
 }

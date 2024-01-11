@@ -2,54 +2,57 @@ package exception
 
 import (
 	"bytes"
+	"github.com/archine/gin-plus/v3/plugin/logger"
 	"github.com/archine/gin-plus/v3/resp"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
+	"log"
 	"runtime"
 )
 
-// BusinessException the service level exception, the service code is -10400, equivalent to resp.BadRequest
+// BusinessException the service level exception, equivalent to resp.BadRequest
 type BusinessException struct {
-	error
+	code int
+	msg  string
 }
 
-type SysException struct {
-	error
+func (b *BusinessException) Error() string {
+	return b.msg
+}
+
+func NewBusinessErr(msg string) *BusinessException {
+	return &BusinessException{msg: msg, code: 40000}
 }
 
 func printStack(err error) {
 	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
-	log.Errorf("%s %s", err.Error(), string(buf[:n]))
+	log.Printf("%s %s", err.Error(), string(buf[:n]))
 }
 
-func printSimpleStack(err error) {
+func printSimpleStack(err string) {
 	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
 	lines := bytes.Split(buf[:n], []byte("\n"))
-	log.Errorf("%s\n%s", err.Error(), string(bytes.Join(lines[9:11], []byte("\n"))))
+	log.Printf("%s\n%s", err, string(bytes.Join(lines[9:11], []byte("\n"))))
 }
 
 // GlobalExceptionInterceptor gin global exception interceptor
 // add via gin middleware.
-// an error of -10400 is thrown when the exception type is string and the BusinessException
+// thrown when the exception type is string and the BusinessException
 func GlobalExceptionInterceptor(context *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch t := r.(type) {
 			case string:
-				resp.BadRequest(context, true, t)
-			case BusinessException:
-				printSimpleStack(t)
-				resp.BadRequest(context, true, t.Error())
-			case SysException:
-				printSimpleStack(t)
-				resp.SeverError(context, true)
+				resp.DirectBadRequest(context, t)
+			case *BusinessException:
+				printSimpleStack(t.msg)
+				resp.DirectBadRequest(context, t.msg)
 			case error:
 				printStack(t)
 				resp.SeverError(context, true)
 			default:
-				log.Error(t)
+				logger.Log.Error(r)
 				resp.SeverError(context, true)
 			}
 			context.Abort()
@@ -61,13 +64,6 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 // OrThrow if err not nil, panic
 func OrThrow(err error) {
 	if err != nil {
-		panic(SysException{err})
-	}
-}
-
-// OrThrowBusiness if err not nil, panic
-func OrThrowBusiness(err error) {
-	if err != nil {
-		panic(BusinessException{err})
+		panic(err)
 	}
 }

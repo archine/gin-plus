@@ -10,7 +10,6 @@ require (
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/validator/v10 v10.15.5
-	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.17.0
 )
 
