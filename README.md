@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v3@v3.0.5
+go get github.com/archine/gin-plus/v3@v3.0.6
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v3 v3.0.5
+github.com/archine/gin-plus/v3 v3.0.6
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -136,11 +136,14 @@ func (t *TestController) Hello(ctx *gin.Context) {
 框架默认会读取项目同级目录的 app.yml 文件（可通过 -c 参数指定文件）
 * 基础配置
 ```yaml
-log_level: debug # 默认 debug，支持 error、info、trace、warn、panic、fetal、debug
-port: 4006 # 默认 4006
-max_file_size: 104857600 # 默认 100m，单位字节
+server:
+  port: 4006               # 默认 4006
+  max_file_size: 104857600 # 默认 100m，单位字节
+  env: dev                 # 默认 dev，支持 dev、test、prod
+  write_timeout: 0         # 默认 0，不超时，单位秒
+  read_timeout: 0          # 默认 0，不超时，单位秒
 ```
-这些参数框架内部会解析，使用这些参数时，可通过 ``application.Env`` 来获取。
+这些参数框架内部会解析，使用这些参数时，可通过 ``application.Conf.Server`` 来获取。
 
 - 自定义配置    
 
@@ -202,7 +205,7 @@ func (t *TestController) AddUser(ctx *gin.Context) {
 - 响应结构
 ```json
 {
-    "err_code": -10602,
+    "err_code": 40010,
     "err_msg": "年龄最小为10"
 }
 ```
