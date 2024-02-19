@@ -1,7 +1,5 @@
 package logger
 
-import "github.com/gin-gonic/gin"
-
 var (
 	Log AbstractLogger // Log logger instance
 )
@@ -50,7 +48,4 @@ type AbstractLogger interface {
 
 	// Fatalf Fatal logs a message at FatalLevel
 	Fatalf(format string, v ...any)
-
-	// GinMiddleware Log print
-	GinMiddleware() gin.HandlerFunc
 }

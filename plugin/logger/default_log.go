@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"github.com/gin-gonic/gin"
 	"log"
 )
 
@@ -62,8 +61,4 @@ func (d *DefaultLog) Fatal(v ...any) {
 
 func (d *DefaultLog) Fatalf(format string, v ...any) {
 	log.Fatalf(format, v...)
-}
-
-func (d *DefaultLog) GinMiddleware() gin.HandlerFunc {
-	return nil
 }
