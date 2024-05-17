@@ -80,9 +80,6 @@ func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
 
 // Run the main program entry
 func (a *App) Run() {
-	if logger.Log == nil {
-		logger.Log = &logger.DefaultLog{}
-	}
 	a.e = gin.New()
 	server := &http.Server{
 		Addr:                         fmt.Sprintf(":%d", Conf.Server.Port),

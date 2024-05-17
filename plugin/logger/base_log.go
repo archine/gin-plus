@@ -1,7 +1,7 @@
 package logger
 
 var (
-	Log AbstractLogger // Log logger instance
+	Log AbstractLogger = &DefaultLog{} // Log logger instance
 )
 
 type AbstractLogger interface {
