@@ -67,6 +67,7 @@ func (a *App) Banner(b string) *App {
 
 // Log Sets the log collector
 func (a *App) Log(collector logger.AbstractLogger) *App {
+	collector.Init()
 	logger.Log = collector
 	return a
 }
