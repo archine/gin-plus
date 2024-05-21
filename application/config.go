@@ -2,8 +2,8 @@ package application
 
 import (
 	"flag"
+	"fmt"
 	"github.com/archine/gin-plus/v3/listener"
-	"github.com/archine/gin-plus/v3/plugin/logger"
 	ioc "github.com/archine/ioc"
 	"github.com/spf13/viper"
 	"time"
@@ -53,10 +53,10 @@ func LoadApplicationConfigFile(l listener.ConfigListener) {
 		err = v.ReadInConfig()
 	}
 	if err != nil {
-		logger.Log.Fatalf("Init project config error, %s", err.Error())
+		panic(fmt.Sprintf("Failed to read the configuration file, %s", err.Error()))
 	}
 	if err = v.Unmarshal(&Conf); err != nil {
-		logger.Log.Fatalf("Parse project config error, %s", err.Error())
+		panic(fmt.Sprintf("Failed to parse the configuration file, %s", err.Error()))
 	}
 	ioc.SetBeans(v)
 }

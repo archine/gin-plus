@@ -67,7 +67,6 @@ func (a *App) Banner(b string) *App {
 
 // Log Sets the log collector
 func (a *App) Log(collector logger.AbstractLogger) *App {
-	collector.Init()
 	logger.Log = collector
 	return a
 }
@@ -123,10 +122,10 @@ func (a *App) Run() {
 	listener.DoPreStart(a.listeners)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Log.Fatalf("Application start error, %s", err.Error())
+			logger.Log.Fatal("Application start error, %s", err.Error())
 		}
 	}()
-	logger.Log.Debugf("Application start success on Ports:[%d]", Conf.Server.Port)
+	logger.Log.Info("Application start success on Ports:[%d]", Conf.Server.Port)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
@@ -135,7 +134,7 @@ func (a *App) Run() {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), a.exitDelay)
 	defer cancelFunc()
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Log.Fatalf("Server shutdown failure, %s", err.Error())
+		logger.Log.Fatal("Server shutdown failure, %s", err.Error())
 	}
 	listener.DoPostStop(a.listeners)
 	logger.Log.Debug("Server exiting ...")
@@ -145,7 +144,7 @@ func (a *App) Run() {
 // v config struct pointer
 func (a *App) ReadConfig(v any) *App {
 	if err := GetConfReader().Unmarshal(v); err != nil {
-		logger.Log.Fatalf("read config error, %s", err.Error())
+		logger.Log.Fatal("read config error, %s", err.Error())
 	}
 	return a
 }
@@ -155,7 +154,7 @@ func (a *App) ReadConfig(v any) *App {
 // sub: sub configuration key
 func (a *App) ReadConfigSub(v any, sub string) *App {
 	if err := GetConfReader().Sub(sub).Unmarshal(v); err != nil {
-		logger.Log.Fatalf("read config error, %s", err.Error())
+		logger.Log.Fatal("read config error, %s", err.Error())
 	}
 	return a
 }

@@ -49,11 +49,11 @@ type PaginationResult struct {
 
 // Result Return result
 type Result struct {
-	ctx     *gin.Context `json:"-"`
-	Code    int          `json:"err_code"`           // business code
-	TraceId string       `json:"trace_id,omitempty"` // trace id, optional, can be empty. you can manually set it.
-	Message string       `json:"err_msg"`            // business message
-	Data    interface{}  `json:"ret,omitempty"`      // Response data
+	ctx     *gin.Context
+	Code    int         `json:"err_code"`           // business code
+	TraceId string      `json:"trace_id,omitempty"` // trace id, optional, can be empty. you can manually set it.
+	Message string      `json:"err_msg"`            // business message
+	Data    interface{} `json:"ret,omitempty"`      // Response data
 }
 
 func (r *Result) WithBasic(code int, msg string, data any) Resp {
@@ -172,7 +172,7 @@ func LoginExpired(ctx *gin.Context, condition bool, msg ...string) bool {
 
 // Ok Normal request with no data returned
 func Ok(ctx *gin.Context) {
-	InitResp(ctx).To()
+	InitResp(ctx).WithBasic(0, "ok", nil).To()
 }
 
 // Json Normal request with data returned
