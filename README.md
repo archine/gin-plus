@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v3@v3.1.7
+go get github.com/archine/gin-plus/v3@v3.1.8
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v3 v3.1.7
+github.com/archine/gin-plus/v3 v3.1.8
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -205,8 +205,8 @@ func (t *TestController) AddUser(ctx *gin.Context) {
 - 响应结构
 ```json
 {
-    "err_code": 40010,
-    "err_msg": "年龄最小为10"
+    "code": 40010,
+    "msg": "年龄最小为10"
 }
 ```
 

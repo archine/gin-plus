@@ -50,9 +50,9 @@ type PaginationResult struct {
 // Result Return result
 type Result struct {
 	ctx     *gin.Context
-	Code    int         `json:"err_code"`           // business code
+	Code    int         `json:"code"`               // business code
 	TraceId string      `json:"trace_id,omitempty"` // trace id, optional, can be empty. you can manually set it.
-	Message string      `json:"err_msg"`            // business message
+	Message string      `json:"msg"`                // business message
 	Data    interface{} `json:"ret,omitempty"`      // Response data
 }
 
