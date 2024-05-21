@@ -21,7 +21,7 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 				exception.PrintStack(t)
 				resp.SeverError(context, true)
 			default:
-				logger.Log.Error(r)
+				logger.Log.Error("Unknown error: %v", r)
 				resp.SeverError(context, true)
 			}
 		}

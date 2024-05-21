@@ -35,7 +35,7 @@ func OrThrow(err error) {
 func PrintStack(err error) {
 	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
-	logger.Log.Errorf("%s %s", err.Error(), string(buf[:n]))
+	logger.Log.Error("%s %s", err.Error(), string(buf[:n]))
 }
 
 // PrintSimpleStack Print short stack information
@@ -43,5 +43,5 @@ func PrintSimpleStack(err error) {
 	var buf [2048]byte
 	n := runtime.Stack(buf[:], false)
 	lines := bytes.Split(buf[:n], []byte("\n"))
-	logger.Log.Errorf("%s\n%s", err.Error(), string(bytes.Join(lines[7:11], []byte("\n"))))
+	logger.Log.Error("%s\n%s", err.Error(), string(bytes.Join(lines[7:11], []byte("\n"))))
 }
