@@ -8,13 +8,13 @@
 
 - Get
 ```bash
-go get github.com/archine/gin-plus/v3@v3.1.4
+go get github.com/archine/gin-plus/v3@v3.1.5
 ```
 
 - Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v3 v3.1.4
+github.com/archine/gin-plus/v3 v3.1.5
 
 # 命令行在该项目目录下执行
 go mod tidy
