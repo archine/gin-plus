@@ -6,12 +6,12 @@
 详细文档点击前往：[文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
 ### 1、安装
 
-- Get
+* Get
 ```bash
 go get github.com/archine/gin-plus/v3@v3.1.9
 ```
 
-- Mod
+* Mod
 ```bash
 # go.mod文件加入下面的一条
 github.com/archine/gin-plus/v3 v3.1.9
@@ -23,7 +23,7 @@ go mod tidy
 
 ### 1、快速开始
 
-- controller接口
+* controller接口
 ```go
 package controller
 
@@ -45,7 +45,7 @@ func (t *TestController) Hello(ctx *gin.Context) {
 }
 ```
 
-- 启动类
+* 启动类
 ```go
 package main
 
@@ -145,7 +145,7 @@ server:
 ```
 这些参数框架内部会解析，使用这些参数时，可通过 ``application.Conf.Server`` 来获取。
 
-- 自定义配置    
+* 自定义配置    
 
 实际开发中，项目配置往往不只是基础配置那些，可能还包括其他配置，这时我们需要在启动时调用 ``ReadConfig()``方法，参数为需要解析到哪个结构体中
 ```go
