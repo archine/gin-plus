@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v3/application/config"
 	"github.com/archine/gin-plus/v3/application/middleware"
 	"github.com/archine/gin-plus/v3/banner"
 	"github.com/archine/gin-plus/v3/exception/interceptor"
@@ -37,16 +38,16 @@ func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFun
 	configured := false
 	for _, l := range listeners {
 		if cl, ok := l.(listener.ConfigListener); ok {
-			LoadApplicationConfigFile(cl)
+			config.LoadByCommand(cl)
 			configured = true
 			continue
 		}
 		app.listeners = append(app.listeners, l)
 	}
 	if !configured {
-		LoadApplicationConfigFile(nil)
+		config.LoadByCommand(nil)
 	}
-	if Conf.Server.Env == Prod {
+	if config.Conf.Server.Env == config.Prod {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		gin.SetMode(gin.DebugMode)
@@ -67,7 +68,6 @@ func (a *App) Banner(b string) *App {
 
 // Log Sets the log collector
 func (a *App) Log(collector logger.AbstractLogger) *App {
-	collector.Init()
 	logger.Log = collector
 	return a
 }
@@ -82,16 +82,16 @@ func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
 func (a *App) Run() {
 	a.e = gin.New()
 	server := &http.Server{
-		Addr:                         fmt.Sprintf(":%d", Conf.Server.Port),
-		ReadTimeout:                  Conf.Server.ReadTimeout,
-		WriteTimeout:                 Conf.Server.WriteTimeout,
+		Addr:                         fmt.Sprintf(":%d", config.Conf.Server.Port),
+		ReadTimeout:                  config.Conf.Server.ReadTimeout,
+		WriteTimeout:                 config.Conf.Server.WriteTimeout,
 		DisableGeneralOptionsHandler: true,
 	}
 	server.Handler = a.e
 	if len(a.ginMiddlewares) > 0 {
 		a.e.Use(a.ginMiddlewares...)
 	}
-	a.e.MaxMultipartMemory = Conf.Server.MaxFileSize
+	a.e.MaxMultipartMemory = config.Conf.Server.MaxFileSize
 	a.e.RemoveExtraSlash = true
 	ioc.SetBeans(a.e)
 	if banner.Banner != "" {
@@ -126,7 +126,7 @@ func (a *App) Run() {
 			logger.Log.Fatal("Application start error, %s", err.Error())
 		}
 	}()
-	logger.Log.Info("Application start success on Ports:[%d]", Conf.Server.Port)
+	logger.Log.Info("Application start success on Ports:[%d]", config.Conf.Server.Port)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
@@ -144,7 +144,7 @@ func (a *App) Run() {
 // ReadConfig Read configuration
 // v config struct pointer
 func (a *App) ReadConfig(v any) *App {
-	if err := GetConfReader().Unmarshal(v); err != nil {
+	if err := config.GetConfReader().Unmarshal(v); err != nil {
 		logger.Log.Fatal("read config error, %s", err.Error())
 	}
 	return a
@@ -154,7 +154,7 @@ func (a *App) ReadConfig(v any) *App {
 // v: config struct pointer
 // sub: sub configuration key
 func (a *App) ReadConfigSub(v any, sub string) *App {
-	if err := GetConfReader().Sub(sub).Unmarshal(v); err != nil {
+	if err := config.GetConfReader().Sub(sub).Unmarshal(v); err != nil {
 		logger.Log.Fatal("read config error, %s", err.Error())
 	}
 	return a

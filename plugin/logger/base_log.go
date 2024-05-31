@@ -5,10 +5,6 @@ var (
 )
 
 type AbstractLogger interface {
-	// Init logger
-	// After reading the project configuration, you can initialize your log in this method
-	Init()
-
 	// Info logs a message at InfoLevel, args are handled in the manner of fmt.sprintf.
 	Info(msg string, args ...any)
 

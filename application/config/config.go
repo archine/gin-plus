@@ -1,4 +1,4 @@
-package application
+package config
 
 import (
 	"flag"
@@ -33,13 +33,18 @@ type config struct {
 	}
 }
 
-// LoadApplicationConfigFile load the application configuration file
-func LoadApplicationConfigFile(l listener.ConfigListener) {
-	var v = viper.New()
+// LoadByCommand Load configuration file by command line
+func LoadByCommand(l listener.ConfigListener) {
 	var configFile string
 	flag.StringVar(&configFile, "c", "app.yml", "Absolute path to the project configuration file, default app.yml")
 	flag.Parse()
-	v.SetConfigFile(configFile)
+	Load(configFile, l)
+}
+
+// Load Load configuration file
+func Load(configFilePath string, l listener.ConfigListener) {
+	var v = viper.New()
+	v.SetConfigFile(configFilePath)
 	v.SetDefault("server.port", 4006)
 	v.SetDefault("server.env", Dev)
 	v.SetDefault("server.max_file_size", 104857600)

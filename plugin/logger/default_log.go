@@ -7,8 +7,6 @@ import (
 // DefaultLog use golang log as default
 type DefaultLog struct{}
 
-func (d *DefaultLog) Init() {}
-
 func (d *DefaultLog) Info(msg string, args ...any) {
 	log.Printf(msg, args...)
 }
