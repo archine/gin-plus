@@ -130,7 +130,7 @@ func (a *App) Run() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
-	logger.Log.Debug("Shutdown server ...")
+	logger.Log.Info("Shutdown server ...")
 	listener.DoPreStop(a.listeners)
 	ctx, cancelFunc := context.WithTimeout(context.Background(), a.exitDelay)
 	defer cancelFunc()
@@ -138,7 +138,7 @@ func (a *App) Run() {
 		logger.Log.Fatal("Server shutdown failure, %s", err.Error())
 	}
 	listener.DoPostStop(a.listeners)
-	logger.Log.Debug("Server exiting ...")
+	logger.Log.Info("Server exiting ...")
 }
 
 // ReadConfig Read configuration
