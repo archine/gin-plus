@@ -223,6 +223,23 @@ func Recycle(resp Resp) {
 	resultPool.Put(resp)
 }
 
+// Stream response, word-by-word response
+// @param event: event name, such as "Error"、"Info"
+// @param msg: message
+func Stream(ctx *gin.Context, event string, msg string) error {
+	ctx.Header("Content-Type", "text/event-stream")
+	ctx.Header("Cache-Control", "no-cache")
+	ctx.Header("Connection", "keep-alive")
+	for _, char := range msg {
+		_, err := fmt.Fprintf(ctx.Writer, "event: %s\ndata: %s\n\n", event, string(char))
+		if err != nil {
+			return err
+		}
+		ctx.Writer.Flush()
+	}
+	return nil
+}
+
 func getValidMsg(err error, obj interface{}) string {
 	if obj == nil {
 		return err.Error()
