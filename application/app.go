@@ -85,13 +85,15 @@ func (a *App) Run() {
 		Addr:                         fmt.Sprintf(":%d", config.Conf.Server.Port),
 		ReadTimeout:                  config.Conf.Server.ReadTimeout,
 		WriteTimeout:                 config.Conf.Server.WriteTimeout,
-		DisableGeneralOptionsHandler: true,
+		ReadHeaderTimeout:            config.Conf.Server.ReadHeaderTimeout,
+		IdleTimeout:                  config.Conf.Server.IdleTimeout,
+		DisableGeneralOptionsHandler: config.Conf.Server.DisableGeneralOptions,
 	}
 	server.Handler = a.e
 	if len(a.ginMiddlewares) > 0 {
 		a.e.Use(a.ginMiddlewares...)
 	}
-	a.e.MaxMultipartMemory = config.Conf.Server.MaxFileSize
+	a.e.MaxMultipartMemory = config.Conf.Server.MaxMultipartMemory
 	a.e.RemoveExtraSlash = true
 	ioc.SetBeans(a.e)
 	if banner.Banner != "" {
