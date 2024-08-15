@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
-	"github.com/archine/gin-plus/v3/plugin/logger"
+	"github.com/archine/gin-plus/v3/internal/logger"
 	"github.com/archine/gin-plus/v3/resp/bcode"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -199,12 +199,11 @@ func DirectRespErr(ctx *gin.Context, err error) {
 	}
 	var stackErr *exception.StackBusinessError
 	if errors.As(err, &stackErr) {
-		fmt.Printf("%+v\n", stackErr)
+		logger.Log.Stack(stackErr.Error(), stackErr.FormatStack())
 		DirectRespWithCode(ctx, stackErr.Code, stackErr.Msg)
 		return
 	}
 	ServerError(ctx, true)
-	logger.Log.
 }
 
 // ChangeResultType Change the result type

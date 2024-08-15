@@ -36,20 +36,28 @@ func NewBusinessErrWithCode(code int, msg string) *BusinessException {
 type StackBusinessError struct {
 	Code int
 	Msg  string
-	s    *stacktrace.Stack
+	st   string
 }
 
 func (s *StackBusinessError) Error() string {
 	return s.Msg
 }
 
-func NewStackBusinessErr(msg string) *StackBusinessError {
-	return &StackBusinessError{bcode.BadRequest, msg, stacktrace.Callers()}
+// FormatStack format stack
+func (s *StackBusinessError) FormatStack() string {
+	return s.st
 }
 
-func NewStackBusinessErrWithCode(code int, msg string) *StackBusinessError {
-	return &StackBusinessError{code, msg, stacktrace.Callers()}
+func NewStackBusinessErr(msg string) *StackBusinessError {
+	stack := stacktrace.Capture(32)
+	defer stack.Free()
+	return &StackBusinessError{bcode.BadRequest, msg, stack.Format()}
 }
+
+//
+//func NewStackBusinessErrWithCode(code int, msg string) *StackBusinessError {
+//	return &StackBusinessError{code, msg, stacktrace.Callers()}
+//}
 
 // OrThrow if err not nil, panic
 func OrThrow(err error) {

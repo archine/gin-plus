@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v3/application/config"
-	"github.com/archine/gin-plus/v3/application/middleware"
 	"github.com/archine/gin-plus/v3/banner"
-	"github.com/archine/gin-plus/v3/exception/ginplus"
+	"github.com/archine/gin-plus/v3/internal/logger"
+	"github.com/archine/gin-plus/v3/internal/middleware"
 	"github.com/archine/gin-plus/v3/listener"
 	"github.com/archine/gin-plus/v3/mvc"
-	"github.com/archine/gin-plus/v3/plugin/logger"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -31,6 +30,10 @@ type App struct {
 
 // New Create a clean application, you can add some gin middlewares to the engine
 func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFunc) *App {
+	if banner.Banner != "" {
+		fmt.Print(banner.Banner)
+		banner.Banner = ""
+	}
 	app := &App{
 		exitDelay:      3 * time.Second,
 		ginMiddlewares: middlewares,
@@ -57,7 +60,7 @@ func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFun
 
 // Default Create a default application with gin default logger, exception interception, and cross-domain middleware
 func Default(listeners ...listener.ApplicationListener) *App {
-	return New(listeners, gin.Logger(), ginplus.GlobalExceptionInterceptor)
+	return New(listeners, gin.Logger(), middleware.GlobalExceptionInterceptor)
 }
 
 // Banner Sets the project startup banner
@@ -80,9 +83,6 @@ func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
 
 // Run the main program entry
 func (a *App) Run() {
-	if banner.Banner != "" {
-		fmt.Print(banner.Banner)
-	}
 	a.e = gin.New()
 	server := &http.Server{
 		Addr:                         fmt.Sprintf(":%d", config.Conf.Server.Port),

@@ -26,3 +26,7 @@ func (d *DefaultLog) Error(msg string, args ...any) {
 func (d *DefaultLog) Fatal(format string, v ...any) {
 	log.Fatalf(format, v...)
 }
+
+func (d *DefaultLog) Stack(msg, stackTrace string) {
+	log.Printf("%s\n%s", msg, stackTrace)
+}

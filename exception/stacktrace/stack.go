@@ -3,18 +3,18 @@ package stacktrace
 import (
 	"github.com/archine/gin-plus/v3/internal/pool"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
 var _stackPool = pool.New(func() *Stack {
 	return &Stack{
-		pcs: make([]uintptr, 32),
+		pcs: make([]uintptr, 16),
 	}
 })
 
 // Stack represents a stack of program counters.
 type Stack struct {
-	// program counters; always a subs lice of storage
 	pcs    []uintptr
 	frames *runtime.Frames
 }
@@ -25,7 +25,7 @@ func Capture(depth int) *Stack {
 	if depth < 1 {
 		stack.pcs = stack.pcs[:1]
 	}
-	n := runtime.Callers(2, stack.pcs)
+	n := runtime.Callers(3, stack.pcs)
 	stack.pcs = stack.pcs[:n]
 	stack.frames = runtime.CallersFrames(stack.pcs)
 	return stack
@@ -47,11 +47,18 @@ func (s *Stack) Free() {
 // Format formats to string
 func (s *Stack) Format() string {
 	var builder strings.Builder
-	builder.WriteByte('\n')
-	frame, b := s.Next()
-	builder.WriteString(frame.Function)
-	builder.WriteByte('')
-	if b {
-
+	for {
+		frame, more := s.Next()
+		builder.WriteString(frame.Function)
+		builder.WriteByte('\n')
+		builder.WriteByte('\t')
+		builder.WriteString(frame.File)
+		builder.WriteByte(':')
+		builder.WriteString(strconv.Itoa(frame.Line))
+		if !more {
+			break
+		}
+		builder.WriteByte('\n')
 	}
+	return builder.String()
 }

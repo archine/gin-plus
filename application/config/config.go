@@ -3,9 +3,9 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/archine/gin-plus/v3/internal/logger"
 	"github.com/archine/gin-plus/v3/listener"
-	"github.com/archine/gin-plus/v3/plugin/logger"
-	ioc "github.com/archine/ioc"
+	"github.com/archine/ioc"
 	"github.com/spf13/viper"
 	"time"
 )

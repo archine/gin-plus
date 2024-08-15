@@ -19,4 +19,7 @@ type AbstractLogger interface {
 
 	// Fatal logs a message at FatalLevel
 	Fatal(format string, v ...any)
+
+	// Stack logs a message at ErrorLevel with stack, args are handled in the manner of fmt.sprintf.
+	Stack(msg, stackTrace string)
 }
