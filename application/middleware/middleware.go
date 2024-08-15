@@ -8,7 +8,7 @@ import (
 // Cors Cross-domain middleware
 func Cors() gin.HandlerFunc {
 	return cors.New(cors.Config{
-		AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS", "HEAD"},
+		AllowMethods:     []string{"*"},
 		AllowHeaders:     []string{"*"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,

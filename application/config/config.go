@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/archine/gin-plus/v3/listener"
+	"github.com/archine/gin-plus/v3/plugin/logger"
 	ioc "github.com/archine/ioc"
 	"github.com/spf13/viper"
 	"time"
@@ -28,6 +29,13 @@ type config struct {
 
 		// Application environment, default dev, you can set it to prod or test
 		Env string `mapstructure:"env"`
+
+		// AllowedCors allowed cross-domain, default false
+		// If true, the server will add the default cors middleware to the gin engine.
+		//
+		// Note: When you add cross-domain middleware through application.New(), you do not need to allow it, otherwise there will be multiple,
+		// this parameter only controls when you use application.Default()
+		AllowedCors bool `mapstructure:"allowed_cors"`
 
 		// MaxMultipartMemory The maximum memory space that an uploaded file can occupy, default 32M.
 		// When the uploaded file exceeds this limit, Gin writes the file data to a temporary file instead of storing it directly in memory.
@@ -106,6 +114,7 @@ func Load(configFilePath string, l listener.ConfigListener) {
 		panic(fmt.Sprintf("Failed to parse the configuration file, %s", err.Error()))
 	}
 	ioc.SetBeans(v)
+	logger.Log.Info("Configuration file is loaded")
 }
 
 // GetConfReader Get config reader of the application

@@ -7,7 +7,7 @@ import (
 	"github.com/archine/gin-plus/v3/application/config"
 	"github.com/archine/gin-plus/v3/application/middleware"
 	"github.com/archine/gin-plus/v3/banner"
-	"github.com/archine/gin-plus/v3/exception/interceptor"
+	"github.com/archine/gin-plus/v3/exception/ginplus"
 	"github.com/archine/gin-plus/v3/listener"
 	"github.com/archine/gin-plus/v3/mvc"
 	"github.com/archine/gin-plus/v3/plugin/logger"
@@ -57,7 +57,7 @@ func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFun
 
 // Default Create a default application with gin default logger, exception interception, and cross-domain middleware
 func Default(listeners ...listener.ApplicationListener) *App {
-	return New(listeners, gin.Logger(), interceptor.GlobalExceptionInterceptor, middleware.Cors())
+	return New(listeners, gin.Logger(), ginplus.GlobalExceptionInterceptor)
 }
 
 // Banner Sets the project startup banner
@@ -80,6 +80,9 @@ func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
 
 // Run the main program entry
 func (a *App) Run() {
+	if banner.Banner != "" {
+		fmt.Print(banner.Banner)
+	}
 	a.e = gin.New()
 	server := &http.Server{
 		Addr:                         fmt.Sprintf(":%d", config.Conf.Server.Port),
@@ -92,13 +95,14 @@ func (a *App) Run() {
 	server.Handler = a.e
 	if len(a.ginMiddlewares) > 0 {
 		a.e.Use(a.ginMiddlewares...)
+		if config.Conf.Server.AllowedCors {
+			a.e.Use(middleware.Cors())
+		}
 	}
+	logger.Log.Info("Gin middlewares loaded.")
 	a.e.MaxMultipartMemory = config.Conf.Server.MaxMultipartMemory
 	a.e.RemoveExtraSlash = true
 	ioc.SetBeans(a.e)
-	if banner.Banner != "" {
-		fmt.Print(banner.Banner)
-	}
 	listener.DoPreApply(a.listeners)
 	if len(a.interceptors) > 0 {
 		a.e.Use(func(context *gin.Context) {
@@ -122,12 +126,14 @@ func (a *App) Run() {
 		})
 	}
 	mvc.Apply(a.e, true)
+	logger.Log.Info("API application complete.")
 	listener.DoPreStart(a.listeners)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Log.Fatal("Application start error, %s", err.Error())
+			logger.Log.Fatal("Application start failed, %s", err.Error())
 		}
 	}()
+	time.Sleep(100 * time.Millisecond)
 	logger.Log.Info("Application start success on Ports:[%d]", config.Conf.Server.Port)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)

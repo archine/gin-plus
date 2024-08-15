@@ -1,8 +1,8 @@
-package interceptor
+package ginplus
 
 import (
+	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
-	"github.com/archine/gin-plus/v3/plugin/logger"
 	"github.com/archine/gin-plus/v3/resp"
 	"github.com/gin-gonic/gin"
 )
@@ -15,14 +15,14 @@ func GlobalExceptionInterceptor(context *gin.Context) {
 		if r := recover(); r != nil {
 			switch t := r.(type) {
 			case *exception.BusinessException:
-				exception.PrintSimpleStack(t)
+				fmt.Printf("%+v", stacktrace.CallersWithSize(16))
 				resp.DirectRespWithCode(context, t.Code, t.Msg)
-			case error:
-				exception.PrintStack(t)
-				resp.SeverError(context, true)
+			case *exception.StackBusinessError:
+				fmt.Printf("%+v", t)
+				resp.DirectRespWithCode(context, t.Code, t.Msg)
 			default:
-				logger.Log.Error("Unknown error: %v", r)
-				resp.SeverError(context, true)
+				fmt.Printf("%+v", stacktrace.Callers())
+				resp.ServerError(context, true)
 			}
 		}
 	}()

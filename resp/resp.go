@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
 	"github.com/archine/gin-plus/v3/plugin/logger"
+	"github.com/archine/gin-plus/v3/resp/bcode"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"net/http"
@@ -14,18 +15,9 @@ import (
 
 // Respond to the client assistant and return quickly
 
-const (
-	BadRequestCode      = 40000
-	NonLoginCode        = 40001
-	TokenExpiredCode    = 40002
-	ForbiddenCode       = 40003
-	ParamValidationCode = 40010
-	SystemErrorCode     = 50000
-)
-
 // ResultPool result pool
 var resultPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &Result{}
 	},
 }
@@ -70,7 +62,6 @@ func (r *Result) WithContext(ctx *gin.Context) Resp {
 
 func (r *Result) To(httpCode ...int) {
 	r.TraceId = r.ctx.GetString("trace_id")
-	r.ctx.Set("bcode", r.Code)
 	if len(httpCode) > 0 {
 		r.ctx.JSON(httpCode[0], r)
 	} else {
@@ -90,7 +81,7 @@ func InitResp(ctx *gin.Context) Resp {
 	return resultPool.Get().(Resp).WithContext(ctx)
 }
 
-// BadRequest business-related error returned.
+// BadRequest Business-related errors.
 // Return true means the condition is true
 func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
@@ -98,14 +89,14 @@ func BadRequest(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(BadRequestCode, message, nil).To()
+		InitResp(ctx).WithBasic(bcode.BadRequest, message, nil).To()
 	}
 	return condition
 }
 
 // DirectBadRequest Directly return business-related errors.
 func DirectBadRequest(ctx *gin.Context, format string, args ...any) {
-	InitResp(ctx).WithBasic(BadRequestCode, fmt.Sprintf(format, args...), nil).To()
+	InitResp(ctx).WithBasic(bcode.BadRequest, fmt.Sprintf(format, args...), nil).To()
 }
 
 // ParamInvalid invalid parameter.
@@ -116,7 +107,7 @@ func ParamInvalid(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(ParamValidationCode, message, nil).To()
+		InitResp(ctx).WithBasic(bcode.ParamValidation, message, nil).To()
 	}
 	return condition
 }
@@ -128,7 +119,7 @@ func ParamValidation(ctx *gin.Context, obj interface{}) bool {
 	if err == nil {
 		return true
 	}
-	InitResp(ctx).WithBasic(ParamValidationCode, GetValidMsg(err, obj), nil).To()
+	InitResp(ctx).WithBasic(bcode.ParamValidation, GetValidMsg(err, obj), nil).To()
 	return false
 }
 
@@ -140,7 +131,7 @@ func Forbidden(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(ForbiddenCode, message, nil).To()
+		InitResp(ctx).WithBasic(bcode.Forbidden, message, nil).To()
 	}
 	return condition
 }
@@ -153,7 +144,7 @@ func NoLogin(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(NonLoginCode, message, nil).To(http.StatusUnauthorized)
+		InitResp(ctx).WithBasic(bcode.NonLogin, message, nil).To(http.StatusUnauthorized)
 	}
 	return condition
 }
@@ -166,7 +157,7 @@ func LoginExpired(ctx *gin.Context, condition bool, msg ...string) bool {
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(TokenExpiredCode, message, nil).To(http.StatusUnauthorized)
+		InitResp(ctx).WithBasic(bcode.TokenExpired, message, nil).To(http.StatusUnauthorized)
 	}
 	return condition
 }
@@ -177,19 +168,19 @@ func Ok(ctx *gin.Context) {
 }
 
 // Json Normal request with data returned
-func Json(ctx *gin.Context, data interface{}) {
+func Json(ctx *gin.Context, data any) {
 	InitResp(ctx).WithBasic(0, "ok", data).To()
 }
 
-// SeverError Server exception
+// ServerError Server exception
 // Return true means the condition is true
-func SeverError(ctx *gin.Context, condition bool, msg ...string) bool {
+func ServerError(ctx *gin.Context, condition bool, msg ...string) bool {
 	if condition {
 		message := "服务器异常,请联系管理员!"
 		if len(msg) > 0 {
 			message = msg[0]
 		}
-		InitResp(ctx).WithBasic(SystemErrorCode, message, nil).To()
+		InitResp(ctx).WithBasic(bcode.SystemError, message, nil).To()
 	}
 	return condition
 }
@@ -206,14 +197,20 @@ func DirectRespErr(ctx *gin.Context, err error) {
 		DirectRespWithCode(ctx, businessErr.Code, businessErr.Msg)
 		return
 	}
-	SeverError(ctx, true)
-	exception.PrintStack(err)
+	var stackErr *exception.StackBusinessError
+	if errors.As(err, &stackErr) {
+		fmt.Printf("%+v\n", stackErr)
+		DirectRespWithCode(ctx, stackErr.Code, stackErr.Msg)
+		return
+	}
+	ServerError(ctx, true)
+	logger.Log.
 }
 
 // ChangeResultType Change the result type
 func ChangeResultType(f func() Resp) {
 	resultPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return f()
 		},
 	}
