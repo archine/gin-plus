@@ -8,13 +8,13 @@
 
 * Get
 ```bash
-go get github.com/archine/gin-plus/v3@v3.2.4
+go get github.com/archine/gin-plus/v3@v3.3.0
 ```
 
 * Mod
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v3 v3.2.4
+github.com/archine/gin-plus/v3 v3.3.0
 
 # 命令行在该项目目录下执行
 go mod tidy
@@ -130,84 +130,3 @@ func (t *TestController) Hello(ctx *gin.Context) {
     resp.Json(ctx, t.TestMapper.Say())
 }
 ```
-
-### 5、配置读取
-
-框架默认会读取项目同级目录的 app.yml 文件（可通过 -c 参数指定文件）
-* 基础配置
-```yaml
-server:
-  port: 4006               # 默认 4006
-  max_file_size: 104857600 # 默认 100m，单位字节
-  env: dev                 # 默认 dev，支持 dev、test、prod
-  write_timeout: 0         # 默认 0，不超时，单位秒
-  read_timeout: 0          # 默认 0，不超时，单位秒
-```
-这些参数框架内部会解析，使用这些参数时，可通过 ``application.Conf.Server`` 来获取。
-
-* 自定义配置    
-
-实际开发中，项目配置往往不只是基础配置那些，可能还包括其他配置，这时我们需要在启动时调用 ``ReadConfig()``方法，参数为需要解析到哪个结构体中
-```go
-package main
-
-import (
-  _ "gin-plus-demo/controller"
-  "github.com/archine/gin-plus/v3/application"
-)
-
-var Conf = &config{}
-
-type config struct {
-  // 读取配置文件中的 name 配置，安装了 iocer 插件的话输入 maps 可以快速补全后面的tag
-  Name string `mapstructure:"name"`
-}
-
-//go:generate gp-ast
-func main() {
-  application.Default().ReadConfig(Conf).Run()
-}
-```
-
-### 6、参数校验
-对结构体参数进行绑定校验。当我们有多个条件时，我们可以为每个条件单独定义错误信息，格式为条件+Msg，例如：minMsg ，如果未找到，则取 msg，如果也未找到，会使用参数校验默认的 英文信息。项目中通过
-``resp.ParamValidation()``调用，💡 如果安装了 IoCer 插件，可输入 **rp** 进行代码快速补全。更多参数校验的关键字， [请参考](https://pkg.go.dev/github.com/go-playground/validator)
-
-```go
-package controller
-
-import (
-    "github.com/gin-gonic/gin"
-    "github.com/archine/gin-plus/v3/mvc"
-    "github.com/archine/gin-plus/v3/resp"
-)
-
-type TestController struct {
-    mvc.Controller
-}
-
-type User struct {
-    Age  int    `json:"age" binding:"min=10" minMsg:"年龄最小为10"`
-    Name string `json:"name" binding:"required" msg:"名字不能为空"`
-}
-
-// AddUser
-// @POST(path="/user") 添加用户
-func (t *TestController) AddUser(ctx *gin.Context) {
-    var arg User
-    if !resp.ParamValidation(ctx, &arg) {
-        return
-    }
-    resp.Ok(ctx)
-}
-```
-
-- 响应结构
-```json
-{
-    "code": 40010,
-    "msg": "年龄最小为10"
-}
-```
-
-**框架使用Demo地址**：[点击前往](https://github.com/archine/gin-plus-demo)

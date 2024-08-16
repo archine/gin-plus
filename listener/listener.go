@@ -5,66 +5,69 @@ import "github.com/spf13/viper"
 // ApplicationListener Application listener
 type ApplicationListener interface{}
 
-// ApplicationEventListener Application event listener
+// ApplicationEventListener defines an interface for listening to application lifecycle events.
 type ApplicationEventListener interface {
 	ApplicationListener
 
-	// PreApply triggered before mvc starts, Before the project starts.
-	// This is where you can provide basic services, such as set beans.
-	// Of course, you can also perform logic here that doesn't require obtaining beans.
+	// PreApply is triggered before the MVC framework starts, and before the application fully initiates.
+	// This is the stage where you can set up basic services, such as registering beans.
+	// Additionally, any logic that doesn't require access to beans can be executed here.
 	PreApply()
 
-	// PreStart The last event before the project starts, dependency injection is all finished and ready to run.
-	// You can execute any logic here.
+	// PreStart is the final event before the application starts running, after all dependency injections have been completed.
+	// At this point, you can execute any necessary logic to prepare for the application's startup.
 	PreStart()
 
-	// PreStop The event before the application stops can be performed here to close some resources
+	// PreStop is triggered before the application stops, providing an opportunity to close resources
+	// or perform other pre-shutdown tasks.
 	PreStop()
 
-	// PostStop Events after the application has stopped can perform other closing operations here
+	// PostStop is triggered after the application has stopped, allowing for final cleanup operations
+	// or any other shutdown-related activities.
 	PostStop()
 }
 
-// ConfigListener Configuration listener, used to load configuration
+// ConfigListener defines an interface for configuration listeners
+// that are used to load and process configuration settings.
 type ConfigListener interface {
 	ApplicationListener
 
-	// Read configuration
+	// Read loads the configuration settings from the provided Viper instance.
+	// This method is intended to be implemented by users to define custom
+	// configuration loading logic.
 	Read(v *viper.Viper) error
+
+	// After is called after the configuration has been successfully read.
+	// This method allows for any additional processing or setup that may
+	// be required after the initial configuration load.
+	After(v *viper.Viper)
 }
 
-// DoPreApply Trigger the PreApply event
+// DoPreApply triggers the PreApply event.
 func DoPreApply(listeners []ApplicationListener) {
-	for _, l := range listeners {
-		if ael, ok := l.(ApplicationEventListener); ok {
-			ael.PreApply()
-		}
-	}
+	triggerEvent(listeners, ApplicationEventListener.PreApply)
 }
 
-// DoPreStart Trigger the PreStart event
+// DoPreStart triggers the PreStart event.
 func DoPreStart(listeners []ApplicationListener) {
-	for _, l := range listeners {
-		if ael, ok := l.(ApplicationEventListener); ok {
-			ael.PreStart()
-		}
-	}
+	triggerEvent(listeners, ApplicationEventListener.PreStart)
 }
 
-// DoPreStop Trigger the PreStop event
+// DoPreStop triggers the PreStop event.
 func DoPreStop(listeners []ApplicationListener) {
-	for _, l := range listeners {
-		if ael, ok := l.(ApplicationEventListener); ok {
-			ael.PreStop()
-		}
-	}
+	triggerEvent(listeners, ApplicationEventListener.PreStop)
 }
 
-// DoPostStop Trigger the PostStop event
+// DoPostStop triggers the PostStop event.
 func DoPostStop(listeners []ApplicationListener) {
+	triggerEvent(listeners, ApplicationEventListener.PostStop)
+}
+
+// triggerEvent triggers the specified event method for all listeners that implement ApplicationEventListener.
+func triggerEvent(listeners []ApplicationListener, eventFunc func(ApplicationEventListener)) {
 	for _, l := range listeners {
 		if ael, ok := l.(ApplicationEventListener); ok {
-			ael.PostStop()
+			eventFunc(ael)
 		}
 	}
 }

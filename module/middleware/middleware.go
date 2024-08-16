@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
+	"github.com/archine/gin-plus/v3/internal"
+	"github.com/archine/gin-plus/v3/module/stacktrace"
 	"github.com/archine/gin-plus/v3/resp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -24,20 +25,27 @@ func Cors() gin.HandlerFunc {
 // GlobalExceptionInterceptor gin global exception interceptor
 // add via gin middleware.
 // thrown when the exception type is string and the BusinessException
-func GlobalExceptionInterceptor(context *gin.Context) {
+func GlobalExceptionInterceptor(ctx *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch t := r.(type) {
 			case *exception.BusinessException:
-				resp.DirectRespWithCode(context, t.Code, t.Msg)
-			case *exception.StackBusinessError:
-				fmt.Printf("%+v", t)
-				resp.DirectRespWithCode(context, t.Code, t.Msg)
+				resp.DirectRespWithCode(ctx, t.Code(), t.Error())
+			case *exception.StackError:
+				internal.Logger.Error("%s\n%s", t.Error(), t.StackTrace())
+				resp.ServerError(ctx, true)
 			default:
-				//capture := stacktrace.Capture(32)
-				resp.ServerError(context, true)
+				trace := getTrace(stacktrace.FULL_STACK)
+				internal.Logger.Error("%v\n%s", t, trace)
+				resp.ServerError(ctx, true)
 			}
 		}
 	}()
-	context.Next()
+	ctx.Next()
+}
+
+func getTrace(depth int) string {
+	stack := stacktrace.Capture(depth)
+	defer stack.Free()
+	return stack.ToString()
 }

@@ -1,15 +1,21 @@
 package stacktrace
 
 import (
-	"github.com/archine/gin-plus/v3/internal/pool"
+	"github.com/archine/gin-plus/v3/module/pool"
 	"runtime"
 	"strconv"
 	"strings"
 )
 
+const (
+	FULL_STACK  = 16 // the size of the full stack
+	SHORT_STACK = 4  // the size of the short stack
+	CALLER_SKIP = 3  // the number of stack frames to skip
+)
+
 var _stackPool = pool.New(func() *Stack {
 	return &Stack{
-		pcs: make([]uintptr, 16),
+		pcs: make([]uintptr, FULL_STACK),
 	}
 })
 
@@ -23,9 +29,13 @@ type Stack struct {
 func Capture(depth int) *Stack {
 	stack := _stackPool.Get()
 	if depth < 1 {
+		// if the depth is less than 1, sets the depth to 1.
 		stack.pcs = stack.pcs[:1]
 	}
-	n := runtime.Callers(3, stack.pcs)
+	n := runtime.Callers(CALLER_SKIP, stack.pcs)
+	if depth < n {
+		n = depth // if the depth is less than n, sets the n to depth.
+	}
 	stack.pcs = stack.pcs[:n]
 	stack.frames = runtime.CallersFrames(stack.pcs)
 	return stack
@@ -44,8 +54,8 @@ func (s *Stack) Free() {
 	_stackPool.Put(s)
 }
 
-// Format formats to string
-func (s *Stack) Format() string {
+// ToString returns the string representation of the stack trace.
+func (s *Stack) ToString() string {
 	var builder strings.Builder
 	for {
 		frame, more := s.Next()

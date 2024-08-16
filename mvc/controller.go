@@ -7,43 +7,44 @@ import (
 	"reflect"
 )
 
-// Annotations the annotation of Api method
+// Annotations represents the annotations of an API method.
 type Annotations map[string]string
 
-// Global controller cache
+// Global controller cache.
 var controllerCache []abstractController
 
-// Annotations of each API
+// Cache for annotations of each API.
 var annotationCache map[string]Annotations
 
+// abstractController defines the interface for a controller that
+// requires a post-construction initialization method.
 type abstractController interface {
-	// PostConstruct Triggered after dependency injection is completed. You can continue to decorate the controller here
+	// PostConstruct is triggered after dependency injection is completed.
+	// This method can be used to further initialize the controller.
 	PostConstruct()
 }
 
-// Controller Declares the structure to be a controller
-// you can add api methods to it
+// Controller is a base struct that declares an entity as a controller.
+// API methods can be added to this struct.
 type Controller struct{}
 
+// PostConstruct is a default implementation for Controller.
 func (c *Controller) PostConstruct() {}
 
-// Register controllers
-func Register(controller ...abstractController) {
-	controllerCache = append(controllerCache, controller...)
+// Register adds controllers to the global cache.
+func Register(controllers ...abstractController) {
+	controllerCache = append(controllerCache, controllers...)
 }
 
-// IsController Determine whether it is controller
+// IsController checks if a given value implements the abstractController interface.
 func IsController(v interface{}) bool {
 	ct := reflect.TypeOf(v)
-	if ct.Kind() != reflect.Ptr {
-		return false
-	}
-	return ct.Implements(reflect.TypeOf((*abstractController)(nil)).Elem())
+	return ct.Kind() == reflect.Ptr && ct.Implements(reflect.TypeOf((*abstractController)(nil)).Elem())
 }
 
-// Apply all apis to the gin engine
-// @param e: gin.Engine
-// @param autowired: whether enable autowired properties
+// Apply attaches all APIs to the Gin engine.
+// @param e: the Gin engine.
+// @param autowired: if true, enables property injection via IoC.
 func Apply(e *gin.Engine, autowired bool) {
 	if core.Apis == nil {
 		for _, controller := range controllerCache {
@@ -53,38 +54,44 @@ func Apply(e *gin.Engine, autowired bool) {
 		}
 		return
 	}
+
 	ginProxy := reflect.ValueOf(e)
 	annotationCache = make(map[string]Annotations)
+
 	for _, controller := range controllerCache {
 		if autowired {
 			ioc.Inject(controller)
 		}
 		controller.PostConstruct()
-		controllerTypeOf := reflect.TypeOf(controller).Elem()
-		controllerProxy := reflect.ValueOf(controller)
-		methodInfosAst := core.Apis[controllerTypeOf.Name()]
-		for _, m := range methodInfosAst {
-			mValueProxy := controllerProxy.MethodByName(m.Name)
-			if mValueProxy.Kind() == reflect.Invalid {
+
+		controllerType := reflect.TypeOf(controller).Elem()
+		controllerValue := reflect.ValueOf(controller)
+		methodInfos := core.Apis[controllerType.Name()]
+
+		for _, m := range methodInfos {
+			methodValue := controllerValue.MethodByName(m.Name)
+			if methodValue.Kind() == reflect.Invalid {
 				continue
 			}
+
 			ginMethod := ginProxy.MethodByName(m.Method)
-			args := []reflect.Value{reflect.ValueOf(m.ApiPath)}
-			args = append(args, mValueProxy)
+			args := []reflect.Value{reflect.ValueOf(m.ApiPath), methodValue}
 			ginMethod.Call(args)
 			annotationCache[m.ApiPath] = m.Annotations
 		}
+
 		if len(controllerCache) == 1 {
 			controllerCache = nil
 			return
 		}
+
 		controllerCache = controllerCache[1:]
 	}
-	core.Apis = nil // GC
+	core.Apis = nil // Trigger garbage collection
 }
 
-// GetAnnotation Gets the specified annotation
-// Returns the value of this annotation, when the has is false mine this val is empty
+// GetAnnotation retrieves the specified annotation from the current context.
+// Returns the annotation value and a boolean indicating whether the annotation exists.
 func GetAnnotation(ctx *gin.Context, annotationName string) (val string, has bool) {
 	anno, has := annotationCache[ctx.FullPath()]
 	if !has || len(anno) == 0 {
@@ -94,17 +101,16 @@ func GetAnnotation(ctx *gin.Context, annotationName string) (val string, has boo
 	return
 }
 
-// MethodInterceptor API method interceptor
-// You can do logical processing before and after method calls
+// MethodInterceptor allows for pre- and post-processing of API method calls.
 type MethodInterceptor interface {
-	// Predicate true means intercept
+	// Predicate determines whether to intercept the request.
 	Predicate(ctx *gin.Context) bool
 
-	// PreHandle triggered before method invocation
-	// if you want to abort the current request, just call abort() and response inside the method
+	// PreHandle is triggered before the API method is invoked.
+	// If you want to abort the current request, call ctx.Abort() and handle the response inside this method.
 	PreHandle(ctx *gin.Context)
 
-	// PostHandle triggered after method invocation
-	// if you want to abort the current request, just call abort() and response inside the method
+	// PostHandle is triggered after the API method is invoked.
+	// If you want to abort the current request, call ctx.Abort() and handle the response inside this method.
 	PostHandle(ctx *gin.Context)
 }

@@ -3,7 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/archine/gin-plus/v3/internal/logger"
+	"github.com/archine/gin-plus/v3/internal"
 	"github.com/archine/gin-plus/v3/listener"
 	"github.com/archine/ioc"
 	"github.com/spf13/viper"
@@ -13,7 +13,7 @@ import (
 // Project global configuration
 
 // Conf project basic configuration
-var Conf *config
+var Conf *Config
 
 const (
 	// Dev development environment
@@ -22,7 +22,7 @@ const (
 	Prod = "prod"
 )
 
-type config struct {
+type Config struct {
 	Server struct {
 		// Application running port, default 4006
 		Port int `mapstructure:"port"`
@@ -90,8 +90,9 @@ func LoadByCommand(l listener.ConfigListener) {
 
 // Load Load configuration file
 func Load(configFilePath string, l listener.ConfigListener) {
-	var v = viper.New()
-	v.SetConfigFile(configFilePath)
+	v := viper.New()
+	ioc.SetBeans(v)
+
 	v.SetDefault("server.port", 4006)
 	v.SetDefault("server.env", Dev)
 	v.SetDefault("server.max_multipart_memory", 32<<20) // 32M
@@ -101,6 +102,8 @@ func Load(configFilePath string, l listener.ConfigListener) {
 	v.SetDefault("server.idle_timeout", 0)
 	v.SetDefault("server.disable_general_options", true)
 	v.AutomaticEnv()
+	v.SetConfigFile(configFilePath)
+
 	var err error
 	if l != nil {
 		err = l.Read(v)
@@ -108,16 +111,16 @@ func Load(configFilePath string, l listener.ConfigListener) {
 		err = v.ReadInConfig()
 	}
 	if err != nil {
-		panic(fmt.Sprintf("Failed to read the configuration file, %s", err.Error()))
+		panic(fmt.Sprintf("Error reading the configuration file: %s", err.Error()))
 	}
-	if err = v.Unmarshal(&Conf); err != nil {
-		panic(fmt.Sprintf("Failed to parse the configuration file, %s", err.Error()))
-	}
-	ioc.SetBeans(v)
-	logger.Log.Info("Configuration file is loaded")
-}
 
-// GetConfReader Get config reader of the application
-func GetConfReader() *viper.Viper {
-	return ioc.GetBeanByName("viper.Viper").(*viper.Viper)
+	err = v.Unmarshal(&Conf)
+	if err != nil {
+		panic(fmt.Sprintf("Error unmarshalling the configuration file into the config structure: %s", err.Error()))
+	}
+
+	if l != nil {
+		l.After(v)
+	}
+	internal.Logger.Info("Configuration file loaded successfully.")
 }
