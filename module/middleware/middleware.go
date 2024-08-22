@@ -35,7 +35,7 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 				internal.Logger.Error("%s\n%s", t.Error(), t.StackTrace())
 				resp.ServerError(ctx, true)
 			default:
-				trace := getTrace(stacktrace.FULL_STACK)
+				trace := getTrace()
 				internal.Logger.Error("%v\n%s", t, trace)
 				resp.ServerError(ctx, true)
 			}
@@ -44,8 +44,8 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 	ctx.Next()
 }
 
-func getTrace(depth int) string {
-	stack := stacktrace.Capture(depth)
+func getTrace() string {
+	stack := stacktrace.Capture(4)
 	defer stack.Free()
 	return stack.ToString()
 }

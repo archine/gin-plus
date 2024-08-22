@@ -2,6 +2,7 @@ package exception
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v3/module/constant/errs"
 	"github.com/archine/gin-plus/v3/module/stacktrace"
 	"strings"
 )
@@ -28,7 +29,7 @@ func (b *BusinessException) Code() int {
 
 // NewBusinessErr creates a new BusinessException with a default error code of 40000.
 func NewBusinessErr(msg string) *BusinessException {
-	return &BusinessException{code: 40000, msg: msg}
+	return &BusinessException{code: errs.BadRequestErr.Code(), msg: msg}
 }
 
 // NewBusinessErrWithCode creates a new BusinessException with a specified error code.
@@ -75,9 +76,9 @@ func (s *StackError) StackTrace() string {
 
 // NewStackErr creates a new StackError with the specified message.
 func NewStackErr(msg string) *StackError {
-	stack := stacktrace.Capture(stacktrace.SHORT_STACK)
+	stack := stacktrace.Capture(1)
 	defer stack.Free()
-	return &StackError{msg, stack.ToString()}
+	return &StackError{msg, stack.First()}
 }
 
 // WithStack wraps an error with a stack trace.
@@ -85,9 +86,9 @@ func WithStack(err error) *StackError {
 	if err == nil {
 		return nil
 	}
-	stack := stacktrace.Capture(stacktrace.SHORT_STACK)
+	stack := stacktrace.Capture(1)
 	defer stack.Free()
-	return &StackError{err.Error(), stack.ToString()}
+	return &StackError{err.Error(), stack.First()}
 }
 
 // Wrap formats an error message by wrapping the provided error with additional context.
