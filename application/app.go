@@ -132,13 +132,13 @@ func (a *App) Run() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			internal.Log.Error("Application startup failed:", err.Error())
+			internal.Log.Error(fmt.Sprintf("Application startup failed: %s", err.Error()))
 			os.Exit(1)
 		}
 	}()
 
 	time.Sleep(100 * time.Millisecond)
-	internal.Log.Info("Application started successfully on port:", config.Conf.Server.Port)
+	internal.Log.Info(fmt.Sprintf("Application started successfully on port: %d", config.Conf.Server.Port))
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
@@ -150,7 +150,7 @@ func (a *App) Run() {
 	ctx, cancel := context.WithTimeout(context.Background(), a.exitDelay)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		internal.Log.Error("Server shutdown failed:", err.Error())
+		internal.Log.Error(fmt.Sprintf("Server shutdown failed:", err.Error()))
 		os.Exit(1)
 	}
 
@@ -161,7 +161,7 @@ func (a *App) Run() {
 // ReadConfig loads the configuration into the provided structure.
 func (a *App) ReadConfig(v any) *App {
 	if err := GetConfReader().Unmarshal(v); err != nil {
-		internal.Log.Error("Failed to read config,", err.Error())
+		internal.Log.Error(fmt.Sprintf("Failed to read config, %s", err.Error()))
 		os.Exit(1)
 	}
 	return a
@@ -170,7 +170,7 @@ func (a *App) ReadConfig(v any) *App {
 // ReadConfigSub loads the sub-configuration into the provided structure.
 func (a *App) ReadConfigSub(v any, sub string) *App {
 	if err := GetConfReader().UnmarshalKey(sub, v); err != nil {
-		internal.Log.Error("Failed to read sub-config,", err.Error())
+		internal.Log.Error(fmt.Sprintf("Failed to read sub-config, %s", err.Error()))
 		os.Exit(1)
 	}
 	return a
