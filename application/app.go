@@ -97,7 +97,7 @@ func (a *App) Run() {
 		}
 	}
 
-	internal.Logger.Info("Gin middlewares loaded.")
+	internal.Log.Info("Gin middlewares loaded.")
 	a.engine.MaxMultipartMemory = config.Conf.Server.MaxMultipartMemory
 	a.engine.RemoveExtraSlash = true
 	ioc.SetBeans(a.engine)
@@ -127,47 +127,51 @@ func (a *App) Run() {
 	}
 
 	mvc.Apply(a.engine, true)
-	internal.Logger.Info("API application setup complete.")
+	internal.Log.Info("API application setup complete.")
 	listener.DoPreStart(a.listeners)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			internal.Logger.Fatal("Application startup failed: %s", err.Error())
+			internal.Log.Error("Application startup failed:", err.Error())
+			os.Exit(1)
 		}
 	}()
 
 	time.Sleep(100 * time.Millisecond)
-	internal.Logger.Info("Application started successfully on port: %d", config.Conf.Server.Port)
+	internal.Log.Info("Application started successfully on port:", config.Conf.Server.Port)
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
-	internal.Logger.Info("Shutting down server...")
+	internal.Log.Info("Shutting down server...")
 
 	listener.DoPreStop(a.listeners)
 
 	ctx, cancel := context.WithTimeout(context.Background(), a.exitDelay)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		internal.Logger.Fatal("Server shutdown failed: %s", err.Error())
+		internal.Log.Error("Server shutdown failed:", err.Error())
+		os.Exit(1)
 	}
 
 	listener.DoPostStop(a.listeners)
-	internal.Logger.Info("Server exited.")
+	internal.Log.Info("Server exited.")
 }
 
 // ReadConfig loads the configuration into the provided structure.
 func (a *App) ReadConfig(v any) *App {
 	if err := GetConfReader().Unmarshal(v); err != nil {
-		internal.Logger.Fatal("Failed to read config, %s", err.Error())
+		internal.Log.Error("Failed to read config,", err.Error())
+		os.Exit(1)
 	}
 	return a
 }
 
 // ReadConfigSub loads the sub-configuration into the provided structure.
 func (a *App) ReadConfigSub(v any, sub string) *App {
-	if err := GetConfReader().Sub(sub).Unmarshal(v); err != nil {
-		internal.Logger.Fatal("Failed to read sub-config, %s", err.Error())
+	if err := GetConfReader().UnmarshalKey(sub, v); err != nil {
+		internal.Log.Error("Failed to read sub-config,", err.Error())
+		os.Exit(1)
 	}
 	return a
 }

@@ -122,5 +122,5 @@ func Load(configFilePath string, l listener.ConfigListener) {
 	if l != nil {
 		l.After(v)
 	}
-	internal.Logger.Info("Configuration file loaded successfully.")
+	internal.Log.Info("Configuration file loaded successfully.")
 }

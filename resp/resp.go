@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
 	"github.com/archine/gin-plus/v3/internal"
+	"github.com/archine/gin-plus/v3/module/constant"
 	"github.com/archine/gin-plus/v3/module/constant/errs"
 	"github.com/archine/gin-plus/v3/module/pool"
 	"github.com/gin-gonic/gin"
@@ -73,7 +74,7 @@ func (r *Result) WithContext(ctx *gin.Context) Resp {
 
 // To sends the Result as a JSON response to the client and releases the object back to the pool.
 func (r *Result) To(httpCode ...int) {
-	r.TraceId = r.ctx.GetString("trace_id")
+	r.TraceId = r.ctx.GetString(constant.TraceId)
 	if len(httpCode) > 0 {
 		r.ctx.JSON(httpCode[0], r)
 	} else {
@@ -208,7 +209,9 @@ func DirectRespWithCode(ctx *gin.Context, bCode int, format string, args ...any)
 func DirectRespErr(ctx *gin.Context, err error) {
 	var stackErr *exception.StackError
 	if errors.As(err, &stackErr) {
-		internal.Logger.Error("%s\n%s", err.Error(), stackErr.StackTrace())
+		internal.Log.ErrorWithCtx(ctx, fmt.Sprintf("%s\n%s", err.Error(), stackErr.StackTrace()))
+	} else {
+		internal.Log.ErrorWithCtx(ctx, err.Error())
 	}
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {

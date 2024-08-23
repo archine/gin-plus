@@ -20,5 +20,5 @@ func GetConfig() *config.Config {
 
 // ChangeLogger changing the logger instance used by the application.
 func ChangeLogger(logger logger.Logger) {
-	internal.Logger = logger
+	internal.Log = logger
 }
