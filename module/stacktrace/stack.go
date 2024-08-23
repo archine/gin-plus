@@ -8,34 +8,40 @@ import (
 )
 
 const (
-	FullStack  = 16 // the size of the full stack
-	CallerSkip = 3  // the number of stack frames to skip
+	MaximumStack = 16 // Maximum number of stack frames to capture and print, limiting to 16 layers
+	CallerSkip   = 3  // Number of stack frames to skip, including up to the current method
 )
 
 var _stackPool = pool.New(func() *Stack {
-	return &Stack{
-		pcs: make([]uintptr, FullStack),
-	}
+	return &Stack{}
 })
 
 // Stack represents a stack of program counters.
 type Stack struct {
-	pcs    []uintptr
 	frames *runtime.Frames
 }
 
-// Capture captures a stack trace of the specified depth
-func Capture(depth int) *Stack {
+// Capture captures a stack trace starting from the specified offset and retrieves up to the specified depth.
+func Capture(skipOffset, depth int) *Stack {
 	stack := _stackPool.Get()
-	if depth < 1 {
-		depth = 1
+
+	// Adjust depth to a valid range, defaults to FullStack if out of bounds.
+	if depth < 1 || depth > MaximumStack {
+		depth = MaximumStack
 	}
-	stack.pcs = stack.pcs[:depth]
-	n := runtime.Callers(CallerSkip, stack.pcs)
+
+	// Ensure skipOffset does not go below the base CallerSkip.
+	if skipOffset < -CallerSkip {
+		skipOffset = 0
+	}
+
+	pcs := make([]uintptr, depth)
+	n := runtime.Callers(CallerSkip+skipOffset, pcs)
 	if n < depth {
-		stack.pcs = stack.pcs[:n]
+		pcs = pcs[:n]
 	}
-	stack.frames = runtime.CallersFrames(stack.pcs)
+
+	stack.frames = runtime.CallersFrames(pcs)
 	return stack
 }
 
@@ -48,7 +54,6 @@ func (s *Stack) Next() (runtime.Frame, bool) {
 // Free releases resources associated with this stacktrace and back to the pool
 func (s *Stack) Free() {
 	s.frames = nil
-	s.pcs = nil
 	_stackPool.Put(s)
 }
 

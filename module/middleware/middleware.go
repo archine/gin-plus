@@ -45,7 +45,7 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 }
 
 func getTrace() string {
-	stack := stacktrace.Capture(4)
+	stack := stacktrace.Capture(4, 8)
 	defer stack.Free()
 	return stack.ToString()
 }

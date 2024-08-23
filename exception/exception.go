@@ -76,7 +76,7 @@ func (s *StackError) StackTrace() string {
 
 // NewStackErr creates a new StackError with the specified message.
 func NewStackErr(msg string) *StackError {
-	stack := stacktrace.Capture(1)
+	stack := stacktrace.Capture(0, 1)
 	defer stack.Free()
 	return &StackError{msg, stack.First()}
 }
@@ -86,7 +86,7 @@ func WithStack(err error) *StackError {
 	if err == nil {
 		return nil
 	}
-	stack := stacktrace.Capture(1)
+	stack := stacktrace.Capture(0, 1)
 	defer stack.Free()
 	return &StackError{err.Error(), stack.First()}
 }
