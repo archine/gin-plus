@@ -90,11 +90,12 @@ func (a *App) Run() {
 		Handler:                      a.engine,
 	}
 
+	if config.Conf.Server.AllowedCors {
+		a.engine.Use(middleware.Cors())
+	}
+
 	if len(a.ginMiddlewares) > 0 {
 		a.engine.Use(a.ginMiddlewares...)
-		if config.Conf.Server.AllowedCors {
-			a.engine.Use(middleware.Cors())
-		}
 	}
 
 	internal.Log.Info("Gin middlewares loaded.")
