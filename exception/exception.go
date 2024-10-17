@@ -76,9 +76,9 @@ func (s *StackError) StackTrace() string {
 
 // NewStackErr creates a new StackError with the specified message.
 func NewStackErr(msg string) *StackError {
-	stack := stacktrace.Capture(0, 1)
+	stack := stacktrace.Capture(1, 8)
 	defer stack.Free()
-	return &StackError{msg, stack.First()}
+	return &StackError{msg, stack.ToString()}
 }
 
 // WithStack wraps an error with a stack trace.
@@ -86,9 +86,9 @@ func WithStack(err error) *StackError {
 	if err == nil {
 		return nil
 	}
-	stack := stacktrace.Capture(0, 1)
+	stack := stacktrace.Capture(1, 8)
 	defer stack.Free()
-	return &StackError{err.Error(), stack.First()}
+	return &StackError{err.Error(), stack.ToString()}
 }
 
 // Wrap formats an error message by wrapping the provided error with additional context.
@@ -114,12 +114,12 @@ func Wrap(err error, msg string, more ...error) error {
 	args := make([]any, 0, 2+len(more))
 
 	// Append the first error and message (if any)
-	builder.WriteString("%w")
-	args = append(args, err)
 	if msg != "" {
-		builder.WriteString(": %s")
+		builder.WriteString("%s")
 		args = append(args, msg)
 	}
+	builder.WriteString(": %w")
+	args = append(args, err)
 
 	// Append any additional errors
 	for _, e := range more {
