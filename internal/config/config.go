@@ -73,6 +73,11 @@ type Config struct {
 		// zero, there is no timeout.
 		IdleTimeout time.Duration `mapstructure:"idle_timeout"`
 
+		// ShutdownTimeout specifies the maximum duration to wait before the server
+		// gracefully shuts down. If the value is zero, the server will not have a timeout
+		// and will wait indefinitely for ongoing requests to complete.
+		ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
+
 		// DisableGeneralOptions Disable general options, default true.
 		// if true, passes "OPTIONS *" requests to the Handler.
 		// otherwise responds with 200 OK and Content-Length: 0.

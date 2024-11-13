@@ -35,7 +35,7 @@ func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFun
 		banner.Banner = ""
 	}
 	app := &App{
-		exitDelay:      3 * time.Second,
+		exitDelay:      0,
 		ginMiddlewares: middlewares,
 	}
 
@@ -89,6 +89,9 @@ func (a *App) Run() {
 		DisableGeneralOptionsHandler: config.Conf.Server.DisableGeneralOptions,
 		Handler:                      a.engine,
 	}
+	server.RegisterOnShutdown(func() {
+		listener.DoPreStop(a.listeners)
+	})
 
 	if config.Conf.Server.AllowedCors {
 		a.engine.Use(middleware.Cors())
@@ -138,7 +141,7 @@ func (a *App) Run() {
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	internal.Log.Info(fmt.Sprintf("Application started successfully on port: %d", config.Conf.Server.Port))
 
 	quit := make(chan os.Signal)
@@ -146,16 +149,25 @@ func (a *App) Run() {
 	<-quit
 	internal.Log.Info("Shutting down server...")
 
-	listener.DoPreStop(a.listeners)
+	var ctx context.Context
+	if config.Conf.Server.ShutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), config.Conf.Server.ShutdownTimeout)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), a.exitDelay)
-	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		internal.Log.Error(fmt.Sprintf("Server shutdown failed:", err.Error()))
+		internal.Log.Error(fmt.Sprintf("Server shutdown failed: %s", err.Error()))
 		os.Exit(1)
 	}
 
 	listener.DoPostStop(a.listeners)
+	if a.exitDelay > 0 {
+		time.Sleep(a.exitDelay)
+	}
+
 	internal.Log.Info("Server exited.")
 }
 
@@ -177,9 +189,10 @@ func (a *App) ReadConfigSub(v any, sub string) *App {
 	return a
 }
 
-// ExitDelay sets the delay for a graceful shutdown (default is 3 seconds).
-// This delay is the time given to the server to complete active requests before shutting down.
-func (a *App) ExitDelay(duration time.Duration) *App {
+// ShutdownWaitDelay sets the delay after the server has shut down
+// (default is 0 seconds). This delay allows time for any post-shutdown
+// tasks (such as cleanup, logging, etc.) to complete before the process exits.
+func (a *App) ShutdownWaitDelay(duration time.Duration) *App {
 	a.exitDelay = duration
 	return a
 }
