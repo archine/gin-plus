@@ -89,14 +89,9 @@ func (a *App) Run() {
 		DisableGeneralOptionsHandler: config.Conf.Server.DisableGeneralOptions,
 		Handler:                      a.engine,
 	}
-	server.RegisterOnShutdown(func() {
-		listener.DoPreStop(a.listeners)
-	})
-
 	if config.Conf.Server.AllowedCors {
 		a.engine.Use(middleware.Cors())
 	}
-
 	if len(a.ginMiddlewares) > 0 {
 		a.engine.Use(a.ginMiddlewares...)
 	}
@@ -157,6 +152,8 @@ func (a *App) Run() {
 	} else {
 		ctx = context.Background()
 	}
+
+	listener.DoPreStop(a.listeners)
 
 	if err := server.Shutdown(ctx); err != nil {
 		internal.Log.Error(fmt.Sprintf("Server shutdown failed: %s", err.Error()))
