@@ -93,7 +93,7 @@ func Apply(e *gin.Engine, autowired bool) {
 // GetAnnotation retrieves the specified annotation from the current context.
 // Returns the annotation value and a boolean indicating whether the annotation exists.
 func GetAnnotation(ctx *gin.Context, annotationName string) (val string, has bool) {
-	anno, has := annotationCache[ctx.FullPath()]
+	anno, has := annotationCache[ctx.Request.URL.Path]
 	if !has || len(anno) == 0 {
 		return "", false
 	}
