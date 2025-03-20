@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/archine/gin-plus/v3/banner"
 	"github.com/archine/gin-plus/v3/internal"
 	"github.com/archine/gin-plus/v3/internal/config"
@@ -12,11 +18,6 @@ import (
 	"github.com/archine/gin-plus/v3/mvc"
 	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 // App represents the main application structure.
@@ -139,7 +140,7 @@ func (a *App) Run() {
 	time.Sleep(50 * time.Millisecond)
 	internal.Log.Info(fmt.Sprintf("Application started successfully on port: %d", config.Conf.Server.Port))
 
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 	internal.Log.Info("Shutting down server...")
