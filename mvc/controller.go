@@ -52,6 +52,7 @@ func Apply(e *gin.Engine, autowired bool) {
 				ioc.Inject(controller)
 			}
 		}
+		controllerCache = nil
 		return
 	}
 
@@ -75,19 +76,17 @@ func Apply(e *gin.Engine, autowired bool) {
 			}
 
 			ginMethod := ginProxy.MethodByName(m.Method)
+			if ginMethod.Kind() == reflect.Invalid {
+				continue
+			}
 			args := []reflect.Value{reflect.ValueOf(m.ApiPath), methodValue}
 			ginMethod.Call(args)
 			annotationCache[m.ApiPath] = m.Annotations
 		}
-
-		if len(controllerCache) == 1 {
-			controllerCache = nil
-			return
-		}
-
-		controllerCache = controllerCache[1:]
 	}
-	core.Apis = nil // Trigger garbage collection
+	// Clear the global cache to prevent memory leaks.
+	controllerCache = nil
+	core.Apis = nil
 }
 
 // GetAnnotation retrieves the specified annotation from the current context.
