@@ -3,7 +3,7 @@ package application
 import (
 	"github.com/archine/gin-plus/v3/internal"
 	"github.com/archine/gin-plus/v3/internal/config"
-	"github.com/archine/gin-plus/v3/module/logger"
+	"github.com/archine/gin-plus/v3/module/gplog"
 	"github.com/archine/ioc"
 	"github.com/spf13/viper"
 )
@@ -18,7 +18,7 @@ func GetConfig() *config.Config {
 	return config.Conf
 }
 
-// ChangeLogger changing the logger instance used by the application.
-func ChangeLogger(logger logger.Logger) {
+// ChangeLogger changing the gplog instance used by the application.
+func ChangeLogger(logger gplog.Logger) {
 	internal.Log = logger
 }

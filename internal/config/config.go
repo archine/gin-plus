@@ -3,8 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/archine/gin-plus/v3/internal"
-	"github.com/archine/gin-plus/v3/listener"
+	"github.com/archine/gin-plus/v3/internal/event_manager"
 	"github.com/archine/ioc"
 	"github.com/spf13/viper"
 	"time"
@@ -27,14 +26,11 @@ type Config struct {
 		// Application running port, default 4006
 		Port int `mapstructure:"port"`
 
-		// Application environment, default dev, you can set it to prod or test
+		// Application environment, default dev, you can set it to prod
 		Env string `mapstructure:"env"`
 
 		// AllowedCors allowed cross-domain, default false
 		// If true, the server will add the default cors middleware to the gin engine.
-		//
-		// Note: When you add cross-domain middleware through application.New(), you do not need to allow it, otherwise there will be multiple,
-		// this parameter only controls when you use application.Default()
 		AllowedCors bool `mapstructure:"allowed_cors"`
 
 		// MaxMultipartMemory The maximum memory space that an uploaded file can occupy, default 32M.
@@ -85,16 +81,12 @@ type Config struct {
 	}
 }
 
-// LoadByCommand Load configuration file by command line
-func LoadByCommand(l listener.ConfigListener) {
+// Init initializes the project configuration.
+// It reads the configuration from a file specified by the -c flag or defaults to "app.yml".
+func Init(eventManager *event_manager.AppEventManager) {
 	var configFile string
-	flag.StringVar(&configFile, "c", "app.yml", "Absolute path to the project configuration file, default app.yml")
+	flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
 	flag.Parse()
-	Load(configFile, l)
-}
-
-// Load Load configuration file
-func Load(configFilePath string, l listener.ConfigListener) {
 	v := viper.New()
 	ioc.SetBeans(v)
 
@@ -107,25 +99,18 @@ func Load(configFilePath string, l listener.ConfigListener) {
 	v.SetDefault("server.idle_timeout", 0)
 	v.SetDefault("server.disable_general_options", true)
 	v.AutomaticEnv()
-	v.SetConfigFile(configFilePath)
+	v.SetConfigFile(configFile)
 
-	var err error
-	if l != nil {
-		err = l.Read(v)
-	} else {
-		err = v.ReadInConfig()
-	}
+	eventManager.TriggerConfigBeforeLoad(v)
+
+	err := v.ReadInConfig()
 	if err != nil {
-		panic(fmt.Sprintf("Error reading the configuration file: %s", err.Error()))
+		panic(fmt.Sprintf("Faild to read the configuration file: %s", err.Error()))
 	}
-
 	err = v.Unmarshal(&Conf)
 	if err != nil {
-		panic(fmt.Sprintf("Error unmarshalling the configuration file into the config structure: %s", err.Error()))
+		panic(fmt.Sprintf("Failed to parse the configuration file into the config structure: %s", err.Error()))
 	}
 
-	if l != nil {
-		l.After(v)
-	}
-	internal.Log.Info("Configuration file loaded successfully.")
+	eventManager.TriggerConfigAfterLoad(v)
 }

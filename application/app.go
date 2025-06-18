@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v3/event"
+	"github.com/archine/gin-plus/v3/internal/event_manager"
+	"github.com/archine/gin-plus/v3/internal/logger"
+	"github.com/archine/gin-plus/v3/module/gplog/iface"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,9 +15,7 @@ import (
 	"time"
 
 	"github.com/archine/gin-plus/v3/banner"
-	"github.com/archine/gin-plus/v3/internal"
 	"github.com/archine/gin-plus/v3/internal/config"
-	"github.com/archine/gin-plus/v3/listener"
 	"github.com/archine/gin-plus/v3/module/middleware"
 	"github.com/archine/gin-plus/v3/mvc"
 	"github.com/archine/ioc"
@@ -24,13 +26,13 @@ import (
 type App struct {
 	engine         *gin.Engine
 	exitDelay      time.Duration
-	interceptors   []mvc.MethodInterceptor
 	ginMiddlewares []gin.HandlerFunc
-	listeners      []listener.ApplicationListener
+	interceptors   []mvc.MethodInterceptor
+	eventManager   *event_manager.AppEventManager
 }
 
 // New Create a clean application, you can add some gin middlewares to the engine
-func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFunc) *App {
+func New(middlewares ...gin.HandlerFunc) *App {
 	if banner.Banner != "" {
 		fmt.Println(banner.Banner)
 		banner.Banner = ""
@@ -38,32 +40,16 @@ func New(listeners []listener.ApplicationListener, middlewares ...gin.HandlerFun
 	app := &App{
 		exitDelay:      0,
 		ginMiddlewares: middlewares,
+		eventManager:   event_manager.NewEventManager(),
 	}
 
-	var configLoaded bool
-	for _, l := range listeners {
-		if cl, ok := l.(listener.ConfigListener); ok {
-			config.LoadByCommand(cl)
-			configLoaded = true
-			continue
-		}
-		app.listeners = append(app.listeners, l)
-	}
-	if !configLoaded {
-		config.LoadByCommand(nil)
-	}
-	if config.Conf.Server.Env == config.Prod {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		gin.SetMode(gin.DebugMode)
-	}
-
+	ioc.SetBeans(app)
 	return app
 }
 
 // Default creates a default application with built-in middleware and listeners.
-func Default(listeners ...listener.ApplicationListener) *App {
-	return New(listeners, gin.Logger(), middleware.GlobalExceptionInterceptor)
+func Default() *App {
+	return New(gin.Logger(), middleware.GlobalExceptionInterceptor)
 }
 
 // Banner sets a custom startup banner.
@@ -72,14 +58,40 @@ func (a *App) Banner(b string) *App {
 	return a
 }
 
-// Interceptor Adds a global interceptor
-func (a *App) Interceptor(interceptor ...mvc.MethodInterceptor) *App {
+// SetCustomerLogger sets a custom logger for the application.
+func (a *App) SetCustomerLogger(customerLogger iface.AbstractAppLogger) *App {
+	logger.GlobalLogger = customerLogger
+	return a
+}
+
+// SetMethodInterceptor sets method interceptors for the application.
+func (a *App) SetMethodInterceptor(interceptor ...mvc.MethodInterceptor) *App {
 	a.interceptors = append(a.interceptors, interceptor...)
 	return a
 }
 
+// SetEvents sets events for the application.
+func (a *App) SetEvents(listener ...event.AppEvent) *App {
+	a.eventManager.Register(listener)
+	return a
+}
+
+// Ready prepares the application for running.
+func (a *App) Ready() {
+	a.eventManager.Register(&logger.DefaultLoggerInitListener{})
+	config.Init(a.eventManager)
+}
+
 // Run starts the application server.
 func (a *App) Run() {
+	a.Ready()
+
+	if config.Conf.Server.Env == config.Prod {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		gin.SetMode(gin.DebugMode)
+	}
+
 	a.engine = gin.New()
 	server := &http.Server{
 		Addr:                         fmt.Sprintf(":%d", config.Conf.Server.Port),
@@ -97,12 +109,9 @@ func (a *App) Run() {
 		a.engine.Use(a.ginMiddlewares...)
 	}
 
-	internal.Log.Info("Gin middlewares loaded.")
 	a.engine.MaxMultipartMemory = config.Conf.Server.MaxMultipartMemory
 	a.engine.RemoveExtraSlash = true
 	ioc.SetBeans(a.engine)
-
-	listener.DoPreApply(a.listeners)
 
 	if len(a.interceptors) > 0 {
 		a.engine.Use(func(ctx *gin.Context) {
@@ -127,23 +136,18 @@ func (a *App) Run() {
 	}
 
 	mvc.Apply(a.engine, true)
-	internal.Log.Info("API application setup complete.")
-	listener.DoPreStart(a.listeners)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			internal.Log.Error(fmt.Sprintf("Application startup failed: %s", err.Error()))
 			os.Exit(1)
 		}
 	}()
 
 	time.Sleep(50 * time.Millisecond)
-	internal.Log.Info(fmt.Sprintf("Application started successfully on port: %d", config.Conf.Server.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
-	internal.Log.Info("Shutting down server...")
 
 	var ctx context.Context
 	if config.Conf.Server.ShutdownTimeout > 0 {
@@ -154,25 +158,19 @@ func (a *App) Run() {
 		ctx = context.Background()
 	}
 
-	listener.DoPreStop(a.listeners)
-
 	if err := server.Shutdown(ctx); err != nil {
-		internal.Log.Error(fmt.Sprintf("Server shutdown failed: %s", err.Error()))
 		os.Exit(1)
 	}
 
-	listener.DoPostStop(a.listeners)
 	if a.exitDelay > 0 {
 		time.Sleep(a.exitDelay)
 	}
 
-	internal.Log.Info("Server exited.")
 }
 
 // ReadConfig loads the configuration into the provided structure.
 func (a *App) ReadConfig(v any) *App {
 	if err := GetConfReader().Unmarshal(v); err != nil {
-		internal.Log.Error(fmt.Sprintf("Failed to read config, %s", err.Error()))
 		os.Exit(1)
 	}
 	return a
@@ -181,7 +179,6 @@ func (a *App) ReadConfig(v any) *App {
 // ReadConfigSub loads the sub-configuration into the provided structure.
 func (a *App) ReadConfigSub(v any, sub string) *App {
 	if err := GetConfReader().UnmarshalKey(sub, v); err != nil {
-		internal.Log.Error(fmt.Sprintf("Failed to read sub-config, %s", err.Error()))
 		os.Exit(1)
 	}
 	return a
