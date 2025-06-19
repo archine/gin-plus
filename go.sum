@@ -1,5 +1,5 @@
-github.com/archine/ast-base v1.0.0 h1:EAWKHHsfMVZOsbUYtxWmuEoNmQig9JgydfVm5SFHOh4=
-github.com/archine/ast-base v1.0.0/go.mod h1:NiwPRYcg0QW1y5szR6Z/5ACMnUqxiuERYUQ6/RpLaYE=
+github.com/archine/ast-base v1.0.3 h1:AIhXG5Zt4Cnvs90y1JOX6ael7+vC3G/m5GAcGgLjOt4=
+github.com/archine/ast-base v1.0.3/go.mod h1:NiwPRYcg0QW1y5szR6Z/5ACMnUqxiuERYUQ6/RpLaYE=
 github.com/archine/ioc v1.0.1 h1:YHMAo/WSjQ+e2XU7PA7XAhOnNBQiZ0+yM/cAhdT1EUU=
 github.com/archine/ioc v1.0.1/go.mod h1:VTtX1hL4nkWJrvc6QbqXaOLLSnk3P0KTWh71nwRpJHM=
 github.com/bytedance/sonic v1.13.2 h1:8/H1FempDZqC4VqjptGo14QQlJx8VdZJegxs6wwfqpQ=
@@ -93,10 +93,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65EE=
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
-go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
-go.uber.org/multierr v1.9.0 h1:7fIwc/ZtS0q++VgcfqFDxSBZVv/Xo49/SYnDFupUwlI=
-go.uber.org/multierr v1.9.0/go.mod h1:X2jQV1h+kxSjClGpnseKVIxpmcjrj7MNnI0bnlfKTVQ=
+go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
 go.uber.org/multierr v1.10.0 h1:S0h4aNzvfcFsC3dRF1jLoaov7oRaKqRGC/pUEJ2yvPQ=
 go.uber.org/multierr v1.10.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.uber.org/zap v1.27.0 h1:aJMhYGrd5QSmlpLMr2MftRKl7t8J8PTZPA732ud/XR8=

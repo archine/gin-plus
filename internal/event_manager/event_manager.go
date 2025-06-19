@@ -3,6 +3,7 @@ package event_manager
 import (
 	"github.com/archine/gin-plus/v3/event"
 	"github.com/spf13/viper"
+	"sort"
 )
 
 // AppEventManager manages all app events and triggers events at appropriate times
@@ -20,6 +21,15 @@ func NewEventManager() *AppEventManager {
 // Register adds multiple app events to the manager
 func (em *AppEventManager) Register(events ...event.AppEvent) {
 	em.events = append(em.events, events...)
+}
+
+// Sort sorts the registered events by their order
+func (em *AppEventManager) Sort() {
+	// Sorting logic can be implemented here if needed.
+	// It will be sorted from smallest to largest.
+	sort.Slice(em.events, func(i, j int) bool {
+		return em.events[i].Order() < em.events[j].Order()
+	})
 }
 
 // TriggerAppStarting triggers the AppStarting event
@@ -76,20 +86,29 @@ func (em *AppEventManager) TriggerConfigAfterLoad(v *viper.Viper) {
 	}
 }
 
-// TriggerContainerAfterInit triggers the ContainerAfterInit event
-func (em *AppEventManager) TriggerContainerAfterInit() {
+// TriggerContextBeforeInit triggers the ContextBeforeInit event
+func (em *AppEventManager) TriggerContextBeforeInit() {
 	for _, e := range em.events {
-		if containerEvent, ok := e.(event.ContainerAfterInitEvent); ok {
-			containerEvent.OnBeanContainerAfterInit()
+		if contextEvent, ok := e.(event.ContextBeforeInitEvent); ok {
+			contextEvent.OnContextBeforeInit()
 		}
 	}
 }
 
-// TriggerContainerBeforeInit triggers the ContainerBeforeInit event
-func (em *AppEventManager) TriggerContainerBeforeInit() {
+// TriggerContextAfterInit triggers the ContextAfterInit event
+func (em *AppEventManager) TriggerContextAfterInit() {
 	for _, e := range em.events {
-		if containerEvent, ok := e.(event.ContainerBeforeInitEvent); ok {
-			containerEvent.OnBeanContainerBeforeInit()
+		if contextEvent, ok := e.(event.ContextAfterInitEvent); ok {
+			contextEvent.OnContextAfterInit()
+		}
+	}
+}
+
+// TriggerBeanPostProcess triggers the BeanPostProcess event
+func (em *AppEventManager) TriggerBeanPostProcess(beanName string, bean any) {
+	for _, e := range em.events {
+		if beanEvent, ok := e.(event.BeanPostProcessor); ok {
+			beanEvent.OnBeanPostProcess(beanName, bean)
 		}
 	}
 }

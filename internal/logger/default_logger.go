@@ -83,6 +83,7 @@ func (d *DefaultLoggerInitListener) OnConfigAfterLoad(v *viper.Viper) {
 	if GlobalLogger != nil {
 		return
 	}
+
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.enable_color", true)
 	v.SetDefault("log.format", "console")
@@ -130,4 +131,8 @@ func (d *DefaultLoggerInitListener) OnConfigAfterLoad(v *viper.Viper) {
 		z:       zap.New(zapCore),
 		ctxKeys: conf.CtxKeys,
 	}
+}
+
+func (d *DefaultLoggerInitListener) Order() int {
+	return 99
 }

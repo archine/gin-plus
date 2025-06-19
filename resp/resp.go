@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
-	"github.com/archine/gin-plus/v3/internal"
 	"github.com/archine/gin-plus/v3/module/constant"
 	"github.com/archine/gin-plus/v3/module/constant/errs"
+	"github.com/archine/gin-plus/v3/module/gplog"
 	"github.com/archine/gin-plus/v3/module/pool"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -209,9 +209,9 @@ func DirectRespWithCode(ctx *gin.Context, bCode int, format string, args ...any)
 func DirectRespErr(ctx *gin.Context, err error) {
 	var stackErr *exception.StackError
 	if errors.As(err, &stackErr) {
-		internal.Log.ErrorWithCtx(ctx, fmt.Sprintf("%s\n%s", err.Error(), stackErr.StackTrace()))
+		gplog.WithContext(ctx).Error(fmt.Sprintf("%s\n%s", err.Error(), stackErr.StackTrace()))
 	} else {
-		internal.Log.ErrorWithCtx(ctx, err.Error())
+		gplog.WithContext(ctx).Error(err.Error())
 	}
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {

@@ -1,20 +1,18 @@
 package mvc
 
 import (
-	"github.com/archine/ast-base/core"
-	"github.com/archine/ioc"
+	"github.com/archine/ast-base"
+	"github.com/archine/gin-plus/v3/internal/event_manager"
+	"github.com/archine/gin-plus/v3/ioc"
 	"github.com/gin-gonic/gin"
 	"reflect"
 )
-
-// Annotations represents the annotations of an API method.
-type Annotations map[string]string
 
 // Global controller cache.
 var controllerCache []abstractController
 
 // Cache for annotations of each API.
-var annotationCache map[string]Annotations
+var annotationCache map[string]map[string]string
 
 // abstractController defines the interface for a controller that
 // requires a post-construction initialization method.
@@ -36,6 +34,11 @@ func Register(controllers ...abstractController) {
 	controllerCache = append(controllerCache, controllers...)
 }
 
+// SetAnnotations sets the annotations for a specific API path.
+func SetAnnotations(annos map[string]map[string]string) {
+	annotationCache = annos
+}
+
 // IsController checks if a given value implements the abstractController interface.
 func IsController(v interface{}) bool {
 	ct := reflect.TypeOf(v)
@@ -43,31 +46,27 @@ func IsController(v interface{}) bool {
 }
 
 // Apply attaches all APIs to the Gin engine.
-// @param e: the Gin engine.
-// @param autowired: if true, enables property injection via IoC.
-func Apply(e *gin.Engine, autowired bool) {
-	if core.Apis == nil {
-		for _, controller := range controllerCache {
-			if autowired {
-				ioc.Inject(controller)
-			}
-		}
-		controllerCache = nil
-		return
+// It uses reflection to dynamically bind methods to the Gin engine based on the API definitions
+// provided by the ast_base.Result.Apis map.
+// It also injects dependencies into the controllers
+//
+// Args:
+//
+//	engine: The Gin engine to which the APIs will be attached.
+//	eventManager: The event manager to handle application events.
+func Apply(engine *gin.Engine, eventManager *event_manager.AppEventManager) {
+	var ginProxy reflect.Value
+	if len(ast_base.Result.Apis) > 0 {
+		ginProxy = reflect.ValueOf(engine)
 	}
 
-	ginProxy := reflect.ValueOf(e)
-	annotationCache = make(map[string]Annotations)
-
 	for _, controller := range controllerCache {
-		if autowired {
-			ioc.Inject(controller)
-		}
+		ioc.Inject(controller)
 		controller.PostConstruct()
 
 		controllerType := reflect.TypeOf(controller).Elem()
 		controllerValue := reflect.ValueOf(controller)
-		methodInfos := core.Apis[controllerType.Name()]
+		methodInfos := ast_base.Result.Apis[controllerType.Name()]
 
 		for _, m := range methodInfos {
 			methodValue := controllerValue.MethodByName(m.Name)
@@ -79,14 +78,13 @@ func Apply(e *gin.Engine, autowired bool) {
 			if ginMethod.Kind() == reflect.Invalid {
 				continue
 			}
-			args := []reflect.Value{reflect.ValueOf(m.ApiPath), methodValue}
+			args := []reflect.Value{reflect.ValueOf(m.APIPath), methodValue}
 			ginMethod.Call(args)
-			annotationCache[m.ApiPath] = m.Annotations
+			//annotationCache[m.APIPath] = m.Annotations
 		}
 	}
-	// Clear the global cache to prevent memory leaks.
-	controllerCache = nil
-	core.Apis = nil
+
+	ast_base.Result = nil
 }
 
 // GetAnnotation retrieves the specified annotation from the current context.

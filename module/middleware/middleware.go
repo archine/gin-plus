@@ -3,7 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/archine/gin-plus/v3/exception"
-	"github.com/archine/gin-plus/v3/internal"
+	"github.com/archine/gin-plus/v3/module/gplog"
 	"github.com/archine/gin-plus/v3/module/stacktrace"
 	"github.com/archine/gin-plus/v3/resp"
 	"github.com/gin-contrib/cors"
@@ -33,11 +33,11 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 			case *exception.BusinessException:
 				resp.DirectRespWithCode(ctx, t.Code(), t.Error())
 			case *exception.StackError:
-				internal.Log.ErrorWithCtx(ctx, fmt.Sprintf("%s\n%s", t.Error(), t.StackTrace()))
+				gplog.WithContext(ctx).Error(fmt.Sprintf("%s\n%s", t.Error(), t.StackTrace()))
 				resp.ServerError(ctx, true)
 			default:
 				trace := getTrace()
-				internal.Log.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", t, trace))
+				gplog.WithContext(ctx).Error(fmt.Sprintf("%v\n%s", r, trace))
 				resp.ServerError(ctx, true)
 			}
 		}

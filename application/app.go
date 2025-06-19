@@ -18,7 +18,6 @@ import (
 	"github.com/archine/gin-plus/v3/internal/config"
 	"github.com/archine/gin-plus/v3/module/middleware"
 	"github.com/archine/gin-plus/v3/mvc"
-	"github.com/archine/ioc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,9 +57,12 @@ func (a *App) Banner(b string) *App {
 	return a
 }
 
-// SetCustomerLogger sets a custom logger for the application.
-func (a *App) SetCustomerLogger(customerLogger iface.AbstractAppLogger) *App {
-	logger.GlobalLogger = customerLogger
+// SetCustomLogger sets a custom logger for the application.
+func (a *App) SetCustomLogger(customLogger iface.AbstractAppLogger) *App {
+	if customLogger == nil {
+		panic("custom logger cannot be nil")
+	}
+	logger.GlobalLogger = customLogger
 	return a
 }
 
@@ -71,14 +73,16 @@ func (a *App) SetMethodInterceptor(interceptor ...mvc.MethodInterceptor) *App {
 }
 
 // SetEvents sets events for the application.
-func (a *App) SetEvents(listener ...event.AppEvent) *App {
-	a.eventManager.Register(listener)
+func (a *App) SetEvents(e ...event.AppEvent) *App {
+	a.eventManager.Register(e...)
 	return a
 }
 
 // Ready prepares the application for running.
 func (a *App) Ready() {
 	a.eventManager.Register(&logger.DefaultLoggerInitListener{})
+	a.eventManager.Sort()
+
 	config.Init(a.eventManager)
 }
 
@@ -135,7 +139,7 @@ func (a *App) Run() {
 		})
 	}
 
-	mvc.Apply(a.engine, true)
+	mvc.Apply(a.engine, a.eventManager)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -177,8 +181,8 @@ func (a *App) ReadConfig(v any) *App {
 }
 
 // ReadConfigSub loads the sub-configuration into the provided structure.
-func (a *App) ReadConfigSub(v any, sub string) *App {
-	if err := GetConfReader().UnmarshalKey(sub, v); err != nil {
+func (a *App) ReadConfigSub(key string, confPointer any) *App {
+	if err := GetConfReader().UnmarshalKey(key, confPointer); err != nil {
 		os.Exit(1)
 	}
 	return a
