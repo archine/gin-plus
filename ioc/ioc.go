@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 )
 
@@ -24,14 +23,6 @@ func Inject(v any) error {
 		return fmt.Errorf("must be a pointer to struct")
 	}
 
-	// 先缓存当前对象，避免循环依赖
-	beanName := strings.ToLower(elem.Type().Name()[:1]) + elem.Type().Name()[1:]
-	mutex.Lock()
-	if _, exists := beanCache[beanName]; !exists {
-		beanCache[beanName] = v
-	}
-	mutex.Unlock()
-
 	typ := elem.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
@@ -49,8 +40,8 @@ func Inject(v any) error {
 			continue
 		}
 
-		// 支持指针类型和接口类型
-		if field.Type.Kind() != reflect.Ptr && field.Type.Kind() != reflect.Interface {
+		// 如果字段不是接口类型 且 不是指针型的结构体则跳过
+		if field.Type.Kind() != reflect.Interface && !(field.Type.Kind() == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct) {
 			continue
 		}
 
@@ -74,7 +65,7 @@ func Inject(v any) error {
 			}
 		} else {
 			if factory, ok := fieldVal.Interface().(FactoryBean); ok {
-				created, err := createBean(autowire, factory)
+				created, err := createBean(field, factory)
 				if err != nil {
 					return err
 				}
@@ -83,24 +74,17 @@ func Inject(v any) error {
 					continue
 				}
 			}
-			return fmt.Errorf("bean %s not found for field %s", autowire, field.Name)
+			return fmt.Errorf("bean '%s' not found for field %s.%s", autowire, elem.Type().Name(), field.Name)
 		}
 	}
 	return nil
 }
 
 // createBean 创建并注入 bean
-func createBean(beanName string, factory FactoryBean) (any, error) {
+func createBean(filed reflect.StructField, factory FactoryBean) (any, error) {
+	beanName := factory.GetBeanName()
 	if beanName == "" {
-		// 使用结构体名称，首字母小写
-		typ := reflect.TypeOf(factory)
-		if typ.Kind() == reflect.Ptr {
-			typ = typ.Elem()
-		}
-		structName := typ.Name()
-		if structName != "" {
-			beanName = strings.ToLower(structName[:1]) + structName[1:]
-		}
+		beanName = filed.Type.Name()
 	}
 
 	mutex.Lock()
@@ -112,7 +96,7 @@ func createBean(beanName string, factory FactoryBean) (any, error) {
 	newBean := factory.CreateBean()
 	if newBean == nil {
 		mutex.Unlock()
-		return nil, fmt.Errorf("factory failed to create bean: %s", beanName)
+		return fmt.Errorf("对象 %s 尝试创建Bean失败，返回值为空", filed.Type.String()), nil
 	}
 
 	beanCache[beanName] = newBean
@@ -123,7 +107,7 @@ func createBean(beanName string, factory FactoryBean) (any, error) {
 		mutex.Lock()
 		delete(beanCache, beanName)
 		mutex.Unlock()
-		return nil, err
+		return nil, nil
 	}
 
 	return newBean, nil
