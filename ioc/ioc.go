@@ -1,20 +1,16 @@
 package ioc
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 )
 
 var (
-	beanCache = make(map[string]any)
-	mutex     = sync.RWMutex{}
+	mutex = sync.RWMutex{}
 )
-
-// Bean 定义可被 IoC 容器管理的 bean 接口
-type Bean interface {
-	CreateBean() Bean
-}
 
 // Inject 注入对象的所有依赖字段
 func Inject(v any) error {
@@ -29,18 +25,22 @@ func Inject(v any) error {
 	}
 
 	// 先缓存当前对象，避免循环依赖
-	beanName := elem.Type().String()
+	beanName := strings.ToLower(elem.Type().Name()[:1]) + elem.Type().Name()[1:]
 	mutex.Lock()
 	if _, exists := beanCache[beanName]; !exists {
 		beanCache[beanName] = v
 	}
 	mutex.Unlock()
 
-	// 遍历字段进行注入
 	typ := elem.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		if !field.IsExported() {
+			continue
+		}
+
+		autowire := field.Tag.Get("autowire")
+		if autowire == "" {
 			continue
 		}
 
@@ -49,94 +49,108 @@ func Inject(v any) error {
 			continue
 		}
 
-		if field.Type.Kind() == reflect.Interface {
-			injectInterface(fieldVal, field)
-		} else if field.Type.Kind() == reflect.Ptr {
-			injectPointer(fieldVal, field)
+		// 支持指针类型和接口类型
+		if field.Type.Kind() != reflect.Ptr && field.Type.Kind() != reflect.Interface {
+			continue
+		}
+
+		mutex.RLock()
+		bean, exists := beanCache[autowire]
+		mutex.RUnlock()
+
+		if exists {
+			beanVal := reflect.ValueOf(bean)
+			if field.Type.Kind() == reflect.Interface {
+				if beanVal.Type().Implements(field.Type) {
+					fieldVal.Set(beanVal)
+				} else {
+					return fmt.Errorf("bean %s does not implement interface %s", autowire, field.Type.String())
+				}
+			} else if beanVal.Type().AssignableTo(field.Type) {
+				fieldVal.Set(beanVal)
+			} else {
+				return fmt.Errorf("bean %s of type %s cannot be assigned to field %s of type %s",
+					autowire, beanVal.Type().String(), field.Name, field.Type.String())
+			}
+		} else {
+			if factory, ok := fieldVal.Interface().(FactoryBean); ok {
+				created, err := createBean(autowire, factory)
+				if err != nil {
+					return err
+				}
+				if created != nil {
+					fieldVal.Set(reflect.ValueOf(created))
+					continue
+				}
+			}
+			return fmt.Errorf("bean %s not found for field %s", autowire, field.Name)
 		}
 	}
 	return nil
 }
 
-// injectInterface 注入接口类型字段
-func injectInterface(fieldVal reflect.Value, field reflect.StructField) {
-	primary := field.Tag.Get("autowire")
-	mutex.RLock()
-	defer mutex.RUnlock()
-
-	for _, bean := range beanCache {
-		if reflect.TypeOf(bean).Implements(field.Type) {
-			if primary == "" || reflect.TypeOf(bean).Elem().String() == primary {
-				fieldVal.Set(reflect.ValueOf(bean))
-				break
-			}
-		}
-	}
-}
-
-// injectPointer 注入指针类型字段
-func injectPointer(fieldVal reflect.Value, field reflect.StructField) {
-	fieldBeanName := field.Type.Elem().String()
-
-	mutex.RLock()
-	bean, exists := beanCache[fieldBeanName]
-	mutex.RUnlock()
-
-	if exists {
-		fieldVal.Set(reflect.ValueOf(bean))
-		return
-	}
-
-	// 尝试通过 Bean 接口创建实例
-	if field.Type.Implements(reflect.TypeOf((*Bean)(nil)).Elem()) && !fieldVal.IsNil() {
-		if factory, ok := fieldVal.Interface().(Bean); ok {
-			if created := createBean(fieldBeanName, factory); created != nil {
-				fieldVal.Set(reflect.ValueOf(created))
-			}
-		}
-	}
-}
-
 // createBean 创建并注入 bean
-func createBean(beanName string, factory Bean) any {
+func createBean(beanName string, factory FactoryBean) (any, error) {
+	if beanName == "" {
+		// 使用结构体名称，首字母小写
+		typ := reflect.TypeOf(factory)
+		if typ.Kind() == reflect.Ptr {
+			typ = typ.Elem()
+		}
+		structName := typ.Name()
+		if structName != "" {
+			beanName = strings.ToLower(structName[:1]) + structName[1:]
+		}
+	}
+
 	mutex.Lock()
 	if bean, ok := beanCache[beanName]; ok {
 		mutex.Unlock()
-		return bean
+		return bean, nil
 	}
 
-	instance := factory.CreateBean()
-	if instance == nil {
+	newBean := factory.CreateBean()
+	if newBean == nil {
 		mutex.Unlock()
-		return nil
+		return nil, fmt.Errorf("factory failed to create bean: %s", beanName)
 	}
 
-	beanCache[beanName] = instance
+	beanCache[beanName] = newBean
 	mutex.Unlock()
 
 	// 递归注入新创建的实例
-	if err := Inject(instance); err != nil {
+	if err := Inject(newBean); err != nil {
 		mutex.Lock()
 		delete(beanCache, beanName)
 		mutex.Unlock()
-		return nil
+		return nil, err
 	}
 
-	return instance
+	return newBean, nil
 }
 
-// SetBeans 批量设置 bean 到容器
-func SetBeans(beans ...any) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	for i, bean := range beans {
-		if bean == nil || reflect.TypeOf(bean).Kind() != reflect.Ptr {
-			return fmt.Errorf("bean at index %d must be a non-nil pointer", i)
-		}
-		beanName := reflect.TypeOf(bean).Elem().String()
-		beanCache[beanName] = bean
+// SetBean 手动设置 bean 到 IoC 容器中
+// 主要用于在运行时动态添加 bean，非实现 FactoryBean 接口的对象
+func SetBean(beanName string, bean any) error {
+	if beanName == "" || bean == nil {
+		return errors.New("beanName cannot be empty and bean cannot be nil")
 	}
+	beanTyp := reflect.TypeOf(bean)
+
+	if beanTyp.Kind() != reflect.Ptr {
+		return errors.New("bean must be a non-nil pointer")
+	}
+
+	mutex.RLock()
+	if _, exists := beanCache[beanName]; exists {
+		return nil
+	}
+	mutex.RUnlock()
+
+	mutex.Lock()
+	beanCache[beanName] = bean
+	mutex.Unlock()
+
 	return nil
 }
 
@@ -152,7 +166,7 @@ func GetBean(beanStruct any) any {
 	}
 
 	mutex.RLock()
-	bean := beanCache[typ.String()]
+	bean := beanCache[typ.Name()]
 	mutex.RUnlock()
 	return bean
 }
@@ -167,43 +181,4 @@ func GetBeanByName(beanName string) any {
 	bean := beanCache[beanName]
 	mutex.RUnlock()
 	return bean
-}
-
-// GetAllBeans 获取所有 bean
-func GetAllBeans() map[string]any {
-	mutex.RLock()
-	defer mutex.RUnlock()
-
-	result := make(map[string]any, len(beanCache))
-	for k, v := range beanCache {
-		result[k] = v
-	}
-	return result
-}
-
-// ContainsBean 检查是否存在指定 bean
-func ContainsBean(beanName string) bool {
-	mutex.RLock()
-	_, exists := beanCache[beanName]
-	mutex.RUnlock()
-	return exists
-}
-
-// RemoveBean 移除指定 bean
-func RemoveBean(beanName string) bool {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	if _, exists := beanCache[beanName]; exists {
-		delete(beanCache, beanName)
-		return true
-	}
-	return false
-}
-
-// ClearBeans 清空所有 bean
-func ClearBeans() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	beanCache = make(map[string]any)
 }
