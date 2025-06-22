@@ -2,47 +2,26 @@ package mvc
 
 import (
 	"github.com/archine/ast-base"
-	"github.com/archine/gin-plus/v3/internal/event_manager"
-	"github.com/archine/gin-plus/v3/ioc"
+	"github.com/archine/gin-plus/v4/internal/event_manager"
+	"github.com/archine/gin-plus/v4/ioc"
 	"github.com/gin-gonic/gin"
-	"reflect"
 )
-
-// Global controller cache.
-var controllerCache []abstractController
 
 // Cache for annotations of each API.
 var annotationCache map[string]map[string]string
 
-// abstractController defines the interface for a controller that
-// requires a post-construction initialization method.
-type abstractController interface {
-	// PostConstruct is triggered after dependency injection is completed.
-	// This method can be used to further initialize the controller.
-	PostConstruct()
-}
-
 // Controller is a base struct that declares an entity as a controller.
 // API methods can be added to this struct.
-type Controller struct{}
-
-// PostConstruct is a default implementation for Controller.
-func (c *Controller) PostConstruct() {}
-
-// Register adds controllers to the global cache.
-func Register(controllers ...abstractController) {
-	controllerCache = append(controllerCache, controllers...)
+type Controller struct {
+	ioc.Bean
 }
 
 // SetAnnotations sets the annotations for a specific API path.
+// Do not call this method directly; it is used by the framework to set annotations.
 func SetAnnotations(annos map[string]map[string]string) {
-	annotationCache = annos
-}
-
-// IsController checks if a given value implements the abstractController interface.
-func IsController(v interface{}) bool {
-	ct := reflect.TypeOf(v)
-	return ct.Kind() == reflect.Ptr && ct.Implements(reflect.TypeOf((*abstractController)(nil)).Elem())
+	if annotationCache == nil {
+		annotationCache = annos
+	}
 }
 
 // Apply attaches all APIs to the Gin engine.
@@ -55,34 +34,34 @@ func IsController(v interface{}) bool {
 //	engine: The Gin engine to which the APIs will be attached.
 //	eventManager: The event manager to handle application events.
 func Apply(engine *gin.Engine, eventManager *event_manager.AppEventManager) {
-	var ginProxy reflect.Value
-	if len(ast_base.Result.Apis) > 0 {
-		ginProxy = reflect.ValueOf(engine)
-	}
+	//var ginProxy reflect.Value
+	//if len(ast_base.Result.Apis) > 0 {
+	//	ginProxy = reflect.ValueOf(engine)
+	//}
 
-	for _, controller := range controllerCache {
-		ioc.Inject(controller)
-		controller.PostConstruct()
-
-		controllerType := reflect.TypeOf(controller).Elem()
-		controllerValue := reflect.ValueOf(controller)
-		methodInfos := ast_base.Result.Apis[controllerType.Name()]
-
-		for _, m := range methodInfos {
-			methodValue := controllerValue.MethodByName(m.Name)
-			if methodValue.Kind() == reflect.Invalid {
-				continue
-			}
-
-			ginMethod := ginProxy.MethodByName(m.Method)
-			if ginMethod.Kind() == reflect.Invalid {
-				continue
-			}
-			args := []reflect.Value{reflect.ValueOf(m.APIPath), methodValue}
-			ginMethod.Call(args)
-			//annotationCache[m.APIPath] = m.Annotations
-		}
-	}
+	//for _, controller := range controllerCache {
+	//	ioc.Inject(controller)
+	//	controller.PostConstruct()
+	//
+	//	controllerType := reflect.TypeOf(controller).Elem()
+	//	controllerValue := reflect.ValueOf(controller)
+	//	methodInfos := ast_base.Result.Apis[controllerType.Name()]
+	//
+	//	for _, m := range methodInfos {
+	//		methodValue := controllerValue.MethodByName(m.Name)
+	//		if methodValue.Kind() == reflect.Invalid {
+	//			continue
+	//		}
+	//
+	//		ginMethod := ginProxy.MethodByName(m.Method)
+	//		if ginMethod.Kind() == reflect.Invalid {
+	//			continue
+	//		}
+	//		args := []reflect.Value{reflect.ValueOf(m.APIPath), methodValue}
+	//		ginMethod.Call(args)
+	//		//annotationCache[m.APIPath] = m.Annotations
+	//	}
+	//}
 
 	ast_base.Result = nil
 }

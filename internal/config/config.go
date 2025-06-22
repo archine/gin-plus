@@ -3,8 +3,8 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/archine/gin-plus/v3/internal/event_manager"
-	"github.com/archine/ioc"
+	"github.com/archine/gin-plus/v4/internal/event_manager"
+	"github.com/archine/gin-plus/v4/ioc"
 	"github.com/spf13/viper"
 	"time"
 )
@@ -88,7 +88,7 @@ func Init(eventManager *event_manager.AppEventManager) {
 	flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
 	flag.Parse()
 	v := viper.New()
-	ioc.SetBeans(v)
+	_ = ioc.SetBean("viper", v)
 
 	v.SetDefault("server.port", 4006)
 	v.SetDefault("server.env", Dev)

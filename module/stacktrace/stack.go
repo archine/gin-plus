@@ -1,7 +1,7 @@
 package stacktrace
 
 import (
-	"github.com/archine/gin-plus/v3/module/pool"
+	"github.com/archine/gin-plus/v4/module/pool"
 	"runtime"
 	"strconv"
 	"strings"

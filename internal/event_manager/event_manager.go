@@ -1,7 +1,7 @@
 package event_manager
 
 import (
-	"github.com/archine/gin-plus/v3/event"
+	"github.com/archine/gin-plus/v4/event"
 	"github.com/spf13/viper"
 	"sort"
 )

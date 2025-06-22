@@ -3,7 +3,7 @@ package logger
 import (
 	"context"
 	"fmt"
-	"github.com/archine/gin-plus/v3/module/gplog/iface"
+	"github.com/archine/gin-plus/v4/module/gplog/iface"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

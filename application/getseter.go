@@ -1,8 +1,8 @@
 package application
 
 import (
-	"github.com/archine/gin-plus/v3/internal/config"
-	"github.com/archine/gin-plus/v3/ioc"
+	"github.com/archine/gin-plus/v4/internal/config"
+	"github.com/archine/gin-plus/v4/ioc"
 	"github.com/spf13/viper"
 )
 

@@ -4,20 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/archine/gin-plus/v3/event"
-	"github.com/archine/gin-plus/v3/internal/event_manager"
-	"github.com/archine/gin-plus/v3/internal/logger"
-	"github.com/archine/gin-plus/v3/module/gplog/iface"
+	"github.com/archine/gin-plus/v4/event"
+	"github.com/archine/gin-plus/v4/internal/event_manager"
+	"github.com/archine/gin-plus/v4/internal/logger"
+	"github.com/archine/gin-plus/v4/ioc"
+	"github.com/archine/gin-plus/v4/module/gplog/iface"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/archine/gin-plus/v3/banner"
-	"github.com/archine/gin-plus/v3/internal/config"
-	"github.com/archine/gin-plus/v3/module/middleware"
-	"github.com/archine/gin-plus/v3/mvc"
+	"github.com/archine/gin-plus/v4/banner"
+	"github.com/archine/gin-plus/v4/internal/config"
+	"github.com/archine/gin-plus/v4/module/middleware"
+	"github.com/archine/gin-plus/v4/mvc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,7 +43,6 @@ func New(middlewares ...gin.HandlerFunc) *App {
 		eventManager:   event_manager.NewEventManager(),
 	}
 
-	ioc.SetBeans(app)
 	return app
 }
 
@@ -115,7 +115,7 @@ func (a *App) Run() {
 
 	a.engine.MaxMultipartMemory = config.Conf.Server.MaxMultipartMemory
 	a.engine.RemoveExtraSlash = true
-	ioc.SetBeans(a.engine)
+	_ = ioc.SetBean("ginEngine", a.engine)
 
 	if len(a.interceptors) > 0 {
 		a.engine.Use(func(ctx *gin.Context) {
