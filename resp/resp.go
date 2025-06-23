@@ -3,11 +3,11 @@ package resp
 import (
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/pool"
+	"github.com/archine/gin-plus/v4/constant"
+	"github.com/archine/gin-plus/v4/constant/errs"
 	"github.com/archine/gin-plus/v4/exception"
-	"github.com/archine/gin-plus/v4/module/constant"
-	"github.com/archine/gin-plus/v4/module/constant/errs"
-	"github.com/archine/gin-plus/v4/module/gplog"
-	"github.com/archine/gin-plus/v4/module/pool"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"net/http"
@@ -53,8 +53,8 @@ type PaginationResult struct {
 type Result struct {
 	ctx     *gin.Context
 	Code    int         `json:"code"`               // Business code.
-	TraceId string      `json:"trace_id,omitempty"` // Optional trace ID for tracking, can be empty.
 	Message string      `json:"msg"`                // Business message.
+	TraceId string      `json:"trace_id,omitempty"` // Optional trace ID for tracking, can be empty.
 	Data    interface{} `json:"ret,omitempty"`      // Response data, can be empty.
 }
 

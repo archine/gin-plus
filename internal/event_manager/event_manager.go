@@ -103,12 +103,3 @@ func (em *AppEventManager) TriggerContextAfterInit() {
 		}
 	}
 }
-
-// TriggerBeanPostProcess triggers the BeanPostProcess event
-func (em *AppEventManager) TriggerBeanPostProcess(beanName string, bean any) {
-	for _, e := range em.events {
-		if beanEvent, ok := e.(event.BeanPostProcessor); ok {
-			beanEvent.OnBeanPostProcess(beanName, bean)
-		}
-	}
-}

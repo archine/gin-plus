@@ -3,8 +3,8 @@ package gplog
 import (
 	"context"
 
+	"github.com/archine/gin-plus/v4/component/gplog/iface"
 	"github.com/archine/gin-plus/v4/internal/logger"
-	"github.com/archine/gin-plus/v4/module/gplog/iface"
 )
 
 func Info(text string) {

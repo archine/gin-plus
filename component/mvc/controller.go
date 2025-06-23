@@ -1,7 +1,6 @@
 package mvc
 
 import (
-	"github.com/archine/ast-base"
 	"github.com/archine/gin-plus/v4/internal/event_manager"
 	"github.com/archine/gin-plus/v4/ioc"
 	"github.com/gin-gonic/gin"
@@ -14,14 +13,6 @@ var annotationCache map[string]map[string]string
 // API methods can be added to this struct.
 type Controller struct {
 	ioc.Bean
-}
-
-// SetAnnotations sets the annotations for a specific API path.
-// Do not call this method directly; it is used by the framework to set annotations.
-func SetAnnotations(annos map[string]map[string]string) {
-	if annotationCache == nil {
-		annotationCache = annos
-	}
 }
 
 // Apply attaches all APIs to the Gin engine.
@@ -62,8 +53,6 @@ func Apply(engine *gin.Engine, eventManager *event_manager.AppEventManager) {
 	//		//annotationCache[m.APIPath] = m.Annotations
 	//	}
 	//}
-
-	ast_base.Result = nil
 }
 
 // GetAnnotation retrieves the specified annotation from the current context.

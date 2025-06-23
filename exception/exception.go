@@ -2,8 +2,8 @@ package exception
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/module/constant/errs"
-	"github.com/archine/gin-plus/v4/module/stacktrace"
+	"github.com/archine/gin-plus/v4/component/stacktrace"
+	"github.com/archine/gin-plus/v4/constant/errs"
 	"strings"
 )
 

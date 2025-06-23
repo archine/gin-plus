@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/gplog/iface"
+	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/event"
 	"github.com/archine/gin-plus/v4/internal/event_manager"
 	"github.com/archine/gin-plus/v4/internal/logger"
 	"github.com/archine/gin-plus/v4/ioc"
-	"github.com/archine/gin-plus/v4/module/gplog/iface"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,9 +17,8 @@ import (
 	"time"
 
 	"github.com/archine/gin-plus/v4/banner"
+	"github.com/archine/gin-plus/v4/component/middleware"
 	"github.com/archine/gin-plus/v4/internal/config"
-	"github.com/archine/gin-plus/v4/module/middleware"
-	"github.com/archine/gin-plus/v4/mvc"
 	"github.com/gin-gonic/gin"
 )
 
