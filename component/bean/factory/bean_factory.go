@@ -4,19 +4,11 @@ import (
 	"github.com/archine/gin-plus/v4/exception"
 	"github.com/archine/gin-plus/v4/internal/container"
 	"log"
-	"reflect"
 )
 
-func RegisterBeanDefinition(beanName string, beanType reflect.Type) {
-	if beanType == nil {
-		log.Fatalf("%+v", exception.NewStackErr("[RegisterBeanDefinition] type is nil"))
+func RegisterBeanDefinition(instance any) {
+	if instance == nil {
+		log.Fatalf("%+v", exception.NewStackErr("RegisterBeanError: bean instance is nil"))
 	}
-	if beanType.Kind() == reflect.Ptr {
-		beanType = beanType.Elem()
-	}
-	if beanName == "" {
-		beanName = beanType.Name()
-	}
-
-	container.SetDefinition(beanName, beanType)
+	container.SetDefinition(instance)
 }

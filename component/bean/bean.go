@@ -6,7 +6,7 @@ package bean
 // and injected into other components as needed.
 // Beans can be used to encapsulate business logic, manage dependencies, and provide a consistent way
 // to access shared resources within the application.
-// If you don't want to implement all the methods, you can rewrite some of them by combining beans in the structure.
+// If you don't want to implement all the methods, you can rewrite some of them by combining Bean in the structure.
 type AbstractBean interface {
 	// BeanPostConstruct is called after the bean is instantiated and its properties are set.
 	BeanPostConstruct()
