@@ -31,7 +31,7 @@ func Apply(engine *gin.Engine, eventManager *event_manager.AppEventManager) {
 	//}
 
 	//for _, controller := range controllerCache {
-	//	ioc.Inject(controller)
+	//	bean.Inject(controller)
 	//	controller.PostConstruct()
 	//
 	//	controllerType := reflect.TypeOf(controller).Elem()
