@@ -1,188 +1,177 @@
 package container
 
-// import (
-// 	"fmt"
-// 	"github.com/archine/gin-plus/v4/component/bean"
-// 	"github.com/archine/gin-plus/v4/exception"
-// 	"log"
-// 	"reflect"
-// 	"sync"
-// 	"sync/atomic"
-// )
+import (
+	"fmt"
+	"reflect"
 
-// var (
-// 	refreshedFlag     atomic.Bool
-// 	mutex             = sync.RWMutex{}
-// 	beanCache         = make(map[string]*Definition)
-// 	beanNamesForTypes = make(map[reflect.Type][]string)
-// )
+	"github.com/archine/gin-plus/v4/component/bean"
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/exception"
+	"github.com/archine/gin-plus/v4/internal/container/topo"
+	"github.com/archine/gin-plus/v4/internal/util"
+)
 
-// func SetDefinition(instance any) {
-// 	if refreshedFlag.Load() {
-// 		log.Fatalf("%+v", exception.NewStackErr("BeanDefinitionError: container has been refreshed, cannot set new bean definition"))
-// 	}
+var (
+	beanInterfaceType = reflect.TypeOf((*bean.Marker)(nil)).Elem()
+	lazeInterfaceType = reflect.TypeOf((*bean.Lazy)(nil)).Elem()
+)
 
-// 	ityp := reflect.TypeOf(instance)
-// 	if ityp.Kind() != reflect.Ptr {
-// 		log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("BeanDefinitionError: instance '%s' must be a pointer to a struct", ityp.Name())))
-// 	}
-// 	ityp = ityp.Elem()
-// 	if ityp.Kind() != reflect.Struct {
-// 		log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("BeanDefinitionError: instance '%s' must be a pointer to a struct", ityp.Name())))
-// 	}
+type BeanContainer struct {
+	refreshed      bool
+	beans          map[string]any
+	earlyInitBeans map[string]reflect.Type
+	typeForNames   map[reflect.Type][]string
+}
 
-// 	var beanName string
-// 	if b, ok := instance.(bean.AbstractBean); ok {
-// 		beanName = b.BeanName()
-// 	}
-// 	if beanName == "" {
-// 		beanName = ityp.Name()
-// 		beanName = string(beanName[0]|32) + beanName[1:] // Convert first letter to lowercase
-// 	}
+var container = &BeanContainer{
+	refreshed:      false,
+	beans:          make(map[string]any),
+	earlyInitBeans: make(map[string]reflect.Type),
+	typeForNames:   make(map[reflect.Type][]string),
+}
 
-// 	mutex.Lock()
-// 	defer mutex.Unlock()
-// 	if _, exists := beanCache[beanName]; exists {
-// 		log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("BeanDefinitionError: the beans '%s' definition already exists", beanName)))
-// 	}
+func GetBeanContainer() *BeanContainer {
+	if !container.refreshed {
+		return nil
+	}
+	return container
+}
 
-// 	definition := &Definition{ityp, instance}
-// 	beanCache[beanName] = definition
-// 	if _, exists := beanNamesForTypes[ityp]; !exists {
-// 		beanNamesForTypes[ityp] = []string{beanName}
-// 	} else {
-// 		beanNamesForTypes[ityp] = append(beanNamesForTypes[ityp], beanName)
-// 	}
-// }
+func RegisterBeanDefinition(bType reflect.Type) {
+	if container.refreshed {
+		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanDefinitionErr: register failed, container has been refreshed")))
+	}
 
-// func Refresh() {
-// 	refreshedFlag.Store(true) // Set the flag to forbid further bean definitions
+	if bType.Implements(lazeInterfaceType) || !bType.Implements(beanInterfaceType) {
+		// 如果是懒加载bean或不是bean类型，直接返回
+		return
+	}
 
-// 	var fieldKind reflect.Kind
-// 	var fieldType reflect.Type
-// 	var fieldIsInterface bool
+	beanName := util.FirstToLower(bType.Name())
 
-// 	for name, def := range beanCache {
-// 		beanVal := reflect.ValueOf(def.Bean).Elem()
+	if _, exists := container.earlyInitBeans[beanName]; exists {
+		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanDefinitionErr: bean name already exists: "+beanName)))
+	}
 
-// 		for i := 0; i < def.Type.NumField(); i++ {
-// 			field := def.Type.Field(i)
-// 			// Skip anonymous/embedded fields as they are difficult to handle properly
-// 			if field.Anonymous {
-// 				continue
-// 			}
+	container.earlyInitBeans[beanName] = bType
+	container.typeForNames[bType] = append(container.typeForNames[bType], beanName)
+}
 
-// 			autowire := field.Tag.Get("autowire")
+func Refresh() {
+	container.refreshed = true // Mark the container as refreshed
 
-// 			// Get autowire tag value, skip if not present.
-// 			// This tag indicates that the field should be injected with a bean from the container.
-// 			// The tag value is the name of the bean to be searched for. If it is "-",
-// 			// it indicates lookup by filed name, if not found, it will be by type.
-// 			//
-// 			// Examples: `autowire:"myBean"` or `autowire:"-"`.
-// 			if autowire == "" {
-// 				continue
-// 			}
+	dependEdges := buildBeanDependencies()
+	creationOrder, err := topo.Sort(dependEdges)
+	if err != nil {
+		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: Failed to resovle bean dependencies: "+err.Error())))
+	}
 
-// 			fieldKind = field.Type.Kind()
-// 			fieldIsInterface = fieldKind == reflect.Interface
+	for _, beanName := range creationOrder {
+		createBean(beanName)
+	}
+}
 
-// 			if !fieldIsInterface && !(fieldKind == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct) {
-// 				// Skip fields that are not interfaces or pointers to structs
-// 				continue
-// 			}
+// buildBeanDependencies 构建bean依赖关系
+func buildBeanDependencies() []*topo.DependencyEdge {
+	var edges []*topo.DependencyEdge
 
-// 			fieldType = field.Type.Elem()
+	for beanName, def := range container.earlyInitBeans {
+		dependencies := getStructDependencies(def)
 
-// 			fieldVal := beanVal.Field(i)
-// 			if !fieldVal.IsNil() {
-// 				// If the field is already set, skip it
-// 				continue
-// 			}
+		// 为每个依赖创建边：beanName依赖dependency
+		for _, dependency := range dependencies {
+			edge := &topo.DependencyEdge{
+				From: beanName,   // 依赖者
+				To:   dependency, // 被依赖者
+			}
+			edges = append(edges, edge)
+		}
+	}
 
-// 			var injectBean any
-// 			if fieldIsInterface {
-// 				injectBean = processInterface(autowire, fieldType)
-// 			} else {
-// 				injectBean = processObj(autowire, fieldType)
-// 			}
+	return edges
+}
 
-// 			if injectBean == nil {
-// 				log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("RefreshContextError: the bean '%s' not found for field '%s' in bean '%s'", autowire, field.Name, name)))
-// 			}
+// getStructDependencies 获取结构体字段的依赖
+func getStructDependencies(structType reflect.Type) []string {
+	var dependencies []string
 
-// 			// Set the field value to the injected bean
-// 			if fieldVal.CanSet() {
-// 				fieldVal.Set(reflect.ValueOf(injectBean))
-// 			}
-// 		}
-// 	}
-// }
+	// 跳过receiver参数，从第1个参数开始
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		if field.Anonymous {
+			continue
+		}
 
-// func processObj(autowire string, fieldType reflect.Type) any {
-// 	if autowire == "-" {
-// 		autowire = fieldType.Name()
-// 		autowire = string(autowire[0]|32) + autowire[1:]
+		fieldKind := field.Type.Kind()
+		fieldIsInterface := fieldKind == reflect.Interface
 
-// 		if targetBeanDef, exist := beanCache[autowire]; exist {
-// 			if targetBeanDef.Type != fieldType {
-// 				log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("RefreshContextError: the bean '%s' does not match the type '%s'", targetBeanDef.Type.Name(), fieldType.Name())))
-// 			}
-// 			return targetBeanDef.Bean
-// 		}
+		autowire := field.Tag.Get("autowire")
 
-// 		if beanNames, ok := beanNamesForTypes[fieldType]; ok && len(beanNames) > 0 {
-// 			return beanCache[beanNames[0]].Bean
-// 		} else {
-// 			// 缓存中没有找到对应的bean，遍历缓存，直到找到第一个符合的
-// 			for n, d := range beanCache {
-// 				if d.Type == fieldType {
-// 					beanNamesForTypes[fieldType] = append(beanNamesForTypes[fieldType], n)
-// 					return d.Bean
-// 				}
-// 			}
-// 		}
-// 	} else {
-// 		if targetBeanDef, exist := beanCache[autowire]; exist {
-// 			if targetBeanDef.Type != fieldType {
-// 				log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("RefreshContextError: the bean '%s' does not match the type '%s'", targetBeanDef.Type.Name(), fieldType.Name())))
-// 			}
-// 			return targetBeanDef.Bean
-// 		}
-// 	}
-// 	return nil
-// }
+		if !fieldIsInterface && !(fieldKind == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct) && autowire != "" {
+			gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: Invalid field type for autowire: "+field.Name+" in "+structType.Name())))
+		}
 
-// func processInterface(autowire string, fieldType reflect.Type) any {
-// 	if autowire == "-" {
-// 		autowire = fieldType.Name()
-// 		autowire = string(autowire[0]|32) + autowire[1:]
+		fieldType := field.Type.Elem()
 
-// 		if targetBeanDef, exist := beanCache[autowire]; exist {
-// 			if !targetBeanDef.Type.Implements(fieldType) {
-// 				log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("RefreshContextError: the bean '%s' does not implement the interface '%s'", targetBeanDef.Type.Name(), fieldType.Name())))
-// 			}
-// 			return targetBeanDef.Bean
-// 		}
-// 		// If not found by name, try to find by type
-// 		if beanNames, ok := beanNamesForTypes[fieldType]; ok && len(beanNames) > 0 {
-// 			return beanCache[beanNames[0]].Bean
-// 		}
-// 		// 缓存中没有找到对应的bean，遍历缓存，直到找到第一个符合的
-// 		for n, d := range beanCache {
-// 			if d.Type.Implements(fieldType) {
-// 				beanNamesForTypes[fieldType] = append(beanNamesForTypes[fieldType], n)
-// 				return d.Bean
-// 			}
-// 		}
-// 	} else {
-// 		if targetBeanDef, exist := beanCache[autowire]; exist {
-// 			if !targetBeanDef.Type.Implements(fieldType) {
-// 				log.Fatalf("%+v", exception.NewStackErr(fmt.Sprintf("RefreshContextError: the bean '%s' does not implement the interface '%s'", targetBeanDef.Type.Name(), fieldType.Name())))
-// 			}
-// 			return targetBeanDef.Bean
-// 		}
-// 	}
+		if names, exists := container.typeForNames[fieldType]; exists {
+			dependencies = append(dependencies, names...)
+		} else {
+			if fieldIsInterface {
+				implementingBeans := findBeansImplementingInterface(fieldType)
+				if len(implementingBeans) == 0 {
+					gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: No bean found for type "+fieldType.String()+" in "+structType.Name())))
+				}
+				dependencies = append(dependencies, implementingBeans...)
+				container.typeForNames[fieldType] = dependencies
+			} else {
+				gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: No bean found for type "+fieldType.String()+" in "+structType.Name())))
+			}
+		}
+	}
 
-// 	return nil
-// }
+	return dependencies
+}
+
+// findBeansImplementingInterface 查找实现了指定接口的bean
+func findBeansImplementingInterface(interfaceType reflect.Type) []string {
+	var implementingBeans []string
+
+	for beanName, typ := range container.earlyInitBeans {
+		if typ.Implements(interfaceType) {
+			implementingBeans = append(implementingBeans, beanName)
+		}
+	}
+
+	return implementingBeans
+}
+
+// createBean 创建bean实例
+func createBean(beanName string) {
+	if _, exists := container.beans[beanName]; exists {
+		return // 已创建
+	}
+
+	beanTyp := container.earlyInitBeans[beanName]
+	structName := beanTyp.Name()
+
+	var instance any
+	// 查找构造方法
+	constructMethod, exists := beanTyp.MethodByName("New" + structName)
+	if exists {
+		instance = createBeanWithConstructor(beanName, constructMethod)
+	} else {
+		instance = reflect.New(beanTyp).Interface()
+	}
+
+	container.beans[beanName] = instance
+
+	if postConstruct, ok := instance.(bean.PostConstruct); ok {
+		postConstruct.BeanPostConstruct()
+	}
+}
+
+// createBeanWithConstructor 使用构造器创建bean
+func createBeanWithConstructor(beanName string, method reflect.Method) any {
+	// todo
+	return nil
+}

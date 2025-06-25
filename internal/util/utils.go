@@ -12,3 +12,11 @@ func GetTypeKey(typ reflect.Type) string {
 	hash := md5.Sum([]byte(fullName))
 	return fmt.Sprintf("%x", hash)
 }
+
+// FirstToLower converts the first character of a string to lowercase.
+func FirstToLower(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return string(s[0]|32) + s[1:]
+}

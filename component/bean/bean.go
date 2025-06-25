@@ -1,28 +1,28 @@
 package bean
 
-// AbstractBean is the interface that all beans must implement.
-// It provides methods for bean lifecycle management and naming.
-// Beans are objects managed by the IoC container, and they can be automatically instantiated
-// and injected into other components as needed.
-// Beans can be used to encapsulate business logic, manage dependencies, and provide a consistent way
-// to access shared resources within the application.
-// If you don't want to implement all the methods, you can rewrite some of them by combining Bean in the structure.
-type AbstractBean interface {
-	// BeanPostConstruct is called after the bean is instantiated and its properties are set.
-	BeanPostConstruct()
-
-	// BeanName returns the name of the bean.
-	// If it is not set, the structure name with the first letter in lowercase is used.
-	BeanName() string
+// Marker marks a struct as a Bean component in the dependency injection container.
+// Any struct implementing this interface will be recognized and managed as a Bean.
+type Marker interface {
+	// IsBean is a marker method with no implementation required.
+	// It serves as a type constraint to identify Bean components.
+	IsBean()
 }
 
-// Bean declare this structure as a Bean.
-// When other beans inject this bean, the structure will be automatically instantiated
-// and its properties processed when it does not exist in the container
-type Bean struct{}
+// PostConstruct defines the lifecycle callback interface for Bean initialization.
+// Beans implementing this interface will have their BeanPostConstruct method
+// called automatically after instantiation and dependency injection.
+type PostConstruct interface {
+	// BeanPostConstruct is invoked after the bean is instantiated and all its
+	// dependencies have been injected. Use this method for initialization logic
+	// that requires fully configured dependencies.
+	BeanPostConstruct()
+}
 
-func (b *Bean) BeanPostConstruct() {}
-
-func (b *Bean) BeanName() string {
-	return ""
+// Lazy defines the interface for lazy-loaded Bean components.
+// Beans implementing this interface can control their instantiation timing.
+type Lazy interface {
+	// IsLazyBean indicates whether the bean should be instantiated lazily.
+	// When true, the bean will only be created when first accessed or injected,
+	// rather than during container initialization.
+	IsLazyBean()
 }
