@@ -56,22 +56,15 @@ func (s *StackError) Error() string {
 	return s.msg
 }
 
-func (s *StackError) Format(f fmt.State, verb rune) {
-	switch verb {
-	case 'v':
-		if f.Flag('+') {
-			_, _ = fmt.Fprintf(f, "%s\n%s", s.msg, s.st)
-			return
-		}
-		fallthrough
-	default:
-		_, _ = fmt.Fprintf(f, "%s", s.msg)
-	}
-}
-
 // StackTrace returns the stack trace of the error.
 func (s *StackError) StackTrace() string {
 	return s.st
+}
+
+// ToString returns the string representation of the StackError,
+// which includes the error message and stack trace.
+func (s *StackError) ToString() string {
+	return fmt.Sprintf("%s\n%s", s.msg, s.st)
 }
 
 // NewStackErr creates a new StackError with the specified message.

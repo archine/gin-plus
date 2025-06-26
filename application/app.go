@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v4/component/gplog/iface"
 	"github.com/archine/gin-plus/v4/component/mvc"
+	"github.com/archine/gin-plus/v4/component/mvc/ctrl"
 	"github.com/archine/gin-plus/v4/event"
 	"github.com/archine/gin-plus/v4/internal/event_manager"
 	"github.com/archine/gin-plus/v4/internal/logger"
@@ -27,7 +28,7 @@ type App struct {
 	engine         *gin.Engine
 	exitDelay      time.Duration
 	ginMiddlewares []gin.HandlerFunc
-	interceptors   []mvc.MethodInterceptor
+	interceptors   []ctrl.MethodInterceptor
 	eventManager   *event_manager.AppEventManager
 }
 
@@ -67,7 +68,7 @@ func (a *App) SetCustomLogger(customLogger iface.AbstractAppLogger) *App {
 }
 
 // SetMethodInterceptor sets method interceptors for the application.
-func (a *App) SetMethodInterceptor(interceptor ...mvc.MethodInterceptor) *App {
+func (a *App) SetMethodInterceptor(interceptor ...ctrl.MethodInterceptor) *App {
 	a.interceptors = append(a.interceptors, interceptor...)
 	return a
 }
@@ -119,7 +120,7 @@ func (a *App) Run() {
 
 	if len(a.interceptors) > 0 {
 		a.engine.Use(func(ctx *gin.Context) {
-			var appliedInterceptors []mvc.MethodInterceptor
+			var appliedInterceptors []ctrl.MethodInterceptor
 			for _, interceptor := range a.interceptors {
 				if interceptor.Predicate(ctx) {
 					appliedInterceptors = append(appliedInterceptors, interceptor)

@@ -1,177 +1,206 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/archine/gin-plus/v4/component/bean"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
-	"github.com/archine/gin-plus/v4/internal/container/topo"
-	"github.com/archine/gin-plus/v4/internal/util"
 )
 
 var (
-	beanInterfaceType = reflect.TypeOf((*bean.Marker)(nil)).Elem()
-	lazeInterfaceType = reflect.TypeOf((*bean.Lazy)(nil)).Elem()
+	componentType = reflect.TypeOf((*bean.Component)(nil)).Elem()
+	lazeInitType  = reflect.TypeOf((*bean.LazyInit)(nil)).Elem()
 )
 
+// structField represents dependency injection information for struct fields
+type structField struct {
+	idx         int                 // field index position in struct
+	name        string              // field name
+	isInterface bool                // indicates if field is interface type
+	autowire    string              // autowire tag value, used to specify bean name for injection
+	field       reflect.StructField // reflection information of the field
+}
+
+// beanDefinition represents bean definition information, including type and dependency relationships
+type beanDefinition struct {
+	typ             reflect.Type   // bean type information
+	dependFields    []*structField // list of fields that need dependency injection
+	dependBeanNames []string       // list of dependent bean names
+}
+
+// BeanContainer IOC container, responsible for managing the lifecycle of all beans
 type BeanContainer struct {
-	refreshed      bool
-	beans          map[string]any
-	earlyInitBeans map[string]reflect.Type
-	typeForNames   map[reflect.Type][]string
+	refreshed    bool                       // indicates if container has completed initialization
+	beans        map[string]any             // stores created bean instances, key is bean name (lowercase first letter)
+	befCache     map[string]*beanDefinition // stores bean definition information, key is bean name
+	typeForNames map[reflect.Type][]string  // stores mapping from type to bean names, used for type-based bean lookup
 }
 
+// container global container instance
 var container = &BeanContainer{
-	refreshed:      false,
-	beans:          make(map[string]any),
-	earlyInitBeans: make(map[string]reflect.Type),
-	typeForNames:   make(map[reflect.Type][]string),
+	refreshed:    false,
+	beans:        make(map[string]any),
+	befCache:     make(map[string]*beanDefinition),
+	typeForNames: make(map[reflect.Type][]string),
 }
 
+// GetBeanContainer gets the initialized bean container instance
+//
+// Returns:
+//   - *BeanContainer: container instance if initialized, nil otherwise
 func GetBeanContainer() *BeanContainer {
 	if !container.refreshed {
+		gplog.Warn("container has not been initialized")
 		return nil
 	}
 	return container
 }
 
-func RegisterBeanDefinition(bType reflect.Type) {
-	if container.refreshed {
-		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanDefinitionErr: register failed, container has been refreshed")))
+// GetBean gets bean instance by bean name
+//
+// Args:
+//   - name: bean name to search for
+//
+// Returns:
+//   - any: bean instance if found
+//   - bool: true if bean exists, false otherwise
+func (bc *BeanContainer) GetBean(name string) (any, bool) {
+	if name == "" {
+		return nil, false
 	}
 
-	if bType.Implements(lazeInterfaceType) || !bType.Implements(beanInterfaceType) {
-		// 如果是懒加载bean或不是bean类型，直接返回
-		return
-	}
-
-	beanName := util.FirstToLower(bType.Name())
-
-	if _, exists := container.earlyInitBeans[beanName]; exists {
-		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanDefinitionErr: bean name already exists: "+beanName)))
-	}
-
-	container.earlyInitBeans[beanName] = bType
-	container.typeForNames[bType] = append(container.typeForNames[bType], beanName)
+	b, exists := bc.beans[name]
+	return b, exists
 }
 
-func Refresh() {
-	container.refreshed = true // Mark the container as refreshed
-
-	dependEdges := buildBeanDependencies()
-	creationOrder, err := topo.Sort(dependEdges)
-	if err != nil {
-		gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: Failed to resovle bean dependencies: "+err.Error())))
+// GetBeanByType gets bean instance by type
+//
+// Args:
+//   - structValue: struct instance or pointer, used to determine the type to search for
+//
+// Returns:
+//   - any: bean instance if found
+//   - bool: true if bean exists, false otherwise
+//
+// Note: throws exception if multiple bean instances exist for the same type
+func (bc *BeanContainer) GetBeanByType(structValue any) (any, bool) {
+	if structValue == nil {
+		return nil, false
 	}
 
-	for _, beanName := range creationOrder {
-		createBean(beanName)
+	typ := reflect.TypeOf(structValue)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
 	}
-}
 
-// buildBeanDependencies 构建bean依赖关系
-func buildBeanDependencies() []*topo.DependencyEdge {
-	var edges []*topo.DependencyEdge
+	names, ok := bc.typeForNames[typ]
+	if !ok {
+		return nil, false
+	}
 
-	for beanName, def := range container.earlyInitBeans {
-		dependencies := getStructDependencies(def)
-
-		// 为每个依赖创建边：beanName依赖dependency
-		for _, dependency := range dependencies {
-			edge := &topo.DependencyEdge{
-				From: beanName,   // 依赖者
-				To:   dependency, // 被依赖者
-			}
-			edges = append(edges, edge)
+	if len(names) == 1 {
+		b, exists := bc.GetBean(names[0])
+		if exists {
+			return b, true
 		}
+		return nil, false
 	}
 
-	return edges
+	// multiple bean instances exist for the same type
+	panic(exception.NewStackErr(fmt.Sprintf("multiple beans found for type '%s': %v", typ.Name(), names)).ToString())
 }
 
-// getStructDependencies 获取结构体字段的依赖
-func getStructDependencies(structType reflect.Type) []string {
-	var dependencies []string
+// RegisterBeanDefinition registers bean definitions to the container
+//
+// Args:
+//   - structTypes: list of struct types to register that implement bean.Marker interface
+//
+// Returns:
+//   - error: error information during registration process, nil if successful
+func RegisterBeanDefinition(structTypes []reflect.Type) error {
+	if container.refreshed {
+		return errors.New("container already initialized")
+	}
 
-	// 跳过receiver参数，从第1个参数开始
-	for i := 0; i < structType.NumField(); i++ {
-		field := structType.Field(i)
-		if field.Anonymous {
+	if len(structTypes) == 0 {
+		return nil
+	}
+
+	for _, typ := range structTypes {
+		if typ == nil {
 			continue
 		}
 
-		fieldKind := field.Type.Kind()
-		fieldIsInterface := fieldKind == reflect.Interface
-
-		autowire := field.Tag.Get("autowire")
-
-		if !fieldIsInterface && !(fieldKind == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct) && autowire != "" {
-			gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: Invalid field type for autowire: "+field.Name+" in "+structType.Name())))
+		if typ.Kind() != reflect.Ptr && typ.Elem().Kind() != reflect.Struct {
+			return fmt.Errorf("type '%s' must be struct pointer", typ.Name())
+		}
+		if typ.Implements(lazeInitType) {
+			continue
+		}
+		if !typ.Implements(componentType) {
+			return fmt.Errorf("type '%s' must embed bean.Component", typ.Name())
 		}
 
-		fieldType := field.Type.Elem()
+		if typ.Kind() == reflect.Ptr {
+			typ = typ.Elem()
+		}
 
-		if names, exists := container.typeForNames[fieldType]; exists {
-			dependencies = append(dependencies, names...)
-		} else {
-			if fieldIsInterface {
-				implementingBeans := findBeansImplementingInterface(fieldType)
-				if len(implementingBeans) == 0 {
-					gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: No bean found for type "+fieldType.String()+" in "+structType.Name())))
-				}
-				dependencies = append(dependencies, implementingBeans...)
-				container.typeForNames[fieldType] = dependencies
-			} else {
-				gplog.Fatal(fmt.Sprintf("%+v", exception.NewStackErr("BeanCreationErr: No bean found for type "+fieldType.String()+" in "+structType.Name())))
+		beanName := typ.Name()
+
+		// check if bean definition already exists
+		if _, exists := container.befCache[beanName]; exists {
+			return fmt.Errorf("bean '%s' already registered", beanName)
+		}
+
+		def := &beanDefinition{
+			typ: typ,
+		}
+
+		// parse bean dependencies
+		newStructTypes, err := getStructDependsBean(def)
+		if err != nil {
+			return fmt.Errorf("failed to parse bean '%s': %w", beanName, err)
+		}
+
+		container.befCache[beanName] = def
+		container.typeForNames[typ] = []string{beanName}
+
+		// recursively register dependent bean definitions
+		if len(newStructTypes) > 0 {
+			if err = RegisterBeanDefinition(newStructTypes); err != nil {
+				gplog.Fatal(exception.NewStackErr("failed to register bean definitions: " + err.Error()).ToString())
 			}
 		}
 	}
 
-	return dependencies
+	return nil
 }
 
-// findBeansImplementingInterface 查找实现了指定接口的bean
-func findBeansImplementingInterface(interfaceType reflect.Type) []string {
-	var implementingBeans []string
+// Refresh initializes the container and creates all registered bean instances
+// This method determines bean creation order based on dependencies and completes dependency injection
+func Refresh() {
+	gplog.Info("starting bean container initialization...")
 
-	for beanName, typ := range container.earlyInitBeans {
-		if typ.Implements(interfaceType) {
-			implementingBeans = append(implementingBeans, beanName)
+	// build bean creation order (topological sort)
+	creationOrder, err := buildBeanCreatOrder()
+	if err != nil {
+		gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to build creation order: %s", err.Error())).ToString())
+	}
+
+	for _, beanName := range creationOrder {
+		if err = createBean(beanName); err != nil {
+			gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to create bean '%s': %s", beanName, err.Error())).ToString())
 		}
 	}
 
-	return implementingBeans
-}
+	container.befCache = nil
+	componentType = nil
+	lazeInitType = nil
 
-// createBean 创建bean实例
-func createBean(beanName string) {
-	if _, exists := container.beans[beanName]; exists {
-		return // 已创建
-	}
+	container.refreshed = true // mark container as initialized
 
-	beanTyp := container.earlyInitBeans[beanName]
-	structName := beanTyp.Name()
-
-	var instance any
-	// 查找构造方法
-	constructMethod, exists := beanTyp.MethodByName("New" + structName)
-	if exists {
-		instance = createBeanWithConstructor(beanName, constructMethod)
-	} else {
-		instance = reflect.New(beanTyp).Interface()
-	}
-
-	container.beans[beanName] = instance
-
-	if postConstruct, ok := instance.(bean.PostConstruct); ok {
-		postConstruct.BeanPostConstruct()
-	}
-}
-
-// createBeanWithConstructor 使用构造器创建bean
-func createBeanWithConstructor(beanName string, method reflect.Method) any {
-	// todo
-	return nil
+	gplog.Info("bean container initialization completed")
 }
