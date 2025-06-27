@@ -13,7 +13,7 @@ import (
 // Args:
 //
 //	engine: The Gin engine to which the APIs will be attached.
-//	eventManager: The event manager to handle application events.
+//	eventManager: The event manager to handle app events.
 func Apply(engine *gin.Engine, eventManager *event_manager.AppEventManager) {
 
 }

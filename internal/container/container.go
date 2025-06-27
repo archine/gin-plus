@@ -6,7 +6,6 @@ import (
 	"reflect"
 
 	"github.com/archine/gin-plus/v4/component/bean"
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
 )
 
@@ -53,7 +52,6 @@ var container = &BeanContainer{
 //   - *BeanContainer: container instance if initialized, nil otherwise
 func GetBeanContainer() *BeanContainer {
 	if !container.refreshed {
-		gplog.Warn("container has not been initialized")
 		return nil
 	}
 	return container
@@ -111,6 +109,21 @@ func (bc *BeanContainer) GetBeanByType(structValue any) (any, bool) {
 
 	// multiple bean instances exist for the same type
 	panic(exception.NewStackErr(fmt.Sprintf("multiple beans found for type '%s': %v", typ.Name(), names)).ToString())
+}
+
+func DirectSetBean(name string, bean any) error {
+	if name == "" || bean == nil {
+		return errors.New("bean name and instance cannot be empty")
+	}
+
+	if _, exists := container.beans[name]; exists {
+		return fmt.Errorf("bean '%s' already exists", name)
+	}
+
+	container.beans[name] = bean
+	container.typeForNames[reflect.TypeOf(bean)] = []string{name}
+
+	return nil
 }
 
 // RegisterBeanDefinition registers bean definitions to the container
@@ -171,7 +184,7 @@ func RegisterBeanDefinition(structTypes []reflect.Type) error {
 		// recursively register dependent bean definitions
 		if len(newStructTypes) > 0 {
 			if err = RegisterBeanDefinition(newStructTypes); err != nil {
-				gplog.Fatal(exception.NewStackErr("failed to register bean definitions: " + err.Error()).ToString())
+				panic(exception.NewStackErr("failed to register bean definitions: " + err.Error()).ToString())
 			}
 		}
 	}
@@ -181,26 +194,22 @@ func RegisterBeanDefinition(structTypes []reflect.Type) error {
 
 // Refresh initializes the container and creates all registered bean instances
 // This method determines bean creation order based on dependencies and completes dependency injection
-func Refresh() {
-	gplog.Info("starting bean container initialization...")
-
-	// build bean creation order (topological sort)
-	creationOrder, err := buildBeanCreatOrder()
-	if err != nil {
-		gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to build creation order: %s", err.Error())).ToString())
-	}
-
-	for _, beanName := range creationOrder {
-		if err = createBean(beanName); err != nil {
-			gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to create bean '%s': %s", beanName, err.Error())).ToString())
-		}
-	}
-
-	container.befCache = nil
-	componentType = nil
-	lazeInitType = nil
-
-	container.refreshed = true // mark container as initialized
-
-	gplog.Info("bean container initialization completed")
-}
+//func Refresh() {
+//	// build bean creation order (topological sort)
+//	creationOrder, err := buildBeanCreatOrder()
+//	if err != nil {
+//		gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to build creation order: %s", err.Error())).ToString())
+//	}
+//
+//	for _, beanName := range creationOrder {
+//		if err = createBean(beanName); err != nil {
+//			gplog.Fatal(exception.NewStackErr(fmt.Sprintf("failed to create bean '%s': %s", beanName, err.Error())).ToString())
+//		}
+//	}
+//
+//	container.befCache = nil
+//	componentType = nil
+//	lazeInitType = nil
+//
+//	container.refreshed = true // mark container as initialized
+//}

@@ -16,7 +16,7 @@ import (
 )
 
 /*
-Package ResponseHandler provides a unified way to handle HTTP responses in a Gin-based web application.
+Package ResponseHandler provides a unified way to handle HTTP responses in a Gin-based web app.
 
 This package includes utilities for managing standard and error responses, along with a result pooling mechanism to optimize performance.
 
@@ -176,19 +176,6 @@ func Ok(ctx *gin.Context) {
 // Json sends a standard success response with data.
 func Json(ctx *gin.Context, data any) {
 	InitResp(ctx).WithBasic(0, "ok", data).To()
-}
-
-// ServerError handles server exceptions.
-// Returns true if the condition is true.
-func ServerError(ctx *gin.Context, condition bool, msg ...string) bool {
-	if condition {
-		message := strings.Join(msg, ",")
-		if message == "" {
-			message = errs.ServerErr.Error()
-		}
-		InitResp(ctx).WithBasic(errs.ServerErr.Code(), message, nil).To()
-	}
-	return condition
 }
 
 // DirectRespWithCode directly responds with a custom business code.

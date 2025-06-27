@@ -2,31 +2,67 @@ package gplog
 
 import (
 	"context"
-
-	"github.com/archine/gin-plus/v4/component/gplog/iface"
-	"github.com/archine/gin-plus/v4/internal/logger"
 )
 
-func Info(text string) {
-	logger.GlobalLogger.Info(text)
+// Field represents a key-value pair for logging.
+type Field struct {
+	Key   string
+	Value any
 }
 
-func Debug(text string) {
-	logger.GlobalLogger.Debug(text)
+// Logger is an interface that defines the methods for logging in the app.
+type Logger interface {
+	Info(text string, fields ...Field)
+
+	Debug(text string, fields ...Field)
+
+	Warn(text string, fields ...Field)
+
+	Error(text string, fields ...Field)
+
+	Fatal(text string, fields ...Field)
+
+	// WithContext returns a new syslog with the context.
+	// The context can be used to add additional fields to the syslog output.
+	WithContext(ctx context.Context) Logger
 }
 
-func Warn(text string) {
-	logger.GlobalLogger.Warn(text)
+var defaultLogger Logger
+
+// SetDefaultLogger sets the default logger implementation
+func SetDefaultLogger(logger Logger) {
+	if logger == nil {
+		return
+	}
+	defaultLogger = logger
 }
 
-func Error(text string) {
-	logger.GlobalLogger.Error(text)
+// Info logs an info level message
+func Info(text string, fields ...Field) {
+	defaultLogger.Info(text, fields...)
 }
 
-func Fatal(text string) {
-	logger.GlobalLogger.Fatal(text)
+// Debug logs a debug level message
+func Debug(text string, fields ...Field) {
+	defaultLogger.Debug(text, fields...)
 }
 
-func WithContext(ctx context.Context) iface.AbstractAppLogger {
-	return logger.GlobalLogger.WithContext(ctx)
+// Warn logs a warning level message
+func Warn(text string, fields ...Field) {
+	defaultLogger.Warn(text, fields...)
+}
+
+// Error logs an error level message
+func Error(text string, fields ...Field) {
+	defaultLogger.Error(text, fields...)
+}
+
+// Fatal logs a fatal level message and exits
+func Fatal(text string, fields ...Field) {
+	defaultLogger.Fatal(text, fields...)
+}
+
+// WithContext returns a syslog with context values
+func WithContext(ctx context.Context) Logger {
+	return defaultLogger.WithContext(ctx)
 }

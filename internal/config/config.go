@@ -1,24 +1,7 @@
 package config
 
 import (
-	"flag"
-	"fmt"
-	"github.com/archine/gin-plus/v4/internal/event_manager"
-	"github.com/archine/gin-plus/v4/ioc"
-	"github.com/spf13/viper"
 	"time"
-)
-
-// Project global configuration
-
-// Conf project basic configuration
-var Conf *Config
-
-const (
-	// Dev development environment
-	Dev = "dev"
-	// Prod production environment
-	Prod = "prod"
 )
 
 type Config struct {
@@ -79,38 +62,4 @@ type Config struct {
 		// otherwise responds with 200 OK and Content-Length: 0.
 		DisableGeneralOptions bool `mapstructure:"disable_general_options"`
 	}
-}
-
-// Init initializes the project configuration.
-// It reads the configuration from a file specified by the -c flag or defaults to "app.yml".
-func Init(eventManager *event_manager.AppEventManager) {
-	var configFile string
-	flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
-	flag.Parse()
-	v := viper.New()
-	_ = ioc.SetBean("viper", v)
-
-	v.SetDefault("server.port", 4006)
-	v.SetDefault("server.env", Dev)
-	v.SetDefault("server.max_multipart_memory", 32<<20) // 32M
-	v.SetDefault("server.read_timeout", 0)
-	v.SetDefault("server.write_timeout", 0)
-	v.SetDefault("server.read_header_timeout", 0)
-	v.SetDefault("server.idle_timeout", 0)
-	v.SetDefault("server.disable_general_options", true)
-	v.AutomaticEnv()
-	v.SetConfigFile(configFile)
-
-	eventManager.TriggerConfigBeforeLoad(v)
-
-	err := v.ReadInConfig()
-	if err != nil {
-		panic(fmt.Sprintf("Faild to read the configuration file: %s", err.Error()))
-	}
-	err = v.Unmarshal(&Conf)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to parse the configuration file into the config structure: %s", err.Error()))
-	}
-
-	eventManager.TriggerConfigAfterLoad(v)
 }

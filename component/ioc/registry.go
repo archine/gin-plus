@@ -1,12 +1,9 @@
 package ioc
 
 import (
-	"reflect"
-
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
-
 	"github.com/archine/gin-plus/v4/internal/container"
+	"reflect"
 )
 
 // RegisterBeanDefinition registers bean definitions with the IOC container
@@ -36,7 +33,7 @@ import (
 //	}
 //	func (f *FileLogger) Log(msg string) { /* implementation */ }
 //
-//	// In your main application, register the external implementation
+//	// In your main app, register the external implementation
 //	RegisterBeanDefinition(reflect.TypeOf((*external.FileLogger)(nil)))
 //
 //	// Now you can inject the interface in your beans
@@ -50,6 +47,14 @@ func RegisterBeanDefinition(structPtrTypes ...reflect.Type) {
 	}
 	err := container.RegisterBeanDefinition(structPtrTypes)
 	if err != nil {
-		gplog.Fatal(exception.NewStackErr("failed to register bean definitions: " + err.Error()).ToString())
+		panic(exception.NewStackErr("failed to register bean definitions: " + err.Error()).ToString())
+	}
+}
+
+// DirectSetBean allows you to directly set a bean instance in the IOC container
+// This is useful for manually registering beans that are not automatically discovered
+func DirectSetBean(name string, bean any) {
+	if err := container.DirectSetBean(name, bean); err != nil {
+		panic(exception.NewStackErr("failed to set bean: " + err.Error()).ToString())
 	}
 }
