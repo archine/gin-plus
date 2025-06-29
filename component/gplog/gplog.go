@@ -2,7 +2,20 @@ package gplog
 
 import (
 	"context"
+	"sync"
 )
+
+var (
+	globalLog Logger
+	once      sync.Once
+)
+
+// setLogger the global logger for the application.
+func setLogger(l Logger) {
+	once.Do(func() {
+		globalLog = l
+	})
+}
 
 // Field represents a key-value pair for logging.
 type Field struct {
@@ -27,42 +40,32 @@ type Logger interface {
 	WithContext(ctx context.Context) Logger
 }
 
-var defaultLogger Logger
-
-// SetDefaultLogger sets the default logger implementation
-func SetDefaultLogger(logger Logger) {
-	if logger == nil {
-		return
-	}
-	defaultLogger = logger
-}
-
 // Info logs an info level message
 func Info(text string, fields ...Field) {
-	defaultLogger.Info(text, fields...)
+	globalLog.Info(text, fields...)
 }
 
 // Debug logs a debug level message
 func Debug(text string, fields ...Field) {
-	defaultLogger.Debug(text, fields...)
+	globalLog.Debug(text, fields...)
 }
 
 // Warn logs a warning level message
 func Warn(text string, fields ...Field) {
-	defaultLogger.Warn(text, fields...)
+	globalLog.Warn(text, fields...)
 }
 
 // Error logs an error level message
 func Error(text string, fields ...Field) {
-	defaultLogger.Error(text, fields...)
+	globalLog.Error(text, fields...)
 }
 
 // Fatal logs a fatal level message and exits
 func Fatal(text string, fields ...Field) {
-	defaultLogger.Fatal(text, fields...)
+	globalLog.Fatal(text, fields...)
 }
 
 // WithContext returns a syslog with context values
 func WithContext(ctx context.Context) Logger {
-	return defaultLogger.WithContext(ctx)
+	return globalLog.WithContext(ctx)
 }

@@ -21,7 +21,7 @@ var annotationCache map[string]map[string]string
 //
 // Example:
 //
-//	// For an API method with annotation @RateLimit("100/min")
+//	// For an API method with annotation @RateLimit -> 100/min
 //	if limit, exists := GetAnnotation(ctx, "@RateLimit"); exists {
 //	    // Use the rate limit value: "100/min"
 //	}
