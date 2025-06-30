@@ -10,8 +10,8 @@ var sysBanner = `
 `
 
 func printBanner() {
-   if sysBanner != "" {
-      println(sysBanner)
-   }
-   sysBanner = ""
+	if sysBanner != "" {
+		println(sysBanner)
+		sysBanner = ""
+	}
 }

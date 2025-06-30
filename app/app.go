@@ -99,6 +99,8 @@ func (a *App) Run() {
 		return
 	}
 
+	printBanner()
+
 	if a.state&StateContainerPrepared == 0 {
 		a.PrepareContainer()
 	}

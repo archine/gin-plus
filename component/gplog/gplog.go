@@ -2,19 +2,15 @@ package gplog
 
 import (
 	"context"
-	"sync"
 )
 
 var (
 	globalLog Logger
-	once      sync.Once
 )
 
 // setLogger the global logger for the application.
 func setLogger(l Logger) {
-	once.Do(func() {
-		globalLog = l
-	})
+	globalLog = l
 }
 
 // Field represents a key-value pair for logging.

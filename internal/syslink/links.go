@@ -3,8 +3,8 @@ package syslink
 import (
 	_ "unsafe"
 
-	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/ioc"
 )
 
 //go:linkname SetGlobalLogger github.com/archine/gin-plus/v4/component/gplog.setLogger
