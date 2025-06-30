@@ -14,16 +14,21 @@ type ServerConfig struct {
 	// Port specifies the HTTP server listening port.
 	// Default: 4006
 	Port int `mapstructure:"port"`
-	
+
 	// Host specifies the HTTP server binding address.
-    // Use "0.0.0.0" to bind to all interfaces, "127.0.0.1" for localhost only.
-    // Default: "0.0.0.0"
-    Host string `mapstructure:"host"`
+	// Use "0.0.0.0" to bind to all interfaces, "127.0.0.1" for localhost only.
+	// Default: "0.0.0.0"
+	Host string `mapstructure:"host"`
+
+	// ContextPath is the base path for the HTTP server.
+	// All routes will be prefixed with this path.
+	// If empty, the server will listen on the root path ("/").
+	ContextPath string `mapstructure:"context_path"`
 
 	// Mode specifies the Gin mode: "debug", "release", or "test".
-    // In debug mode, Gin provides more detailed logging and error information.
-    // Default: "debug"
-    Mode string `mapstructure:"mode"`
+	// In debug mode, Gin provides more detailed logging and error information.
+	// Default: "debug"
+	Mode string `mapstructure:"mode"`
 
 	// AllowedCors enables Cross-Origin Resource Sharing (CORS) support.
 	// When enabled, the server automatically adds default CORS middleware to handle cross-origin requests.
@@ -81,26 +86,26 @@ type ServerConfig struct {
 	// Default: false
 	EnableHealthCheck bool `mapstructure:"enable_health_check"`
 
-    // TLS configuration for HTTPS support
-    TLS TLSConfig `mapstructure:"tls"`
+	// TLS configuration for HTTPS support
+	TLS TLSConfig `mapstructure:"tls"`
 }
 
 // TLSConfig contains TLS/HTTPS related configuration options.
 type TLSConfig struct {
-    // Enabled enables HTTPS/TLS support.
-    // Default: false
-    Enabled bool `mapstructure:"enabled"`
+	// Enabled enables HTTPS/TLS support.
+	// Default: false
+	Enabled bool `mapstructure:"enabled"`
 
-    // CertFile specifies the path to the TLS certificate file.
-    // Required when TLS is enabled.
-    CertFile string `mapstructure:"cert_file"`
+	// CertFile specifies the path to the TLS certificate file.
+	// Required when TLS is enabled.
+	CertFile string `mapstructure:"cert_file"`
 
-    // KeyFile specifies the path to the TLS private key file.
-    // Required when TLS is enabled.
-    KeyFile string `mapstructure:"key_file"`
+	// KeyFile specifies the path to the TLS private key file.
+	// Required when TLS is enabled.
+	KeyFile string `mapstructure:"key_file"`
 
-    // AutoRedirect automatically redirects HTTP requests to HTTPS.
-    // Only effective when TLS is enabled.
-    // Default: false
-    AutoRedirect bool `mapstructure:"auto_redirect"`
+	// AutoRedirect automatically redirects HTTP requests to HTTPS.
+	// Only effective when TLS is enabled.
+	// Default: false
+	AutoRedirect bool `mapstructure:"auto_redirect"`
 }

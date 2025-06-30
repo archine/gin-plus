@@ -28,8 +28,8 @@ type AppLifecycleEvent interface {
 	// - Registering additional middleware or routes
 	//
 	// Returns:
-	//   - true: Allow the application to start normally
-	//   - false: Prevent the application from starting (abort startup)
+	//   - true: Prevent the application from starting (abort startup)
+	//   - false: Allow the application to start normally
 	OnStarting(e *gin.Engine) bool
 
 	// OnStarted is called after the application has started successfully.
@@ -42,7 +42,7 @@ type AppLifecycleEvent interface {
 	// - Triggering external system notifications
 	//
 	// Note: At this point, the HTTP server is running and ready to accept requests.
-	OnStarted(e *gin.Engine)
+	OnStarted()
 
 	// OnStopping is called before the application begins its shutdown process.
 	// This is the ideal place to perform pre-stop tasks such as:

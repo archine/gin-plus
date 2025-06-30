@@ -15,8 +15,7 @@ func InterfaceOf[T any]() reflect.Type {
 //
 // For example, if T is a struct type Foo, StructOf(T) returns reflect.Type representing Foo.
 func StructOf[T any]() reflect.Type {
-	var zero T
-	return reflect.TypeOf(zero)
+	return reflect.TypeOf((*T)(nil)).Elem()
 }
 
 // PointerOf returns the reflect.Type of pointer to T.
