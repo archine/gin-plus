@@ -1,19 +1,25 @@
-package routing
+package router
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"reflect"
+
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/util/reflectutil"
+	"github.com/archine/gin-plus/v4/util/strutil"
+	"github.com/gin-gonic/gin"
 )
 
 type Method struct {
-	HandlerFunc gin.HandlerFunc // Handler function for the method
-	HttpMethod  string          // HTTP method (GET, POST, PUT, DELETE, etc.)
-	Path        string          // URL path for the route
+	Name       string // Name of the method (controller action)
+	HttpMethod string // HTTP method (GET, POST, PUT, DELETE, etc.)
+	Path       string // URL path for the route
 }
 
 type Route struct {
+	Name     string    // Name of the controller
 	BasePath string    // Base path for the controller
 	Methods  []*Method // List of methods associated with the controller
 }
@@ -32,20 +38,19 @@ var routes []*Route
 //
 //	RegisterRoutes(
 //	    &Route{
-//	        BasePath: "/user",
+//	        BasePath: "/api/v1",
 //	        Methods: []*Method{
-//	            {Name: "GetUser", HttpMethod: "GET", Path: "/:id"},
-//	            {Name: "CreateUser", HttpMethod: "POST", Path: "/"},
+//	            {HttpMethod: "GET", Path: "/users", HandlerFunc: getUsers},
+//	            {HttpMethod: "POST", Path: "/users", HandlerFunc: createUser},
 //	        },
-//	    },
-//	    &Route{
-//	        BasePath: "/product",
-//	        Methods: []*Method{
-//	            {Name: "GetProduct", HttpMethod: "GET", Path: "/:id"},
-//	            {Name: "CreateProduct", HttpMethod: "POST", Path: "/"},
-//	        },
-//	    },
+//	    }
 //	)
+//
+// Note: This function does not perform any validation on the routes or methods.
+// It is assumed that the provided routes are valid and correctly defined.
+// If a method does not have a handler function defined,
+// it will be skipped with a warning logged.
+// If you need to ensure that all methods have handlers, consider adding validation logic before calling this function.
 func RegisterRoutes(r ...*Route) {
 	routes = append(routes, r...)
 }
@@ -64,49 +69,57 @@ func Apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
 		return nil // No routes to apply
 	}
 	baseRouter := engine.Group(contextPath)
+	ginCtxType := reflectutil.PtrOf[gin.Context]()
 
 	if enableHealth {
 		// Register health check endpoint
 		baseRouter.Any("/health", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
 	}
 
 	for _, route := range routes {
-		var ctrlRouter *gin.RouterGroup
+		ctrlInstance, exist := ioc.GetBean(strutil.FirstToLower(route.Name))
+		if !exist {
+			gplog.Warn(fmt.Sprintf("Controller %s not found in IOC container, skipping route registration", route.Name))
+			continue
+		}
+		ctrlValue := reflect.ValueOf(ctrlInstance)
 
+		var ctrlRouter *gin.RouterGroup
 		if route.BasePath != "" {
 			ctrlRouter = baseRouter.Group(route.BasePath)
 		} else {
 			ctrlRouter = baseRouter
 		}
+
 		for _, method := range route.Methods {
-			if method.HandlerFunc == nil {
-				gplog.Warn(fmt.Sprintf("Skipping method %s on path %s: no handler function defined", method.HttpMethod, method.Path))
-				continue // Skip if no handler function is defined
+			if method.Name == "" {
+				gplog.Warn(fmt.Sprintf("Method name is empty for route %s ,path=%s, skipping registration", route.Name, method.Path))
+				continue
 			}
 
-			// Register the method with the Gin engine
-			switch method.HttpMethod {
-			case http.MethodGet:
-				ctrlRouter.GET(method.Path, method.HandlerFunc)
-			case http.MethodPost:
-				ctrlRouter.POST(method.Path, method.HandlerFunc)
-			case http.MethodPut:
-				ctrlRouter.PUT(method.Path, method.HandlerFunc)
-			case http.MethodDelete:
-				ctrlRouter.DELETE(method.Path, method.HandlerFunc)
-			case http.MethodPatch:
-				ctrlRouter.PATCH(method.Path, method.HandlerFunc)
-			case http.MethodHead:
-				ctrlRouter.HEAD(method.Path, method.HandlerFunc)
-			case http.MethodOptions:
-				ctrlRouter.OPTIONS(method.Path, method.HandlerFunc)
-			default:
-				return fmt.Errorf("unsupported HTTP method: %s", method.HttpMethod)
+			methodValue := ctrlValue.MethodByName(method.Name)
+			if !methodValue.IsValid() {
+				gplog.Warn(fmt.Sprintf("Method %s not found in controller %s, skipping registration", method.Name, route.Name))
+				continue
+			}
+
+			if methodValue.Type().NumIn() != 1 || methodValue.Type().In(0) != ginCtxType {
+				gplog.Warn(fmt.Sprintf("Method %s in controller %s must accept exactly one *gin.Context parameter", method.Name, route.Name))
+				continue
+			}
+
+			if handleFunc, ok := methodValue.Interface().(func(*gin.Context)); ok {
+				ctrlRouter.Handle(method.HttpMethod, method.Path, handleFunc)
+			} else {
+				gplog.Warn(fmt.Sprintf("Method %s in controller %s does not have a valid handler function signature", method.Name, route.Name))
 			}
 		}
 	}
+
+	routes = nil // Clear routes after applying to avoid duplicate registrations
+	gplog.Info("All routes applied successfully...")
 
 	return nil
 }

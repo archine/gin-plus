@@ -1,4 +1,4 @@
-package app
+package server
 
 import (
 	"time"
@@ -87,7 +87,7 @@ type ServerConfig struct {
 	EnableHealthCheck bool `mapstructure:"enable_health_check"`
 
 	// TLS configuration for HTTPS support
-	TLS TLSConfig `mapstructure:"tls"`
+	TLS *TLSConfig `mapstructure:"tls"`
 }
 
 // TLSConfig contains TLS/HTTPS related configuration options.

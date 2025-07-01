@@ -1,9 +1,8 @@
-package sysevent
+package event
 
 import (
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/ioc"
-	"github.com/gin-gonic/gin"
 )
 
 // AppEvent is the base interface for all app events.
@@ -30,7 +29,7 @@ type AppLifecycleEvent interface {
 	// Returns:
 	//   - true: Prevent the application from starting (abort startup)
 	//   - false: Allow the application to start normally
-	OnStarting(e *gin.Engine) bool
+	OnStarting() bool
 
 	// OnStarted is called after the application has started successfully.
 	// This is the ideal place to perform post-start tasks such as:

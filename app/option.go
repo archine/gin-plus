@@ -2,8 +2,9 @@ package app
 
 import (
 	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/event"
 	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/internal/sysevent"
+	"github.com/archine/gin-plus/v4/internal/server"
 	"github.com/archine/gin-plus/v4/internal/syslink"
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,19 @@ type Option func(app *App)
 func WithConfigure(confFunc func() config.Configure) Option {
 	return func(app *App) {
 		app.configure = confFunc()
+		if app.configure == nil {
+			panic("app configure is nil")
+		}
+
+		var conf *server.Config
+		if app.configure != nil {
+			err := app.configure.Unmarshal("gin_plus", conf)
+			if err != nil {
+				panic("app configure unmarshal error: " + err.Error())
+			}
+		}
+
+		app.config = conf
 		app.eventManager.TriggerConfigAfterLoad(app.configure)
 	}
 }
@@ -26,13 +40,13 @@ func WithConfigure(confFunc func() config.Configure) Option {
 // Middlewares are executed in the order they are added.
 func WithMiddleware(middlewares ...gin.HandlerFunc) Option {
 	return func(app *App) {
-		app.middlewares = append(app.middlewares, middlewares...)
+		app.server.RegisterMiddleware(middlewares...)
 	}
 }
 
 // WithEvent registers application lifecycle events.
-// Events are managed by the sysevent manager and triggered during app lifecycle.
-func WithEvent(events ...sysevent.AppEvent) Option {
+// Events are managed by the event manager and triggered during app lifecycle.
+func WithEvent(events ...event.AppEvent) Option {
 	return func(app *App) {
 		app.eventManager.Register(events...)
 	}

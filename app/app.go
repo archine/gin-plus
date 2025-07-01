@@ -1,9 +1,12 @@
 package app
 
 import (
+	"fmt"
+	"github.com/archine/gin-plus/v4/internal/server"
 	"github.com/archine/gin-plus/v4/internal/sysconf"
 	"github.com/archine/gin-plus/v4/internal/syslink"
 	"github.com/archine/gin-plus/v4/middleware"
+	"time"
 
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
@@ -13,9 +16,6 @@ import (
 )
 
 const (
-	// Application states
-	// These constants represent the different states of the application lifecycle.
-
 	// StateInit indicates that the application is in the initial state.
 	StateInit = 1
 	// StateContainerPrepared indicates that the IoC container has been prepared.
@@ -31,9 +31,10 @@ const (
 
 type App struct {
 	state        int
-	middlewares  []gin.HandlerFunc
+	server       *server.GinServer
 	eventManager *sysevent.Manager
 	configure    config.Configure
+	config       *server.Config
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -44,6 +45,7 @@ func New(opts ...Option) *App {
 	a := &App{
 		state:        StateInit,
 		eventManager: sysevent.NewEventManager(),
+		server:       &server.GinServer{},
 	}
 
 	for _, opt := range opts {
@@ -86,7 +88,7 @@ func (a *App) PrepareContainer() {
 
 	a.eventManager.TriggerContainerRefreshBefore(ct)
 	syslink.RefreshContainer()
-	a.eventManager.TriggerContainerRefreshAfter(syslink.GetContainer())
+	a.eventManager.TriggerContainerRefreshAfter(ct)
 
 	a.state |= StateContainerPrepared
 	gplog.Info("Application container prepared with refresh completed.")
@@ -105,11 +107,17 @@ func (a *App) Run() {
 		a.PrepareContainer()
 	}
 
-	a.state |= StateRunning
-	gplog.Info("Application is now running.")
+	a.eventManager.TriggerOnStarting()
+	err := a.server.Run(a.config)
+	if err != nil {
+		gplog.Error(fmt.Sprintf("Application failed to start: %v", err))
+		return
+	}
 
-	// Here you would typically start the HTTP server or any other main loop.
-	// For example:
-	// ginEngine := gin.Default()
-	// ginEngine.Run(":8080")
+	time.Sleep(10 * time.Millisecond) // Allow some time for the server to start
+
+	a.state |= StateRunning
+	a.eventManager.TriggerOnStarted()
+	gplog.Info(fmt.Sprintf("Application started successfully on [%s]", a.server.GetAddress()))
+
 }
