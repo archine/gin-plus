@@ -35,7 +35,6 @@ func Sort(edges []*DependencyEdge) ([]string, error) {
 		return nil, fmt.Errorf("circular dependency detected: %v", cycle)
 	}
 
-	// Kahn's algorithm for topological sorting
 	queue := getZeroInDegreeNodes(inDegree)
 	result := make([]string, 0)
 

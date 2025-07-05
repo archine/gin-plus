@@ -3,6 +3,8 @@ package sysconf
 import (
 	"flag"
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/util/reflectutil"
 
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/spf13/viper"
@@ -30,7 +32,12 @@ func NewLocalFileConfigure() config.Configure {
 
 	lc := &LocalFileConfigure{v: v}
 
-	fmt.Printf("[CONFIG] Configuration loaded successfully from: %s\n", configFile)
+	err := ioc.RegisterBean("", lc, reflectutil.InterfaceOf[config.Configure]())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to register LocalFileConfigure in IoC container: %v", err))
+	}
+
+	fmt.Printf("Configuration loaded successfully from: %s\n", configFile)
 	return lc
 }
 

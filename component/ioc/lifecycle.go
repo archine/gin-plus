@@ -9,6 +9,8 @@ import (
 )
 
 // refresh initializes the container and creates all registered beans
+//
+// Note: this function is system-internal and should not be used directly in application code.
 func refresh() {
 	defaultContainer.refresh()
 }
@@ -27,7 +29,7 @@ func (c *Container) refresh() {
 				gplog.Fatal(fmt.Sprintf("Failed to create bean '%s': %s", beanName, err.Error()))
 			}
 		}
-		
+
 		c.definitions = nil // clear definitions after creation
 		beanType = nil      // clear bean type to avoid memory leaks
 		lazyBeanType = nil  // clear lazy bean type to avoid memory leaks
@@ -72,7 +74,7 @@ func (c *Container) createBean(beanName string) error {
 	beanValue := reflect.New(def.Type).Elem()
 
 	// inject dependencies
-	for _, depField := range def.Dependencies {
+	for _, depField := range def.DependentFields {
 		if err := c.injectDependency(beanValue, depField); err != nil {
 			return fmt.Errorf("failed to inject dependency for field '%s': %w",
 				depField.Field.Name, err)

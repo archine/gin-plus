@@ -16,9 +16,9 @@ type DependencyField struct {
 
 // BeanDefinition represents bean definition information
 type BeanDefinition struct {
-	Type           reflect.Type       // bean type
-	Dependencies   []*DependencyField // dependency fields
-	DependentBeans []string           // names of dependent beans
+	Type            reflect.Type       // bean type
+	DependentFields []*DependencyField // dependency fields
+	DependentBeans  []string           // names of dependent beans
 }
 
 // analyzeDependencies analyzes struct fields to extract dependency information
@@ -51,15 +51,10 @@ func (c *Container) analyzeDependencies(def *BeanDefinition) ([]reflect.Type, er
 			targetType = fieldType.Elem()
 		}
 
-		depField := &DependencyField{
-			Index:       i,
-			Name:        targetType.Name(),
-			IsInterface: isInterface,
-			AutowireTag: autowireTag,
-			Field:       field,
+		if targetType == def.Type {
+			return nil, fmt.Errorf("field '%s' in '%s' cannot depend on itself",
+				field.Name, def.Type.Name())
 		}
-
-		def.Dependencies = append(def.Dependencies, depField)
 
 		if names, exists := c.typeMapping[targetType]; exists {
 			// if we already have registered beans for this type, use them
@@ -87,6 +82,14 @@ func (c *Container) analyzeDependencies(def *BeanDefinition) ([]reflect.Type, er
 				}
 			}
 		}
+
+		def.DependentFields = append(def.DependentFields, &DependencyField{
+			Index:       i,
+			Name:        targetType.Name(),
+			IsInterface: isInterface,
+			AutowireTag: autowireTag,
+			Field:       field,
+		})
 	}
 
 	return unregisteredTypes, nil

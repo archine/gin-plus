@@ -41,7 +41,7 @@ type zaplog struct {
 
 func NewZapLogger(configure config.Configure) gplog.Logger {
 	var cf conf
-	if err := configure.Unmarshal("syslog", &cf); err != nil {
+	if err := configure.Unmarshal("gin_plus.log", &cf); err != nil {
 		panic(exception.NewStackErr("Init syslog config failed: " + err.Error()))
 	}
 	if cf.Level == "" {

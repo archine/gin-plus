@@ -126,7 +126,7 @@ func (c *Container) registerBeanDefinitions(structPtrTypes ...reflect.Type) erro
 		}
 
 		if !typ.Implements(beanType) {
-			return fmt.Errorf("type '%s' must implement Component interface", typ.Name())
+			return fmt.Errorf("type '%s' must implement Bean interface", typ.Name())
 		}
 
 		structType := typ.Elem()
@@ -224,7 +224,7 @@ func RegisterBeanDefinition(structPtrTypes ...reflect.Type) error {
 //	ioc.RegisterBean("", &UserService{})
 //
 //	// Register with custom name and interface types
-//	ioc.RegisterBean("userSvc", &UserService{}, reflectutil.PtrOf[UserRepository]())
+//	ioc.RegisterBean("userSvc", &UserService{}, reflectutil.InterfaceOf[UserRepository]())
 //
 // Notes:
 //   - The object doesn't need to implement the Bean interface
@@ -243,6 +243,7 @@ func RegisterBean(name string, objPtr any, implementedTypes ...reflect.Type) err
 // This method allows you to get a specific bean instance that has been registered in the IOC container
 // Args:
 //   - name: the name of the bean to retrieve
+//
 // Returns:
 //   - the bean instance if found, or nil if not found
 func GetBean(name string) (any, bool) {
@@ -250,11 +251,17 @@ func GetBean(name string) (any, bool) {
 }
 
 // GetBeanByType retrieves a bean instance by its type using generics.
+//
+// Args:
+//   - T: the type of the bean to retrieve. This should be a struct or interface type, e.g. UserService
+//
 // Usage:
-//   svc, err := ioc.GetBeanByType[UserService]()
+//
+//	svc, err := ioc.GetBeanByType[UserService]()
+//
 // Returns:
 //   - The bean instance as *T if found, or nil and an error if not found or type mismatch.
-func GetBeanByType[T any] () (*T, error) {
+func GetBeanByType[T any]() (*T, error) {
 	typ := reflect.TypeOf((*T)(nil)).Elem()
 
 	bean, err := defaultContainer.GetBeanByType(typ)
@@ -262,13 +269,15 @@ func GetBeanByType[T any] () (*T, error) {
 		return nil, err
 	}
 	instance, ok := bean.(*T)
-    if !ok {
-        return nil, fmt.Errorf("bean is not of type %s", typ.String())
-    }
-    return instance, nil
+	if !ok {
+		return nil, fmt.Errorf("bean is not of type %s", typ.String())
+	}
+	return instance, nil
 }
 
-// getContainer returns the default container instance
+// returns the default container instance.
+//
+// Note: this function is system-internal and should not be used directly in application code.
 func getContainer() *Container {
 	return defaultContainer
 }

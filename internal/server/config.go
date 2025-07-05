@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"time"
 )
 
@@ -77,7 +79,7 @@ type ServerConfig struct {
 	// ExitDelay is the duration to wait before the application process exits after shutdown.
 	// This grace period allows for final cleanup tasks, log flushing, or external notifications.
 	// Useful for ensuring all resources are properly released before process termination.
-	// Default: 0 (no delay)
+	// Default: 3s
 	ExitDelay time.Duration `mapstructure:"exit_delay"`
 
 	// EnableHealthCheck enables the built-in health check endpoint.
@@ -103,9 +105,29 @@ type TLSConfig struct {
 	// KeyFile specifies the path to the TLS private key file.
 	// Required when TLS is enabled.
 	KeyFile string `mapstructure:"key_file"`
+}
 
-	// AutoRedirect automatically redirects HTTP requests to HTTPS.
-	// Only effective when TLS is enabled.
-	// Default: false
-	AutoRedirect bool `mapstructure:"auto_redirect"`
+func (c *Config) Validate() {
+	if c.Server.Port <= 0 || c.Server.Port > 65535 {
+		gplog.Warn(fmt.Sprintf("Invalid server port (%d), using default port 4006", c.Server.Port))
+		c.Server.Port = 4006
+	}
+	if c.Server.Host == "" {
+		c.Server.Host = "0.0.0.0"
+	}
+	if c.Server.ContextPath == "" {
+		c.Server.ContextPath = "/"
+	}
+	if c.Server.Mode == "" {
+		c.Server.Mode = "debug"
+	} else if c.Server.Mode != "debug" && c.Server.Mode != "release" && c.Server.Mode != "test" {
+		gplog.Warn(fmt.Sprintf("Invalid server mode (%s), using default mode 'debug'", c.Server.Mode))
+		c.Server.Mode = "debug"
+	}
+	if c.Server.MaxMultipartMemory <= 0 {
+		c.Server.MaxMultipartMemory = 8388608 // 8MB
+	}
+	if c.Server.ExitDelay <= 0 {
+		c.Server.ExitDelay = 3 * time.Second // Default exit delay
+	}
 }

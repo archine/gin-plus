@@ -18,7 +18,7 @@ func StructOf[T any]() reflect.Type {
 	return reflect.TypeOf((*T)(nil)).Elem()
 }
 
-// PointerOf returns the reflect.Type of pointer to T.
+// PtrOf PointerOf returns the reflect.Type of pointer to T.
 // This is useful when you need the pointer type for reflection operations.
 //
 // For example, if T is a struct type Foo, PtrOf(T) returns reflect.Type representing *Foo.

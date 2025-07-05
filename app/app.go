@@ -1,17 +1,21 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"github.com/archine/gin-plus/v4/internal/server"
-	"github.com/archine/gin-plus/v4/internal/sysconf"
-	"github.com/archine/gin-plus/v4/internal/syslink"
-	"github.com/archine/gin-plus/v4/middleware"
-	"time"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/internal/sysevent"
+	"github.com/archine/gin-plus/v4/internal/server"
+	"github.com/archine/gin-plus/v4/internal/sysconf"
+	"github.com/archine/gin-plus/v4/internal/syslink"
 	"github.com/archine/gin-plus/v4/internal/syslog"
+	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,18 +27,13 @@ const (
 	// StateRunning indicates that the application is currently running.
 	// This state is set when the application has started successfully and is ready to handle requests.
 	StateRunning = 4
-	// StateStopped indicates that the application has been stopped.
-	// This state is set when the application has been gracefully shut down.
-	// It can be used to check if the application is still active or has completed its lifecycle
-	StateStopped = 8
 )
 
 type App struct {
 	state        int
 	server       *server.GinServer
-	eventManager *sysevent.Manager
+	eventManager *eventManager
 	configure    config.Configure
-	config       *server.Config
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -44,7 +43,7 @@ type App struct {
 func New(opts ...Option) *App {
 	a := &App{
 		state:        StateInit,
-		eventManager: sysevent.NewEventManager(),
+		eventManager: newEventManager(),
 		server:       &server.GinServer{},
 	}
 
@@ -62,7 +61,7 @@ func Default() *App {
 	return New(
 		WithConfigure(sysconf.NewLocalFileConfigure),
 		WithLogger(syslog.NewZapLogger),
-		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
+		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger(), gin.Recovery()),
 	)
 }
 
@@ -107,17 +106,26 @@ func (a *App) Run() {
 		a.PrepareContainer()
 	}
 
-	a.eventManager.TriggerOnStarting()
-	err := a.server.Run(a.config)
-	if err != nil {
+	err := a.server.Run(a.configure)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		gplog.Error(fmt.Sprintf("Application failed to start: %v", err))
 		return
 	}
-
-	time.Sleep(10 * time.Millisecond) // Allow some time for the server to start
 
 	a.state |= StateRunning
 	a.eventManager.TriggerOnStarted()
 	gplog.Info(fmt.Sprintf("Application started successfully on [%s]", a.server.GetAddress()))
 
+	stopSignalCh := make(chan os.Signal, 1)
+	signal.Notify(stopSignalCh, syscall.SIGTERM, syscall.SIGINT)
+	<-stopSignalCh
+
+	if err = a.server.Shutdown(func(ctx context.Context) {
+		a.eventManager.TriggerOnStopped(ctx)
+	}); err != nil {
+		gplog.Warn(fmt.Sprintf("Application failed to gracefully shutdown: %v", err))
+		return
+	}
+
+	gplog.Info("Application shutdown gracefully.")
 }

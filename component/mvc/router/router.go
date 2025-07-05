@@ -2,26 +2,37 @@ package router
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/util/strutil"
 	"net/http"
 	"reflect"
 
 	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/util/reflectutil"
-	"github.com/archine/gin-plus/v4/util/strutil"
 	"github.com/gin-gonic/gin"
 )
 
 type Method struct {
-	Name       string // Name of the method (controller action)
-	HttpMethod string // HTTP method (GET, POST, PUT, DELETE, etc.)
-	Path       string // URL path for the route
+	// NameOrFunc method name or gin.HandlerFunc,
+	// the name is used to find the method in the controller, muse be first letter uppercase.
+	NameOrFunc any
+
+	// HttpMethod HTTP method (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD)
+	HttpMethod string
+
+	// Path is the route path for the method.
+	Path string
 }
 
 type Route struct {
-	Name     string    // Name of the controller
-	BasePath string    // Base path for the controller
-	Methods  []*Method // List of methods associated with the controller
+	// Name is the bean name of the controller, used to find the controller in the IOC container.
+	Name string
+
+	// BasePath is the base path for the controller's routes.
+	BasePath string
+
+	// Methods is a list of methods associated with the controller.
+	Methods []*Method
 }
 
 var routes []*Route
@@ -38,10 +49,11 @@ var routes []*Route
 //
 //	RegisterRoutes(
 //	    &Route{
+//	        Name: "userController",
 //	        BasePath: "/api/v1",
 //	        Methods: []*Method{
-//	            {HttpMethod: "GET", Path: "/users", HandlerFunc: getUsers},
-//	            {HttpMethod: "POST", Path: "/users", HandlerFunc: createUser},
+//	            {HttpMethod: "GET", Path: "/users", NameOrFunc: getUsers},
+//	            {HttpMethod: "POST", Path: "/users", NameOrFunc: "CreateUser"},
 //	        },
 //	    }
 //	)
@@ -79,14 +91,9 @@ func Apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
 	}
 
 	for _, route := range routes {
-		ctrlInstance, exist := ioc.GetBean(strutil.FirstToLower(route.Name))
-		if !exist {
-			gplog.Warn(fmt.Sprintf("Controller %s not found in IOC container, skipping route registration", route.Name))
-			continue
-		}
-		ctrlValue := reflect.ValueOf(ctrlInstance)
-
+		var ctrlValue reflect.Value
 		var ctrlRouter *gin.RouterGroup
+
 		if route.BasePath != "" {
 			ctrlRouter = baseRouter.Group(route.BasePath)
 		} else {
@@ -94,32 +101,64 @@ func Apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
 		}
 
 		for _, method := range route.Methods {
-			if method.Name == "" {
-				gplog.Warn(fmt.Sprintf("Method name is empty for route %s ,path=%s, skipping registration", route.Name, method.Path))
+			var handler gin.HandlerFunc
+			var err error
+
+			switch v := method.NameOrFunc.(type) {
+			case string:
+				// If the method name is a string, we assume it's the name of a method in the controller.
+				if v == "" {
+					gplog.Warn(fmt.Sprintf("Method name is empty for route %s, path=%s, skipping registration", route.Name, method.Path))
+					continue
+				}
+				if !ctrlValue.IsValid() {
+					ctrlInstance, exist := ioc.GetBean(strutil.FirstToLower(route.Name))
+					if !exist {
+						gplog.Warn(fmt.Sprintf("Controller %s not found in IOC container, skipping route registration", route.Name))
+						continue
+					}
+					ctrlValue = reflect.ValueOf(ctrlInstance)
+				}
+
+				handler, err = convertMethodToHandler(ctrlValue, v, route.Name, ginCtxType)
+				if err != nil {
+					gplog.Warn(fmt.Sprintf("Failed to convert method %s.%s: %v", route.Name, v, err))
+					continue
+				}
+
+			case gin.HandlerFunc:
+				handler = v
+			default:
+				gplog.Warn(fmt.Sprintf("Invalid NameOrFunc type for route %s, path=%s, skipping registration", route.Name, method.Path))
 				continue
 			}
 
-			methodValue := ctrlValue.MethodByName(method.Name)
-			if !methodValue.IsValid() {
-				gplog.Warn(fmt.Sprintf("Method %s not found in controller %s, skipping registration", method.Name, route.Name))
-				continue
-			}
-
-			if methodValue.Type().NumIn() != 1 || methodValue.Type().In(0) != ginCtxType {
-				gplog.Warn(fmt.Sprintf("Method %s in controller %s must accept exactly one *gin.Context parameter", method.Name, route.Name))
-				continue
-			}
-
-			if handleFunc, ok := methodValue.Interface().(func(*gin.Context)); ok {
-				ctrlRouter.Handle(method.HttpMethod, method.Path, handleFunc)
-			} else {
-				gplog.Warn(fmt.Sprintf("Method %s in controller %s does not have a valid handler function signature", method.Name, route.Name))
-			}
+			ctrlRouter.Handle(method.HttpMethod, method.Path, handler)
 		}
 	}
 
-	routes = nil // Clear routes after applying to avoid duplicate registrations
+	routes = nil
 	gplog.Info("All routes applied successfully...")
 
 	return nil
+}
+
+// convertMethodToHandler converts a method of a controller to a gin.HandlerFunc.
+func convertMethodToHandler(ctrlValue reflect.Value, methodName, ctrlName string, ginCtxType reflect.Type) (gin.HandlerFunc, error) {
+	methodValue := ctrlValue.MethodByName(methodName)
+	if !methodValue.IsValid() {
+		return nil, fmt.Errorf("method %s not found in controller %s", methodName, ctrlName)
+	}
+
+	if methodValue.Type().NumIn() != 1 || methodValue.Type().In(0) != ginCtxType {
+		return nil, fmt.Errorf("method %s.%s must accept exactly one *gin.Context parameter", ctrlName, methodName)
+	}
+
+	handlerFunc, ok := methodValue.Interface().(func(*gin.Context))
+	if !ok {
+		return nil, fmt.Errorf("method %s.%s cannot be converted to gin.HandlerFunc", ctrlName, methodName)
+	}
+
+	return handlerFunc, nil
+
 }

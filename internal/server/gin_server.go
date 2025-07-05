@@ -1,17 +1,27 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/component/mvc/router"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
+// GinServer represents a Gin-based HTTP server with additional features
 type GinServer struct {
-	middlewares []gin.HandlerFunc
 	address     string
+	conf        *Config
+	server      *http.Server
+	middlewares []gin.HandlerFunc
 }
 
 // RegisterMiddleware registers a middleware to the Gin server
@@ -24,10 +34,17 @@ func (s *GinServer) GetAddress() string {
 	return s.address
 }
 
-// Run starts the Gin server with the registered middlewares
-func (s *GinServer) Run(conf *Config) (err error) {
+// Run starts the Gin server with the provided configuration.
+func (s *GinServer) Run(configure config.Configure) error {
+	var conf Config
+	if err := configure.Unmarshal("gin_plus", &conf); err != nil {
+		return fmt.Errorf("failed to unmarshal gin_plus config: %w", err)
+	}
+	conf.Validate()
+
 	s.address = fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)
 
+	gin.SetMode(conf.Server.Mode)
 	engine := gin.New()
 	engine.RemoveExtraSlash = true
 	engine.MaxMultipartMemory = conf.Server.MaxMultipartMemory
@@ -37,9 +54,10 @@ func (s *GinServer) Run(conf *Config) (err error) {
 	}
 	if len(s.middlewares) > 0 {
 		engine.Use(s.middlewares...)
+		s.middlewares = nil
 	}
 
-	err = router.Apply(engine, conf.Server.ContextPath, conf.Server.EnableHealthCheck)
+	err := router.Apply(engine, conf.Server.ContextPath, conf.Server.EnableHealthCheck)
 	if err != nil {
 		return fmt.Errorf("failed to apply routes: %w", err)
 	}
@@ -53,6 +71,9 @@ func (s *GinServer) Run(conf *Config) (err error) {
 		ReadHeaderTimeout:            conf.Server.ReadHeaderTimeout,
 		IdleTimeout:                  conf.Server.IdleTimeout,
 	}
+
+	errChan := make(chan error, 1)
+
 	if conf.Server.TLS != nil && conf.Server.TLS.Enabled {
 		// If TLS is enabled, ensure cert and key files are provided
 		if conf.Server.TLS.CertFile == "" || conf.Server.TLS.KeyFile == "" {
@@ -62,11 +83,73 @@ func (s *GinServer) Run(conf *Config) (err error) {
 			MinVersion: tls.VersionTLS12, // Ensure a minimum TLS version
 		}
 		go func() {
-			err = serve.ListenAndServeTLS(conf.Server.TLS.CertFile, conf.Server.TLS.KeyFile)
+			errChan <- serve.ListenAndServeTLS(conf.Server.TLS.CertFile, conf.Server.TLS.KeyFile)
 		}()
 	} else {
-		err = serve.ListenAndServe()
+		go func() {
+			errChan <- serve.ListenAndServe()
+		}()
 	}
 
-	return err
+	select {
+	case err := <-errChan:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("failed to start server: %w", err)
+		}
+	case <-time.After(10 * time.Millisecond):
+		// wait some time for the server to start
+		s.conf = &conf
+		s.server = &serve
+		err = ioc.RegisterBean("ginEngine", engine)
+		if err != nil {
+			return fmt.Errorf("failed to register Gin engine in IoC container: %w", err)
+		}
+		gplog.Debug(fmt.Sprintf("Gin engine instance is now available in the IoC container as 'ginEngine'"))
+	}
+
+	return nil
+}
+
+// Shutdown gracefully stops the Gin server
+func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
+	if s.server == nil {
+		return fmt.Errorf("server is not running")
+	}
+	if s.conf == nil {
+		return fmt.Errorf("server configuration is not set")
+	}
+
+	shutdownCtx := context.Background()
+	if s.conf.Server.ShutdownTimeout > 0 {
+		var cancelFunc context.CancelFunc
+		shutdownCtx, cancelFunc = context.WithTimeout(shutdownCtx, s.conf.Server.ShutdownTimeout)
+		defer cancelFunc()
+	}
+
+	// Attempt to gracefully shutdown the server
+	err := s.server.Shutdown(shutdownCtx)
+	if err != nil {
+		return fmt.Errorf("failed to shutdown server: %w", err)
+	}
+
+	// If a custom close function is provided, call it with a context that has a timeout
+	if closeFunc != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), s.conf.Server.ExitDelay)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			closeFunc(closeCtx)
+		}()
+
+		select {
+		case <-done:
+			// The close function completed successfully
+		case <-closeCtx.Done():
+			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.Server.ExitDelay))
+		}
+	}
+
+	return nil
 }
