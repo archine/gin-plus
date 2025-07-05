@@ -67,7 +67,7 @@ func RegisterRoutes(r ...*Route) {
 	routes = append(routes, r...)
 }
 
-// Apply attaches all APIs to the Gin engine.
+// apply attaches all APIs to the Gin engine.
 // This function iterates through the registered routes and their methods,
 // and registers them to the provided Gin engine under the specified context path.
 // It also optionally registers a health check endpoint if `enableHealth` is true.
@@ -76,7 +76,9 @@ func RegisterRoutes(r ...*Route) {
 //   - engine: The Gin engine to which the routes will be applied.
 //   - contextPath: The base path for the APIs, which will be prefixed to all routes.
 //   - enableHealth: A boolean flag to enable or disable health check endpoints.
-func Apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
+//
+// Note: this function is system-internal and should not be used directly in application code.
+func apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
 	if len(routes) == 0 {
 		return nil // No routes to apply
 	}

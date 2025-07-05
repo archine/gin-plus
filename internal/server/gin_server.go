@@ -5,13 +5,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v4/internal/syslink"
 	"net/http"
 	"time"
 
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/ioc"
-	"github.com/archine/gin-plus/v4/component/mvc/router"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -57,7 +57,7 @@ func (s *GinServer) Run(configure config.Configure) error {
 		s.middlewares = nil
 	}
 
-	err := router.Apply(engine, conf.Server.ContextPath, conf.Server.EnableHealthCheck)
+	err := syslink.ApplyRoute(engine, conf.Server.ContextPath, conf.Server.EnableHealthCheck)
 	if err != nil {
 		return fmt.Errorf("failed to apply routes: %w", err)
 	}
