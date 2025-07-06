@@ -37,19 +37,19 @@ func (s *GinServer) GetAddress() string {
 // Run starts the Gin server with the provided configuration.
 func (s *GinServer) Run(configure config.Configure) error {
 	var conf Config
-	if err := configure.Unmarshal("gin_plus", &conf); err != nil {
-		return fmt.Errorf("failed to unmarshal gin_plus config: %w", err)
+	if err := configure.Unmarshal("gin-plus.server", &conf); err != nil {
+		return fmt.Errorf("failed to unmarshal gin-plus config: %w", err)
 	}
 	conf.Validate()
 
-	s.address = fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)
+	s.address = fmt.Sprintf("%s:%d", conf.Host, conf.Port)
 
-	gin.SetMode(conf.Server.Mode)
+	gin.SetMode(conf.Mode)
 	engine := gin.New()
 	engine.RemoveExtraSlash = true
-	engine.MaxMultipartMemory = conf.Server.MaxMultipartMemory
+	engine.MaxMultipartMemory = conf.MaxMultipartMemory
 
-	if conf.Server.AllowedCors {
+	if conf.AllowedCors {
 		engine.Use(middleware.Cors())
 	}
 	if len(s.middlewares) > 0 {
@@ -57,7 +57,7 @@ func (s *GinServer) Run(configure config.Configure) error {
 		s.middlewares = nil
 	}
 
-	err := syslink.ApplyRoute(engine, conf.Server.ContextPath, conf.Server.EnableHealthCheck)
+	err := syslink.ApplyRoute(engine, conf.ContextPath, conf.EnableHealthCheck)
 	if err != nil {
 		return fmt.Errorf("failed to apply routes: %w", err)
 	}
@@ -66,24 +66,23 @@ func (s *GinServer) Run(configure config.Configure) error {
 		Addr:                         s.address,
 		Handler:                      engine,
 		DisableGeneralOptionsHandler: true,
-		ReadTimeout:                  conf.Server.ReadTimeout,
-		WriteTimeout:                 conf.Server.WriteTimeout,
-		ReadHeaderTimeout:            conf.Server.ReadHeaderTimeout,
-		IdleTimeout:                  conf.Server.IdleTimeout,
+		ReadTimeout:                  conf.ReadTimeout,
+		WriteTimeout:                 conf.WriteTimeout,
+		ReadHeaderTimeout:            conf.ReadHeaderTimeout,
+		IdleTimeout:                  conf.IdleTimeout,
 	}
 
 	errChan := make(chan error, 1)
 
-	if conf.Server.TLS != nil && conf.Server.TLS.Enabled {
-		// If TLS is enabled, ensure cert and key files are provided
-		if conf.Server.TLS.CertFile == "" || conf.Server.TLS.KeyFile == "" {
+	if conf.TLS != nil && conf.TLS.Enabled {
+		if conf.TLS.CertFile == "" || conf.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS is enabled but cert file or key file is not provided")
 		}
 		serve.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12, // Ensure a minimum TLS version
 		}
 		go func() {
-			errChan <- serve.ListenAndServeTLS(conf.Server.TLS.CertFile, conf.Server.TLS.KeyFile)
+			errChan <- serve.ListenAndServeTLS(conf.TLS.CertFile, conf.TLS.KeyFile)
 		}()
 	} else {
 		go func() {
@@ -112,7 +111,7 @@ func (s *GinServer) Run(configure config.Configure) error {
 
 // Shutdown gracefully stops the Gin server
 func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
-	if s.server == nil {
+	if s == nil {
 		return fmt.Errorf("server is not running")
 	}
 	if s.conf == nil {
@@ -120,21 +119,19 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 	}
 
 	shutdownCtx := context.Background()
-	if s.conf.Server.ShutdownTimeout > 0 {
+	if s.conf.ShutdownTimeout > 0 {
 		var cancelFunc context.CancelFunc
-		shutdownCtx, cancelFunc = context.WithTimeout(shutdownCtx, s.conf.Server.ShutdownTimeout)
+		shutdownCtx, cancelFunc = context.WithTimeout(shutdownCtx, s.conf.ShutdownTimeout)
 		defer cancelFunc()
 	}
 
-	// Attempt to gracefully shutdown the server
 	err := s.server.Shutdown(shutdownCtx)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown server: %w", err)
 	}
 
-	// If a custom close function is provided, call it with a context that has a timeout
 	if closeFunc != nil {
-		closeCtx, cancel := context.WithTimeout(context.Background(), s.conf.Server.ExitDelay)
+		closeCtx, cancel := context.WithTimeout(context.Background(), s.conf.ExitDelay)
 		defer cancel()
 
 		done := make(chan struct{})
@@ -147,7 +144,7 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 		case <-done:
 			// The close function completed successfully
 		case <-closeCtx.Done():
-			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.Server.ExitDelay))
+			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
 		}
 	}
 

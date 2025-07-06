@@ -20,39 +20,34 @@ type LifecycleEvent interface {
 	Event
 
 	// OnStarting is called before the application starts.
-	// This is the ideal place to perform pre-start tasks such as:
-	//
-	//  - Validating application configuration
-	//  - Initializing external connections (database, cache, etc.)
-	//  - Setting up monitoring and health checks
-	//  - Performing pre-flight checks
-	//  - Registering additional middleware or routes
-	//
-	// Returns:
-	//   - true: Prevent the application from starting (abort startup)
-	//   - false: Allow the application to start normally
+	// Use this method to perform initialization tasks, such as:
+	//   - Validating configuration
+	//   - Initializing external connections (databases, caches, etc.)
+	//   - Setting up monitoring and health checks
+	//   - Performing pre-flight checks
+	//   - Registering middleware or routes
+	// Return value:
+	//   - true: Prevents the application from starting (aborts startup)
+	//   - false: Allows the application to start normally
 	OnStarting() bool
 
 	// OnStarted is called after the application has started successfully.
-	// This is the ideal place to perform post-start tasks such as:
-	//
-	//  - Starting background workers or schedulers
-	//  - Sending startup notifications
-	//  - Performing warm-up operations
-	//  - Logging startup completion status
-	//  - Triggering external system notifications
-	//
+	// Use this method to perform post-start tasks, such as:
+	//   - Starting background workers or schedulers
+	//   - Sending startup notifications
+	//   - Performing warm-up operations
+	//   - Logging startup completion status
+	//   - Triggering external system notifications
 	// Note: At this point, the HTTP server is running and ready to accept requests.
 	OnStarted()
 
-	// OnStopped is called after the HTTP server has stopped accepting new requests,
-	//
+	// OnStopped is called after the HTTP server has stopped accepting new requests.
+	// Use this method to perform cleanup tasks, such as:
+	//   - Closing database connections
+	//   - Stopping background workers or schedulers
+	//   - Releasing resources
 	// Args:
 	//   - ctx: The context for the shutdown process, which can be used to perform graceful shutdown operations.
-	// This is the ideal place to perform cleanup tasks such as:
-	//  - Closing database connections
-	//  - Stopping background workers or schedulers
-	//  - Releasing resources
 	OnStopped(ctx context.Context)
 }
 

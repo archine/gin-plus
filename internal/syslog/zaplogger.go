@@ -3,22 +3,23 @@ package syslog
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 )
 
 type conf struct {
 	// Level syslog level, default info.
 	// 	Supports: error、info、trace、warn、panic、fatal、debug
-	Level string `json:"level" yaml:"level"`
+	Level string `yaml:"level"`
 
 	// LevelColor whether to enable color output for syslog levels, default true.
 	// Note: this option only works when the formatter is console.
-	EnableColor bool `json:"enable_color" yaml:"enable_color"`
+	EnableColor bool `yaml:"enable-color"`
 
 	// Formatter syslog format, default console (supports: json、console)
 	// 	json: output syslog in json format.
@@ -26,11 +27,11 @@ type conf struct {
 
 	// ConsoleSeparator console separator.
 	// Note: when the formatter is console, the separator between the fields, default is "\t".
-	ConsoleSeparator string `json:"console_separator" yaml:"console_separator"`
+	ConsoleSeparator string `yaml:"console-separator"`
 
 	// CtxKeys When using WithContext for syslog output.
 	// the value of the specified key is obtained from the context and added to the syslog.
-	CtxKeys []string `json:"ctx_keys" yaml:"ctx_keys"`
+	CtxKeys []string `yaml:"ctx-keys"`
 }
 
 // defaultLogger is the default implementation of the syslog interface.
@@ -41,7 +42,7 @@ type zaplog struct {
 
 func NewZapLogger(configure config.Configure) gplog.Logger {
 	var cf conf
-	if err := configure.Unmarshal("gin_plus.log", &cf); err != nil {
+	if err := configure.Unmarshal("gin-plus.log", &cf); err != nil {
 		panic(exception.NewStackErr("Init syslog config failed: " + err.Error()))
 	}
 	if cf.Level == "" {
@@ -96,49 +97,62 @@ func NewZapLogger(configure config.Configure) gplog.Logger {
 }
 
 func (d *zaplog) Info(text string, fields ...gplog.Field) {
-	d.core.Info(text, convertFields(fields)...)
+	d.core.Info(text, d.buildFields(nil, fields)...)
 }
 
 func (d *zaplog) Debug(text string, fields ...gplog.Field) {
-	d.core.Debug(text, convertFields(fields)...)
+	d.core.Debug(text, d.buildFields(nil, fields)...)
 }
 
 func (d *zaplog) Warn(text string, fields ...gplog.Field) {
-	d.core.Warn(text, convertFields(fields)...)
+	d.core.Warn(text, d.buildFields(nil, fields)...)
 }
 
 func (d *zaplog) Error(text string, fields ...gplog.Field) {
-	d.core.Error(text, convertFields(fields)...)
+	d.core.Error(text, d.buildFields(nil, fields)...)
 }
 
 func (d *zaplog) Fatal(text string, fields ...gplog.Field) {
-	d.core.Fatal(text, convertFields(fields)...)
+	d.core.Fatal(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) WithContext(ctx context.Context) gplog.Logger {
-	if d.ctxKeys == nil {
-		return d
-	}
-
-	var fields []zap.Field
-	for _, key := range d.ctxKeys {
-		if value := ctx.Value(key); value != nil {
-			fields = append(fields, zap.Any(key, value))
-		}
-	}
-	return &zaplog{
-		core:    d.core.With(fields...),
-		ctxKeys: d.ctxKeys,
-	}
+func (d *zaplog) InfoWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+	d.core.Info(text, d.buildFields(ctx, fields)...)
 }
 
-func convertFields(fields []gplog.Field) []zap.Field {
-	if len(fields) == 0 {
+func (d *zaplog) DebugWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+	d.core.Debug(text, d.buildFields(ctx, fields)...)
+}
+
+func (d *zaplog) WarnWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+	d.core.Warn(text, d.buildFields(ctx, fields)...)
+}
+
+func (d *zaplog) ErrorWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+	d.core.Error(text, d.buildFields(ctx, fields)...)
+}
+
+func (d *zaplog) FatalWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+	d.core.Fatal(text, d.buildFields(ctx, fields)...)
+}
+
+func (d *zaplog) buildFields(ctx context.Context, gpFields []gplog.Field) []zap.Field {
+	totalCapacity := len(gpFields) + len(d.ctxKeys)
+	if totalCapacity == 0 {
 		return nil
 	}
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any(field.Key, field.Value)
+
+	zapFields := make([]zap.Field, 0, totalCapacity)
+	for _, f := range gpFields {
+		zapFields = append(zapFields, zap.Any(f.Key, f.Value))
 	}
+	if ctx != nil {
+		for _, key := range d.ctxKeys {
+			if value := ctx.Value(key); value != nil {
+				zapFields = append(zapFields, zap.Any(key, value))
+			}
+		}
+	}
+
 	return zapFields
 }

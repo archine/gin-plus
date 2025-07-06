@@ -86,7 +86,6 @@ func apply(engine *gin.Engine, contextPath string, enableHealth bool) error {
 	ginCtxType := reflectutil.PtrOf[gin.Context]()
 
 	if enableHealth {
-		// Register health check endpoint
 		baseRouter.Any("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})

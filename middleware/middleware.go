@@ -13,9 +13,9 @@ import (
 // Cors Cross-domain middleware
 func Cors() gin.HandlerFunc {
 	return cors.New(cors.Config{
-		AllowMethods:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"*"},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Type", "Request-Id", "X-Request-Id"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
 			return true
@@ -30,15 +30,12 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch t := r.(type) {
-			case *exception.BusinessException:
-				resp.DirectRespWithCode(ctx, t.Code(), t.Error())
-			case *exception.StackError:
-				gplog.WithContext(ctx).Error(fmt.Sprintf("%s\n%s", t.Error(), t.StackTrace()))
-				resp.ServerError(ctx, true)
+			case error:
+				resp.Error(ctx, t)
 			default:
 				trace := getTrace()
-				gplog.WithContext(ctx).Error(fmt.Sprintf("%v\n%s", r, trace))
-				resp.ServerError(ctx, true)
+				resp.Code(ctx, exception.DefaultSystemErrorCode, trace)
+				gplog.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", t, trace))
 			}
 		}
 	}()

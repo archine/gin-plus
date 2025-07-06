@@ -2,87 +2,8 @@ package exception
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/constant/errs"
-	"github.com/archine/gin-plus/v4/exception/stacktrace"
 	"strings"
 )
-
-// BusinessException represents a service-level exception that includes stack trace information.
-// The default business error code is set to 40000, which corresponds to bcode.BadRequest.
-//
-// When returned via resp.DirectRespErr, this error is not treated as an unknown error,
-// so resp.ServerError will not be triggered.
-type BusinessException struct {
-	code int    // Error code representing the specific business error.
-	msg  string // Error message describing the exception.
-}
-
-// Error returns the error message.
-func (b *BusinessException) Error() string {
-	return b.msg
-}
-
-// Code returns the business error code.
-func (b *BusinessException) Code() int {
-	return b.code
-}
-
-// NewBusinessErr creates a new BusinessException with a default error code of 40000.
-func NewBusinessErr(msg string) *BusinessException {
-	return &BusinessException{code: errs.BadRequestErr.Code(), msg: msg}
-}
-
-// NewBusinessErrWithCode creates a new BusinessException with a specified error code.
-func NewBusinessErrWithCode(code int, msg string) *BusinessException {
-	return &BusinessException{code: code, msg: msg}
-}
-
-// StackError represents an exception that includes stack trace information.
-//
-// When formatting the error with fmt.Printf:
-// - Using format '%+v' will include the stack trace information in the output.
-// - Using other formats will display only the error message.
-//
-// Usage example:
-//
-//	err := NewStackErr("error message")
-//	fmt.Printf("%+v", err)
-type StackError struct {
-	msg string // Error message describing the exception.
-	st  string // Stack trace information.
-}
-
-func (s *StackError) Error() string {
-	return s.msg
-}
-
-// StackTrace returns the stack trace of the error.
-func (s *StackError) StackTrace() string {
-	return s.st
-}
-
-// ToString returns the string representation of the StackError,
-// which includes the error message and stack trace.
-func (s *StackError) ToString() string {
-	return fmt.Sprintf("%s\n%s", s.msg, s.st)
-}
-
-// NewStackErr creates a new StackError with the specified message.
-func NewStackErr(msg string) *StackError {
-	stack := stacktrace.Capture(1, 8)
-	defer stack.Free()
-	return &StackError{msg, stack.ToString()}
-}
-
-// WithStack wraps an error with a stack trace.
-func WithStack(err error) *StackError {
-	if err == nil {
-		return nil
-	}
-	stack := stacktrace.Capture(1, 8)
-	defer stack.Free()
-	return &StackError{err.Error(), stack.ToString()}
-}
 
 // Wrap formats an error message by wrapping the provided error with additional context.
 // It supports including multiple additional errors in the format string.

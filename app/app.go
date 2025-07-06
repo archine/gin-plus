@@ -74,9 +74,10 @@ func (a *App) With(opts ...Option) *App {
 	return a
 }
 
-// PrepareContainer prepares the IoC container.
-// This method initializes the container and triggers the refresh process.
-// It is called after the basic preparation to ensure that all beans are properly created and injected.
+// PrepareContainer initializes and refreshes the IoC container.
+// This method ensures that all beans are created and injected properly.
+// In most cases, you do not need to call this method explicitly, as it is automatically invoked when the application starts.
+// Only call this method directly if you need to initialize the container without starting the server (e.g., for testing or tooling purposes).
 func (a *App) PrepareContainer() {
 	if a.state&StateContainerPrepared != 0 {
 		gplog.Warn("Application container is already prepared.")
