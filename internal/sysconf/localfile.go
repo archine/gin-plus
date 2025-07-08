@@ -3,24 +3,27 @@ package sysconf
 import (
 	"flag"
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/ioc"
-	"github.com/archine/gin-plus/v4/util/reflectutil"
+	"os"
 
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/spf13/viper"
 )
 
-// LocalFileConfigure provides a configuration implementation using Viper for local file-based configuration.
-// It wraps the Viper instance and implements the Configure interface to provide type-safe
-// access to configuration values from local configuration files.
+// LocalFileConfigure is a Viper-based configuration implementation for loading local configuration files.
+// It follows these precedence rules when determining the configuration file path:
+// 1. Checks the GIN_PLUS_CONFIG_FILE environment variable first
+// 2. If not set, checks for the '-c' command-line flag
+// 3. Defaults to 'app.yml' in the current directory if neither is specified
 type LocalFileConfigure struct {
 	v *viper.Viper
 }
 
 func NewLocalFileConfigure() config.Configure {
-	var configFile string
-	flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
-	flag.Parse()
+	configFile := os.Getenv("GIN_PLUS_CONFIG_FILE") // Check environment variable first
+	if configFile == "" {
+		flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
+		flag.Parse()
+	}
 
 	v := viper.New()
 	v.AutomaticEnv()
@@ -31,13 +34,8 @@ func NewLocalFileConfigure() config.Configure {
 	}
 
 	lc := &LocalFileConfigure{v: v}
-
-	err := ioc.RegisterBean("", lc, reflectutil.InterfaceOf[config.Configure]())
-	if err != nil {
-		panic(fmt.Sprintf("Failed to register LocalFileConfigure in IoC container: %v", err))
-	}
-
 	fmt.Printf("Configuration loaded successfully from: %s\n", configFile)
+
 	return lc
 }
 

@@ -1,23 +1,24 @@
-package ioc
+package container
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/internal/container/definition"
+	"github.com/archine/gin-plus/v4/internal/container/topo"
 	"reflect"
 
 	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/component/ioc/internal/topo"
 )
 
-// refresh initializes the container and creates all registered beans
-//
-// Note: this function is system-internal and should not be used directly in application code.
-func refresh() {
-	defaultContainer.refresh()
-}
-
-func (c *Container) refresh() {
+func (c *Container) Refresh() {
 	once.Do(func() {
-		refreshed.Store(true)
+		if len(definition.Cache) == 0 {
+			return
+		}
+		err := c.processStructType(definition.Cache)
+		if err != nil {
+			gplog.Fatal("Failed to process bean definitions: " + err.Error())
+		}
 
 		creationOrder, err := c.buildCreationOrder()
 		if err != nil {
@@ -30,9 +31,10 @@ func (c *Container) refresh() {
 			}
 		}
 
-		c.definitions = nil // clear definitions after creation
-		beanType = nil      // clear bean type to avoid memory leaks
-		lazyBeanType = nil  // clear lazy bean type to avoid memory leaks
+		c.definitions = nil    // clear definitions after creation
+		definition.Cache = nil // clear definitions to avoid memory leaks
+		beanType = nil         // clear bean type to avoid memory leaks
+		lazyBeanType = nil     // clear lazy bean type to avoid memory leaks
 	})
 }
 
@@ -84,8 +86,8 @@ func (c *Container) createBean(beanName string) error {
 	beanInstance := beanValue.Interface()
 
 	// call post-construct if available
-	if postConstruct, ok := beanInstance.(BeanPostConstruct); ok {
-		postConstruct.BeanPostConstruct()
+	if postConstruct, ok := beanInstance.(ioc.BeanPostConstruct); ok {
+		postConstruct.BeanPostConstruct(beanName)
 	}
 
 	c.beans[beanName] = beanInstance

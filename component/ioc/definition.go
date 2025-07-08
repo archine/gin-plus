@@ -2,27 +2,58 @@ package ioc
 
 import (
 	"fmt"
+	"github.com/archine/gin-plus/v4/internal/container/definition"
+	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
 )
 
-// DependencyField represents dependency injection information for struct fields
-type DependencyField struct {
-	Index       int                 // field index in struct
-	Name        string              // field name
-	IsInterface bool                // whether field is interface type
-	AutowireTag string              // autowire tag value
-	Field       reflect.StructField // field reflection info
-}
+// RegisterBeanDefinition registers a bean definition in the IoC container.
+// This function is used to register bean definitions that will be managed by the IoC container.
+// It accepts one or more pointers to structs that implement the Bean interface.
+//
+// Args:
+//   - instances: one or more struct pointers that implement the Bean interface.
+func RegisterBeanDefinition(instances ...any) error {
+	if len(instances) == 0 {
+		return nil
+	}
 
-// BeanDefinition represents bean definition information
-type BeanDefinition struct {
-	Type            reflect.Type       // bean type
-	DependentFields []*DependencyField // dependency fields
-	DependentBeans  []string           // names of dependent beans
+	for _, instance := range instances {
+		if instance == nil {
+			continue
+		}
+
+		ib, ok := instance.(Bean)
+		if !ok {
+			continue
+		}
+
+		typ := reflect.TypeOf(instance)
+		if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
+			return fmt.Errorf("type '%s' must be a pointer to a struct", typ.Name())
+		}
+
+		typ = typ.Elem()
+
+		def := &definition.BeanDefinition{
+			Name:           ib.BeanName(),
+			Type:           typ,
+			Prototype:      ib.IsPrototype(),
+			IsLaze:         ib.IsLazy(),
+			DependentBeans: make([]string, 0, typ.NumField()),
+			AutowireFields: make([]*definition.DependencyField, 0, typ.NumField()),
+		}
+		if def.Name == "" {
+			def.Name = strutil.FirstToLower(typ.Name())
+		}
+
+	}
+
+	return nil
 }
 
 // analyzeDependencies analyzes struct fields to extract dependency information
-func (c *Container) analyzeDependencies(def *BeanDefinition) ([]reflect.Type, error) {
+func analyzeDependencies(def *BeanDefinition) ([]reflect.Type, error) {
 	var unregisteredTypes []reflect.Type
 
 	for i := 0; i < def.Type.NumField(); i++ {
@@ -96,7 +127,7 @@ func (c *Container) analyzeDependencies(def *BeanDefinition) ([]reflect.Type, er
 }
 
 // findImplementingBeans finds all beans that implement the specified interface
-func (c *Container) findImplementingBeans(interfaceType reflect.Type) []string {
+func findImplementingBeans(interfaceType reflect.Type) []string {
 	var implementingBeans []string
 
 	for beanName, def := range c.definitions {

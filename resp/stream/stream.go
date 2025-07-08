@@ -35,10 +35,10 @@ type Writer struct {
 	ctx *gin.Context
 }
 
-// NewWriter creates a new SSE writer for the given context.
+// NewWriter creates a new SSE writer for the given gpctx.
 func NewWriter(ctx *gin.Context) *Writer {
 	if ctx == nil {
-		panic("context cannot be nil")
+		panic("gpctx cannot be nil")
 	}
 	w := _pool.Get()
 	w.ctx = ctx

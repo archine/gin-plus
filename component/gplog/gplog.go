@@ -9,9 +9,20 @@ var (
 	globalLog Logger
 )
 
-
-// set by the application during initialization.
-func setLogger(l Logger) {
+// Set initializes the global logger with the provided Logger instance.
+// This function should be called during application initialization to set the logger.
+// It panics if the logger is nil, ensuring that the application does not run without a logger.
+// This is typically done in the main application entry point or during the configuration phase.
+//
+// Args:
+//   - l: The Logger instance to set as the global logger.
+//
+// Usage:
+//
+//	app.WithLogger(func(ctx *app.Context) gplog.Logger {
+//	    return myCustomLogger
+//	})
+func Set(l Logger) {
 	globalLog = l
 }
 
@@ -76,7 +87,7 @@ func Fatal(text string, fields ...Field) {
 	globalLog.Fatal(text, fields...)
 }
 
-// InfoWithCtx logs an info level message with context fields.
+// InfoWithCtx logs an info level message with gpctx fields.
 func InfoWithCtx(ctx context.Context, text string, fields ...Field) {
 	if globalLog == nil {
 		panic("globalLog is not initialized")
@@ -84,7 +95,7 @@ func InfoWithCtx(ctx context.Context, text string, fields ...Field) {
 	globalLog.InfoWithCtx(ctx, text, fields...)
 }
 
-// DebugWithCtx logs a debug level message with context fields.
+// DebugWithCtx logs a debug level message with gpctx fields.
 func DebugWithCtx(ctx context.Context, text string, fields ...Field) {
 	if globalLog == nil {
 		panic("globalLog is not initialized")
@@ -92,7 +103,7 @@ func DebugWithCtx(ctx context.Context, text string, fields ...Field) {
 	globalLog.DebugWithCtx(ctx, text, fields...)
 }
 
-// WarnWithCtx logs a warning level message with context fields.
+// WarnWithCtx logs a warning level message with gpctx fields.
 func WarnWithCtx(ctx context.Context, text string, fields ...Field) {
 	if globalLog == nil {
 		panic("globalLog is not initialized")
@@ -100,7 +111,7 @@ func WarnWithCtx(ctx context.Context, text string, fields ...Field) {
 	globalLog.WarnWithCtx(ctx, text, fields...)
 }
 
-// ErrorWithCtx logs an error level message with context fields.
+// ErrorWithCtx logs an error level message with gpctx fields.
 func ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
 	if globalLog == nil {
 		panic("globalLog is not initialized")
@@ -108,7 +119,7 @@ func ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
 	globalLog.ErrorWithCtx(ctx, text, fields...)
 }
 
-// FatalWithCtx logs a fatal level message with context fields and exits the application.
+// FatalWithCtx logs a fatal level message with gpctx fields and exits the application.
 func FatalWithCtx(ctx context.Context, text string, fields ...Field) {
 	if globalLog == nil {
 		panic("globalLog is not initialized")

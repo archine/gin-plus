@@ -1,9 +1,9 @@
-package app
+package gin_plus
 
 import (
 	"context"
+	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/ioc"
 	"sort"
 )
 
@@ -47,7 +47,7 @@ type LifecycleEvent interface {
 	//   - Stopping background workers or schedulers
 	//   - Releasing resources
 	// Args:
-	//   - ctx: The context for the shutdown process, which can be used to perform graceful shutdown operations.
+	//   - ctx: The gpctx for the shutdown process, which can be used to perform graceful shutdown operations.
 	OnStopped(ctx context.Context)
 }
 
@@ -56,7 +56,7 @@ type LifecycleEvent interface {
 type ConfigAfterLoadEvent interface {
 	Event
 	// OnConfigAfterLoad is called after all configuration files have been successfully loaded.
-	OnConfigAfterLoad(configure config.Configure)
+	OnConfigAfterLoad(cf config.Configure)
 }
 
 // ContainerRefreshBeforeEvent handles events triggered before container refresh.
@@ -71,7 +71,7 @@ type ContainerRefreshBeforeEvent interface {
 	//  - Modifying container configuration
 	//  - Performing pre-refresh validations
 	//  - Setting up custom bean processors
-	OnContainerRefreshBefore(c *ioc.Container)
+	OnContainerRefreshBefore(ctx *app.Context)
 }
 
 // ContainerRefreshAfterEvent handles events triggered after container refresh completion.
@@ -89,20 +89,13 @@ type ContainerRefreshAfterEvent interface {
 	//  - Triggering application-specific initialization logic
 	//
 	// Note: The container state should not be modified at this point.
-	OnContainerRefreshAfter(c *ioc.Container)
+	OnContainerRefreshAfter(ctx *app.Context)
 }
 
 // eventManager manages all app events with a single slice
 type eventManager struct {
 	events []Event
 	sorted bool
-}
-
-// creates a new event manager instance
-func newEventManager() *eventManager {
-	return &eventManager{
-		sorted: true,
-	}
 }
 
 // Register adds multiple app events to the manager
@@ -164,21 +157,21 @@ func (m *eventManager) TriggerConfigAfterLoad(configure config.Configure) {
 }
 
 // TriggerContainerRefreshBefore triggers the ContainerRefreshBefore event
-func (m *eventManager) TriggerContainerRefreshBefore(c *ioc.Container) {
+func (m *eventManager) TriggerContainerRefreshBefore(ctx *app.Context) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if refreshBeforeEvent, ok := e.(ContainerRefreshBeforeEvent); ok {
-			refreshBeforeEvent.OnContainerRefreshBefore(c)
+			refreshBeforeEvent.OnContainerRefreshBefore(ctx)
 		}
 	}
 }
 
 // TriggerContainerRefreshAfter triggers the ContainerRefreshAfter event
-func (m *eventManager) TriggerContainerRefreshAfter(ct *ioc.Container) {
+func (m *eventManager) TriggerContainerRefreshAfter(ctx *app.Context) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if refreshAfterEvent, ok := e.(ContainerRefreshAfterEvent); ok {
-			refreshAfterEvent.OnContainerRefreshAfter(ct)
+			refreshAfterEvent.OnContainerRefreshAfter(ctx)
 		}
 	}
 }

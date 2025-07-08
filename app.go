@@ -1,19 +1,19 @@
-package app
+package gin_plus
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v4/app"
+	"github.com/archine/gin-plus/v4/internal/container"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/internal/server"
 	"github.com/archine/gin-plus/v4/internal/sysconf"
-	"github.com/archine/gin-plus/v4/internal/syslink"
 	"github.com/archine/gin-plus/v4/internal/syslog"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
@@ -31,9 +31,10 @@ const (
 
 type App struct {
 	state        int
-	server       *server.GinServer
 	eventManager *eventManager
-	configure    config.Configure
+	server       *server.GinServer
+	appContext   *app.Context
+	container    *container.Container
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -43,9 +44,11 @@ type App struct {
 func New(opts ...Option) *App {
 	a := &App{
 		state:        StateInit,
-		eventManager: newEventManager(),
+		eventManager: &eventManager{},
 		server:       &server.GinServer{},
+		container:    container.NewContainer(),
 	}
+	a.appContext = app.NewContext(a.container)
 
 	for _, opt := range opts {
 		opt(a)
@@ -61,7 +64,7 @@ func Default() *App {
 	return New(
 		WithConfigure(sysconf.NewLocalFileConfigure),
 		WithLogger(syslog.NewZapLogger),
-		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger(), gin.Recovery()),
+		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
 	)
 }
 
@@ -84,11 +87,8 @@ func (a *App) PrepareContainer() {
 		return
 	}
 
-	ct := syslink.GetContainer()
-
-	a.eventManager.TriggerContainerRefreshBefore(ct)
-	syslink.RefreshContainer()
-	a.eventManager.TriggerContainerRefreshAfter(ct)
+	a.container.Refresh()
+	a.eventManager.TriggerContainerRefreshAfter(a.appContext)
 
 	a.state |= StateContainerPrepared
 	gplog.Info("Application container prepared with refresh completed.")
@@ -107,7 +107,7 @@ func (a *App) Run() {
 		a.PrepareContainer()
 	}
 
-	err := a.server.Run(a.configure)
+	err := a.server.Run(a.appContext)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		gplog.Error(fmt.Sprintf("Application failed to start: %v", err))
 		return

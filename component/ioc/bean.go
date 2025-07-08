@@ -10,23 +10,18 @@ package ioc
 //	    // your fields...
 //	}
 type Bean interface {
-	// IsBean is a marker method with no implementation required.
-	IsBean()
-}
+	// BeanName returns the name of the bean.
+	// If the name is empty, it defaults to the struct name with the first letter in lowercase.
+	BeanName() string
 
-// LazyBean defines the interface for lazy-loaded Bean components.
-// Beans implementing this interface can control their instantiation timing.
-//
-// Usage:
-//
-//	type UserService struct {
-//	    ioc.LazyBean
-//	    // your fields...
-//	}
-type LazyBean interface {
-	Bean
-	// IsLazyBean is a marker method with no implementation required.
-	IsLazyBean()
+	// IsPrototype indicates whether this bean is a prototype.
+	// A prototype bean is instantiated each time it is requested,
+	// while a singleton bean is shared across the application context.
+	IsPrototype() bool
+
+	// IsLazy indicates whether this bean is lazy-loaded.
+	// A lazy bean is not instantiated until it is first requested.
+	IsLazy() bool
 }
 
 // BeanPostConstruct defines the lifecycle callback interface for Bean initialization.
@@ -39,11 +34,11 @@ type LazyBean interface {
 //		    // your fields...
 //		}
 //
-//	 func (s *UserService) BeanPostConstruct() {
+//	 func (s *UserService) BeanPostConstruct(beanName string) {
 //	     // initialization logic here
 //	 }
 type BeanPostConstruct interface {
 	// BeanPostConstruct is invoked after the bean is instantiated
 	// and all its dependencies have been injected.
-	BeanPostConstruct()
+	BeanPostConstruct(beanName string)
 }

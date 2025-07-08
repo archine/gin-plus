@@ -30,7 +30,7 @@ type Resp interface {
 	// WithBasic sets the basic properties of the response.
 	WithBasic(businessCode int, msg string, data any) Resp
 
-	// WithContext sets the context, which is mandatory to avoid null pointer exceptions.
+	// WithContext sets the gpctx, which is mandatory to avoid null pointer exceptions.
 	WithContext(ctx *gin.Context) Resp
 
 	// To sends the response to the client. The optional httpCode parameter allows specifying an HTTP status code.
@@ -61,7 +61,7 @@ func (r *Result) WithBasic(code int, msg string, data any) Resp {
 	return r
 }
 
-// WithContext sets the Gin context for the Result.
+// WithContext sets the Gin gpctx for the Result.
 func (r *Result) WithContext(ctx *gin.Context) Resp {
 	r.ctx = ctx
 	return r
@@ -70,7 +70,7 @@ func (r *Result) WithContext(ctx *gin.Context) Resp {
 // To sends the Result as a JSON response to the client and releases the object back to the pool.
 func (r *Result) To(httpCode ...int) {
 	if r.ctx == nil {
-		panic("Response context is nil")
+		panic("Response gpctx is nil")
 	}
 
 	if len(httpCode) > 0 {
@@ -152,7 +152,7 @@ func Json(ctx *gin.Context, data any) {
 
 // Code responds with a custom business code and message.
 func Code(ctx *gin.Context, code int, format string, args ...any) {
-    InitResp(ctx).WithBasic(code, fmt.Sprintf(format, args...), nil).To()
+	InitResp(ctx).WithBasic(code, fmt.Sprintf(format, args...), nil).To()
 }
 
 // Error responds with an error

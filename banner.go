@@ -1,4 +1,4 @@
-package app
+package gin_plus
 
 // PrintBanner prints the application banner to the console.
 var sysBanner = `

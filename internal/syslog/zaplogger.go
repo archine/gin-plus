@@ -30,7 +30,7 @@ type conf struct {
 	ConsoleSeparator string `yaml:"console-separator"`
 
 	// CtxKeys When using WithContext for syslog output.
-	// the value of the specified key is obtained from the context and added to the syslog.
+	// the value of the specified key is obtained from the gpctx and added to the syslog.
 	CtxKeys []string `yaml:"ctx-keys"`
 }
 

@@ -8,6 +8,9 @@ import (
 
 // Config contains HTTP server related configuration options.
 type Config struct {
+	// Name is the application name.
+	Name string `mapstructure:"name"`
+
 	// Port specifies the HTTP server listening port.
 	// Default: 4006
 	Port int `mapstructure:"port"`
@@ -20,7 +23,7 @@ type Config struct {
 	// ContextPath is the base path for the HTTP server.
 	// All routes will be prefixed with this path.
 	// If empty, the server will listen on the root path ("/").
-	ContextPath string `mapstructure:"context-path"`
+	ContextPath string `mapstructure:"gpctx-path"`
 
 	// Mode specifies the Gin mode: "debug", "release", or "test".
 	// In debug mode, Gin provides more detailed logging and error information.
