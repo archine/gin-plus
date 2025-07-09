@@ -3,28 +3,34 @@ package container
 import (
 	"errors"
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/internal/container/definition"
-	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
-	"sync"
 )
 
-var (
-	once sync.Once
-)
+// BeanDef represents a bean definition in the IOC container.
+type BeanDef struct {
+	// Value is the actual bean instance.
+	value any
+
+	// Typ is the type of the bean instance.
+	typ reflect.Type
+
+	// IsPrototype indicates whether the bean is a prototype (new instance for each request)
+	isPrototype bool
+
+	// AutowireFields contains fields that need to be autowired.
+	autowireFields []*definition.AutowireField
+}
 
 // Container responsible for managing the lifecycle of all beans
 type Container struct {
-	mu sync.RWMutex
-	//beans       map[string]any             // stores created bean instances
-	definitions map[string]*definition.BeanDefinition // stores bean definition information
-	typeMapping map[reflect.Type][]string             // stores type to bean names mapping
+	beans       map[string]*BeanDef       // stores bean definition information
+	typeMapping map[reflect.Type][]string // stores type to bean names mapping
 }
 
 func NewContainer() *Container {
 	return &Container{
-		definitions: make(map[string]*definition.BeanDefinition),
+		beans:       make(map[string]*BeanDef),
 		typeMapping: make(map[reflect.Type][]string),
 	}
 }
@@ -35,14 +41,19 @@ func (c *Container) GetBean(name string) (any, bool) {
 		return nil, false
 	}
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	def, exists := c.definitions[name]
+	def, exists := c.beans[name]
 	if !exists {
 		return nil, false
 	}
-	return def.Bean, true
+	if def.isPrototype {
+		// If it's a prototype bean, create a new instance
+		prototypeBean, err := c.createPrototypeBean(def)
+		if err != nil {
+			return nil, false
+		}
+		return prototypeBean, true
+	}
+	return def.value, true
 }
 
 // GetBeanByType gets bean instance by type
@@ -54,23 +65,21 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, error) {
 		typ = typ.Elem()
 	}
 
-	c.mu.RLock()
 	names, exists := c.typeMapping[typ]
-	c.mu.RUnlock()
 
 	if !exists || len(names) == 0 {
 		return nil, fmt.Errorf("no beans found for type '%s'", typ.Name())
 	}
 
 	if len(names) == 1 {
-		c.mu.RLock()
-		def, exists := c.definitions[names[0]]
-		c.mu.RUnlock()
-
+		def, exists := c.beans[names[0]]
 		if !exists {
 			return nil, fmt.Errorf("bean '%s' not found in container", names[0])
 		}
-		return def.Bean, nil
+		if def.isPrototype {
+			return c.createPrototypeBean(def)
+		}
+		return def.value, nil
 	}
 
 	return nil, fmt.Errorf("multiple beans found for type '%s': %v. "+
@@ -87,21 +96,25 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, error) {
 		typ = typ.Elem()
 	}
 
-	c.mu.RLock()
 	names, exists := c.typeMapping[typ]
-	c.mu.RUnlock()
 	if !exists || len(names) == 0 {
 		return nil, fmt.Errorf("no beans found for type '%s'", typ.Name())
 	}
 
 	beans := make([]any, 0, len(names))
-	c.mu.RLock()
 	for _, name := range names {
-		if def, exists := c.definitions[name]; exists {
-			beans = append(beans, def.Bean)
+		if def, exists := c.beans[name]; exists {
+			if def.isPrototype {
+				prototypeBean, err := c.createPrototypeBean(def)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create prototype bean '%s': %w", name, err)
+				}
+				beans = append(beans, prototypeBean)
+				continue
+			}
+			beans = append(beans, def.value)
 		}
 	}
-	c.mu.RUnlock()
 
 	if len(beans) == 0 {
 		return nil, fmt.Errorf("no beans found for type '%s'", typ.Name())
@@ -109,96 +122,47 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, error) {
 	return beans, nil
 }
 
-// RegisterBean manually registers a ready bean instance to the IOC container.
+// RegisterBean registers an already instantiated bean instance into the IOC container.
 //
-// Args:
-//   - name: bean name for registration. If empty, defaults to the struct name with first letter lowercase
-//   - objPtr: pointer to the struct instance to register (must not be nil)
-//   - implementedTypes: optional interface types that the object implements for type-based lookup
-func (c *Container) RegisterBean(name string, objPtr any, implementedTypes ...reflect.Type) error {
-	objType := reflect.TypeOf(objPtr)
-	if objType.Kind() != reflect.Ptr || objType.Elem().Kind() != reflect.Struct {
-		return errors.New("objPtr must be a pointer to a struct")
-	}
-	structType := objType.Elem()
-	if name == "" {
-		name = strutil.FirstToLower(structType.Name())
+// Parameters:
+//   - name: the bean name for registration.
+//   - bean: a pointer to the struct instance that has already been instantiated.
+//   - itypes: optional interface types that the object implements, used for type-based lookup.
+//
+// Note:
+//   - According to the IOC container design, all beans registered by this method are singletons.
+//   - If a bean with the specified name already exists, an error will be returned.
+//   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
+func (c *Container) RegisterBean(name string, bean any, itypes ...reflect.Type) error {
+	if name == "" || bean == nil {
+		return errors.New("bean name and bean instance must not be empty or nil")
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	beanTyp := reflect.TypeOf(bean)
+	if beanTyp.Kind() != reflect.Ptr || beanTyp.Elem().Kind() != reflect.Struct {
+		return errors.New("bean must be a pointer to a struct")
+	}
+	structType := beanTyp.Elem()
 
-	if _, exists := c.definitions[name]; exists {
+	if _, exists := c.beans[name]; exists {
 		return fmt.Errorf("bean '%s' already exists", name)
 	}
 
-	// register implemented interfaces
-	for _, iType := range implementedTypes {
-		if !objType.Implements(iType) {
-			return fmt.Errorf("object type '%s' does not implement interface '%s'",
-				objType.Name(), iType.Name())
+	for _, itype := range itypes {
+		if !beanTyp.Implements(itype) {
+			return fmt.Errorf("object type '%s' does not implement interface '%s'", beanTyp.Name(), itype.Name())
 		}
-		c.typeMapping[iType] = append(c.typeMapping[iType], name)
+		c.typeMapping[itype] = append(c.typeMapping[itype], name)
 	}
 
-	c.definitions[name] = &definition.BeanDefinition{
-		Name: name,
-		Type: structType,
-		Bean: objPtr,
+	c.beans[name] = &BeanDef{
+		value:       bean,
+		isPrototype: false,
 	}
+
 	if _, exists := c.typeMapping[structType]; !exists {
 		c.typeMapping[structType] = []string{name}
 	}
 
-	return nil
-}
-
-// processStructType processes a slice of struct pointer types to register them as definitions
-func (c *Container) processStructType(structPtrTypes []reflect.Type) error {
-	for _, typ := range structPtrTypes {
-		if typ == nil {
-			continue
-		}
-
-		if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
-			return fmt.Errorf("type '%s' must be a pointer to a struct", typ.Name())
-		}
-
-		if typ.Implements(lazyBeanType) {
-			continue // skip lazy init types
-		}
-
-		if !typ.Implements(beanType) {
-			return fmt.Errorf("type '%s' must implement Bean interface", typ.Name())
-		}
-
-		structType := typ.Elem()
-		beanName := strutil.FirstToLower(structType.Name())
-
-		// check if already registered
-		if _, exists := c.definitions[beanName]; exists {
-			return fmt.Errorf("bean '%s' already registered", beanName)
-		}
-
-		def := &BeanDefinition{
-			Type: structType,
-		}
-
-		// analyze dependencies and register recursively
-		newStructTypes, err := c.analyzeDependencies(def)
-		if err != nil {
-			return fmt.Errorf("failed to analyze dependencies for '%s': %w", beanName, err)
-		}
-
-		c.definitions[beanName] = def
-		c.typeMapping[structType] = []string{beanName}
-
-		// recursively register dependencies
-		if len(newStructTypes) > 0 {
-			if err := c.processStructType(newStructTypes); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }

@@ -14,14 +14,8 @@ type Bean interface {
 	// If the name is empty, it defaults to the struct name with the first letter in lowercase.
 	BeanName() string
 
-	// IsPrototype indicates whether this bean is a prototype.
-	// A prototype bean is instantiated each time it is requested,
-	// while a singleton bean is shared across the application context.
+	// IsPrototype indicates whether the bean is a prototype.
 	IsPrototype() bool
-
-	// IsLazy indicates whether this bean is lazy-loaded.
-	// A lazy bean is not instantiated until it is first requested.
-	IsLazy() bool
 }
 
 // BeanPostConstruct defines the lifecycle callback interface for Bean initialization.

@@ -2,32 +2,22 @@ package topo
 
 import "fmt"
 
-// DependencyEdge represents a dependency relationship between beans
-type DependencyEdge struct {
+// Edge represents a dependency relationship between beans
+type Edge struct {
 	From string `json:"from"` // dependent bean
 	To   string `json:"to"`   // dependency bean
 }
 
-// detectCircularDependency detects circular dependencies in bean graph
-func detectCircularDependency(edges []*DependencyEdge) []string {
-	edgeMap, _ := buildDependencyGraph(edges)
-
-	visited := make(map[string]bool)
-	recStack := make(map[string]bool)
-
-	for beanName := range edgeMap {
-		if !visited[beanName] {
-			if foundCycle, cycle := dfsDetectCycle(beanName, edgeMap, visited, recStack, nil); foundCycle {
-				return cycle
-			}
-		}
+func BuildEdge(from string, to []string) []*Edge {
+	edges := make([]*Edge, 0, len(to))
+	for _, t := range to {
+		edges = append(edges, &Edge{From: from, To: t})
 	}
-
-	return nil
+	return edges
 }
 
 // Sort performs topological sorting to determine bean creation order
-func Sort(edges []*DependencyEdge) ([]string, error) {
+func Sort(edges []*Edge) ([]string, error) {
 	edgeMap, inDegree := buildDependencyGraph(edges)
 
 	// check for circular dependencies
@@ -55,9 +45,27 @@ func Sort(edges []*DependencyEdge) ([]string, error) {
 	return result, nil
 }
 
+// detectCircularDependency detects circular dependencies in bean graph
+func detectCircularDependency(edges []*Edge) []string {
+	edgeMap, _ := buildDependencyGraph(edges)
+
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
+
+	for beanName := range edgeMap {
+		if !visited[beanName] {
+			if foundCycle, cycle := dfsDetectCycle(beanName, edgeMap, visited, recStack, nil); foundCycle {
+				return cycle
+			}
+		}
+	}
+
+	return nil
+}
+
 // buildDependencyGraph builds adjacency list and in-degree map from edges
-func buildDependencyGraph(edges []*DependencyEdge) (map[string][]*DependencyEdge, map[string]int) {
-	edgeMap := make(map[string][]*DependencyEdge)
+func buildDependencyGraph(edges []*Edge) (map[string][]*Edge, map[string]int) {
+	edgeMap := make(map[string][]*Edge)
 	inDegree := make(map[string]int)
 
 	// initialize all nodes
@@ -91,7 +99,7 @@ func getZeroInDegreeNodes(inDegree map[string]int) []string {
 }
 
 // dfsDetectCycle uses DFS to detect cycles in dependency graph
-func dfsDetectCycle(node string, edgeMap map[string][]*DependencyEdge, visited map[string]bool, recStack map[string]bool, currentPath []string) (bool, []string) {
+func dfsDetectCycle(node string, edgeMap map[string][]*Edge, visited map[string]bool, recStack map[string]bool, currentPath []string) (bool, []string) {
 	if recStack[node] {
 		// cycle found, construct cycle path
 		for i, n := range currentPath {

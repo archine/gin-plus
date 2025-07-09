@@ -4,124 +4,127 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/internal/container/definition"
-	"github.com/archine/gin-plus/v4/internal/container/topo"
 	"reflect"
+	"sync"
 
 	"github.com/archine/gin-plus/v4/component/gplog"
 )
 
+var (
+	once sync.Once
+)
+
+// Refresh refreshes the container by processing all bean definitions.
+// It creates beans in the order defined by their dependencies and clears the cache after creation.
+// This method should be called only once, typically during application startup.
+// It ensures that all beans are created and dependencies are injected correctly.
+// If any bean creation fails, it logs a fatal error and stops the application.
 func (c *Container) Refresh() {
 	once.Do(func() {
 		if len(definition.Cache) == 0 {
 			return
 		}
-		err := c.processStructType(definition.Cache)
+		createOrderBeanNames, err := c.processDefinition()
 		if err != nil {
 			gplog.Fatal("Failed to process bean definitions: " + err.Error())
 		}
 
-		creationOrder, err := c.buildCreationOrder()
-		if err != nil {
-			gplog.Fatal("Failed to build bean creation order: " + err.Error())
-		}
-
-		for _, beanName := range creationOrder {
+		for _, beanName := range createOrderBeanNames {
 			if err = c.createBean(beanName); err != nil {
 				gplog.Fatal(fmt.Sprintf("Failed to create bean '%s': %s", beanName, err.Error()))
 			}
 		}
 
-		c.definitions = nil    // clear definitions after creation
 		definition.Cache = nil // clear definitions to avoid memory leaks
 		beanType = nil         // clear bean type to avoid memory leaks
-		lazyBeanType = nil     // clear lazy bean type to avoid memory leaks
 	})
-}
-
-// buildCreationOrder builds bean creation order using topological sorting
-func (c *Container) buildCreationOrder() ([]string, error) {
-	var edges []*topo.DependencyEdge
-
-	for beanName, def := range c.definitions {
-		for _, dependency := range def.DependentBeans {
-			edge := &topo.DependencyEdge{
-				From: beanName,
-				To:   dependency,
-			}
-			edges = append(edges, edge)
-		}
-	}
-
-	if len(edges) == 0 {
-		return nil, nil
-	}
-
-	return topo.Sort(edges)
 }
 
 // createBean creates a bean instance and performs dependency injection
 func (c *Container) createBean(beanName string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, exists := c.beans[beanName]; exists {
-		return nil // already created
+	_, found := c.beans[beanName]
+	if found {
+		// bean already created
+		return nil
 	}
 
-	def, exists := c.definitions[beanName]
-	if !exists {
+	def, found := definition.Cache[beanName]
+	if !found {
 		return fmt.Errorf("bean definition not found for '%s'", beanName)
 	}
 
-	beanValue := reflect.New(def.Type).Elem()
-
-	// inject dependencies
-	for _, depField := range def.DependentFields {
-		if err := c.injectDependency(beanValue, depField); err != nil {
-			return fmt.Errorf("failed to inject dependency for field '%s': %w",
-				depField.Field.Name, err)
-		}
+	if err := c.inject(reflect.ValueOf(def.Bean).Elem(), def.AutowireFields); err != nil {
+		return fmt.Errorf("failed to inject dependencies for bean '%s': %w", beanName, err)
 	}
 
-	beanInstance := beanValue.Interface()
-
 	// call post-construct if available
-	if postConstruct, ok := beanInstance.(ioc.BeanPostConstruct); ok {
+	if postConstruct, ok := def.Bean.(ioc.BeanPostConstruct); ok {
 		postConstruct.BeanPostConstruct(beanName)
 	}
 
-	c.beans[beanName] = beanInstance
+	c.beans[beanName] = &BeanDef{
+		typ:            def.Type,
+		value:          def.Bean,
+		isPrototype:    def.IsPrototype,
+		autowireFields: def.AutowireFields[:len(def.AutowireFields)],
+	}
 	return nil
 }
 
+// createPrototypeBean creates a prototype bean instance
+func (c *Container) createPrototypeBean(def *BeanDef) (any, error) {
+	newBeanValueOf := reflect.New(def.typ)
+
+	err := c.inject(newBeanValueOf.Elem(), def.autowireFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inject dependencies for bean '%s': %w", def.typ.Name(), err)
+	}
+
+	if postConstruct, ok := newBeanValueOf.Interface().(ioc.BeanPostConstruct); ok {
+		postConstruct.BeanPostConstruct(def.typ.Name())
+	}
+
+	return newBeanValueOf.Interface(), err
+}
+
 // injectDependency injects a single dependency into a bean field
-func (c *Container) injectDependency(beanValue reflect.Value, depField *DependencyField) error {
-	if depField.AutowireTag == "-" {
-		return nil
-	}
+func (c *Container) inject(beanValueOf reflect.Value, fields []*definition.AutowireField) error {
+	for _, field := range fields {
+		var bean any
 
-	dependencyBean, exists := c.beans[depField.AutowireTag]
-	if !exists {
-		return fmt.Errorf("dependency bean '%s' not found", depField.AutowireTag)
-	}
-
-	dependencyType := reflect.TypeOf(dependencyBean)
-	fieldValue := beanValue.Field(depField.Index)
-
-	if depField.IsInterface {
-		if !dependencyType.Implements(depField.Field.Type) {
-			return fmt.Errorf("bean '%s' does not implement interface '%s'",
-				depField.AutowireTag, depField.Field.Type.String())
+		if field.AutowireTag == "-" {
+			// look for field type in the container
+			foundBean, err := c.GetBeanByType(field.Field.Type)
+			if err != nil {
+				return err
+			}
+			bean = foundBean
+		} else {
+			foundBean, exist := c.GetBean(field.AutowireTag)
+			if !exist {
+				return fmt.Errorf("bean '%s' not found for field '%s'", field.AutowireTag, field.Field.Name)
+			}
+			bean = foundBean
 		}
-		fieldValue.Set(reflect.ValueOf(dependencyBean))
-		return nil
+
+		fieldValueOf := beanValueOf.Field(field.Index)
+
+		if field.IsInterface {
+			if !reflect.TypeOf(bean).Implements(field.Field.Type) {
+				return fmt.Errorf("bean '%s' does not implement interface '%s'",
+					field.AutowireTag, field.Field.Type.String())
+			}
+			fieldValueOf.Set(reflect.ValueOf(bean))
+			continue
+		}
+
+		if !reflect.TypeOf(bean).AssignableTo(field.Field.Type) {
+			return fmt.Errorf("type mismatch: expected '%s', got '%s'",
+				field.Field.Type.String(), reflect.TypeOf(bean).String())
+		}
+
+		fieldValueOf.Set(reflect.ValueOf(bean))
 	}
 
-	if !dependencyType.AssignableTo(depField.Field.Type) {
-		return fmt.Errorf("type mismatch: expected '%s', got '%s'",
-			depField.Field.Type.String(), dependencyType.String())
-	}
-
-	fieldValue.Set(reflect.ValueOf(dependencyBean))
 	return nil
 }
