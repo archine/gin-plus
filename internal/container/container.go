@@ -4,29 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/internal/container/definition"
 	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
 	"sync"
 )
 
 var (
-	once         sync.Once
-	beanType     = reflect.TypeOf((*ioc.Bean)(nil)).Elem()
-	lazyBeanType = reflect.TypeOf((*ioc.LazyBean)(nil)).Elem()
+	once sync.Once
 )
 
 // Container responsible for managing the lifecycle of all beans
 type Container struct {
-	mu          sync.RWMutex
-	beans       map[string]any             // stores created bean instances
-	definitions map[string]*BeanDefinition // stores bean definition information
-	typeMapping map[reflect.Type][]string  // stores type to bean names mapping
+	mu sync.RWMutex
+	//beans       map[string]any             // stores created bean instances
+	definitions map[string]*definition.BeanDefinition // stores bean definition information
+	typeMapping map[reflect.Type][]string             // stores type to bean names mapping
 }
 
 func NewContainer() *Container {
 	return &Container{
-		beans:       make(map[string]any),
-		definitions: make(map[string]*BeanDefinition),
+		definitions: make(map[string]*definition.BeanDefinition),
 		typeMapping: make(map[reflect.Type][]string),
 	}
 }
@@ -40,8 +38,11 @@ func (c *Container) GetBean(name string) (any, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	bean, exists := c.beans[name]
-	return bean, exists
+	def, exists := c.definitions[name]
+	if !exists {
+		return nil, false
+	}
+	return def.Bean, true
 }
 
 // GetBeanByType gets bean instance by type
@@ -63,13 +64,13 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, error) {
 
 	if len(names) == 1 {
 		c.mu.RLock()
-		bean, exists := c.beans[names[0]]
+		def, exists := c.definitions[names[0]]
 		c.mu.RUnlock()
 
 		if !exists {
 			return nil, fmt.Errorf("bean '%s' not found in container", names[0])
 		}
-		return bean, nil
+		return def.Bean, nil
 	}
 
 	return nil, fmt.Errorf("multiple beans found for type '%s': %v. "+
@@ -96,8 +97,8 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, error) {
 	beans := make([]any, 0, len(names))
 	c.mu.RLock()
 	for _, name := range names {
-		if bean, exists := c.beans[name]; exists {
-			beans = append(beans, bean)
+		if def, exists := c.definitions[name]; exists {
+			beans = append(beans, def.Bean)
 		}
 	}
 	c.mu.RUnlock()
@@ -108,9 +109,7 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, error) {
 	return beans, nil
 }
 
-// RegisterBean manually registers a bean instance to the IOC container.
-// This method allows registration of pre-created objects that don't need to go through
-// the automatic bean creation process.
+// RegisterBean manually registers a ready bean instance to the IOC container.
 //
 // Args:
 //   - name: bean name for registration. If empty, defaults to the struct name with first letter lowercase
@@ -129,7 +128,7 @@ func (c *Container) RegisterBean(name string, objPtr any, implementedTypes ...re
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.beans[name]; exists {
+	if _, exists := c.definitions[name]; exists {
 		return fmt.Errorf("bean '%s' already exists", name)
 	}
 
@@ -142,7 +141,11 @@ func (c *Container) RegisterBean(name string, objPtr any, implementedTypes ...re
 		c.typeMapping[iType] = append(c.typeMapping[iType], name)
 	}
 
-	c.beans[name] = objPtr
+	c.definitions[name] = &definition.BeanDefinition{
+		Name: name,
+		Type: structType,
+		Bean: objPtr,
+	}
 	if _, exists := c.typeMapping[structType]; !exists {
 		c.typeMapping[structType] = []string{name}
 	}

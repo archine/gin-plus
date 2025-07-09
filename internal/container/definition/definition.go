@@ -17,6 +17,7 @@ type DependencyField struct {
 
 // BeanDefinition represents bean definition information
 type BeanDefinition struct {
+	Ready          bool
 	Name           string             // name of the bean, defaults to struct name with first letter lowercase
 	Prototype      bool               // whether this bean is a prototype (new instance each time) or singleton (shared instance)
 	IsLaze         bool               // whether this bean is lazy-loaded (not instantiated until first requested)
@@ -27,7 +28,7 @@ type BeanDefinition struct {
 }
 
 // Cache holds the registered bean definitions
-var Cache = make([]*BeanDefinition, 0, 32)
+var Cache = make(map[string]*BeanDefinition)
 
 // Process processes the given instance and registers its bean definition
 func Process(instances ...any) error {
