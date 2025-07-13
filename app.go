@@ -22,8 +22,8 @@ import (
 const (
 	// StateInit indicates that the application is in the initial state.
 	StateInit = 1
-	// StateContainerPrepared indicates that the IoC container has been prepared.
-	StateContainerPrepared = 2
+	// StateContainerRefreshed indicates that the application container has been refreshed.
+	StateContainerRefreshed = 2
 	// StateRunning indicates that the application is currently running.
 	// This state is set when the application has started successfully and is ready to handle requests.
 	StateRunning = 4
@@ -77,20 +77,21 @@ func (a *App) With(opts ...Option) *App {
 	return a
 }
 
-// PrepareContainer initializes and refreshes the IoC container.
+// RefreshContainer refreshes the bean container.
 // This method ensures that all beans are created and injected properly.
 // In most cases, you do not need to call this method explicitly, as it is automatically invoked when the application starts.
 // Only call this method directly if you need to initialize the container without starting the server (e.g., for testing or tooling purposes).
-func (a *App) PrepareContainer() {
-	if a.state&StateContainerPrepared != 0 {
+func (a *App) RefreshContainer() {
+	if a.state&StateContainerRefreshed != 0 {
 		gplog.Warn("Application container is already prepared.")
 		return
 	}
 
+	a.eventManager.TriggerContainerRefreshBefore(a.appContext)
 	a.container.Refresh()
 	a.eventManager.TriggerContainerRefreshAfter(a.appContext)
 
-	a.state |= StateContainerPrepared
+	a.state |= StateContainerRefreshed
 	gplog.Info("Application container prepared with refresh completed.")
 }
 
@@ -101,11 +102,16 @@ func (a *App) Run() {
 		return
 	}
 
-	printBanner()
-
-	if a.state&StateContainerPrepared == 0 {
-		a.PrepareContainer()
+	if a.state&StateContainerRefreshed == 0 {
+		a.RefreshContainer()
 	}
+
+	continueRun := a.eventManager.TriggerOnStarting()
+	if !continueRun {
+		return
+	}
+
+	printBanner()
 
 	err := a.server.Run(a.appContext)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -120,6 +126,7 @@ func (a *App) Run() {
 	stopSignalCh := make(chan os.Signal, 1)
 	signal.Notify(stopSignalCh, syscall.SIGTERM, syscall.SIGINT)
 	<-stopSignalCh
+	gplog.Info("Application received shutdown signal, starting graceful shutdown...")
 
 	if err = a.server.Shutdown(func(ctx context.Context) {
 		a.eventManager.TriggerOnStopped(ctx)
@@ -128,5 +135,5 @@ func (a *App) Run() {
 		return
 	}
 
-	gplog.Info("Application shutdown gracefully.")
+	gplog.Info("Application gracefully shutdown completed.")
 }

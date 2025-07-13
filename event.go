@@ -27,8 +27,10 @@ type LifecycleEvent interface {
 	//   - Performing pre-flight checks
 	//   - Registering middleware or routes
 	// Return value:
-	//   - true: Prevents the application from starting (aborts startup)
-	//   - false: Allows the application to start normally
+	//   - true: Allows the application to start normally
+	//   - false: Prevents the application from starting (aborts startup)
+	//
+	// If any listener returns false, startup is aborted immediately.
 	OnStarting() bool
 
 	// OnStarted is called after the application has started successfully.

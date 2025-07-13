@@ -6,14 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
-	"github.com/archine/gin-plus/v4/util/reflectutil"
-	"github.com/archine/gin-plus/v4/util/strutil"
+	"github.com/archine/gin-plus/v4/component/mvc"
 	"net/http"
 	"reflect"
 	"time"
 
 	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/component/mvc/router"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -32,45 +30,11 @@ type GinServer struct {
 	// middlewares is a slice of Gin middleware functions that will be applied globally to all routes.
 	// Note: if server is running, this slice will be cleared after applying the middlewares to avoid memory leaks.
 	middlewares []gin.HandlerFunc
-
-	// routes is a slice of registered routes that will be applied to the Gin engine.
-	// Note: if server is running, this slice will be cleared after applying the routes to avoid memory leaks.
-	routes []*router.Route
 }
 
 // RegisterMiddleware registers a middleware to the Gin server
 func (s *GinServer) RegisterMiddleware(middleware ...gin.HandlerFunc) {
 	s.middlewares = append(s.middlewares, middleware...)
-}
-
-// RegisterRoutes registers multiple routes to the global routes slice.
-// This function allows you to add multiple routes at once, which can be useful for bulk registration
-// of API endpoints.
-//
-// Args:
-//   - routes: A variadic parameter that accepts multiple Route pointers.
-//     This allows you to pass any number of Route instances to be registered.
-//
-// Example usage:
-//
-//	RegisterRoutes(
-//	    &Route{
-//	        Name: "userController",
-//	        BasePath: "/api/v1",
-//	        Methods: []*Method{
-//	            {HttpMethod: "GET", Path: "/users", NameOrFunc: getUsers},
-//	            {HttpMethod: "POST", Path: "/users", NameOrFunc: "CreateUser"},
-//	        },
-//	    }
-//	)
-//
-// Note: This function does not perform any validation on the routes or methods.
-// It is assumed that the provided routes are valid and correctly defined.
-// If a method does not have a handler function defined,
-// it will be skipped with a warning logged.
-// If you need to ensure that all methods have handlers, consider adding validation logic before calling this function.
-func (s *GinServer) RegisterRoutes(r ...*router.Route) {
-	s.routes = append(s.routes, r...)
 }
 
 // GetAddress returns the address the Gin server will listen on
@@ -101,7 +65,7 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 		s.middlewares = nil
 	}
 
-	err := s.applyRoute(engine, conf.ContextPath, conf.EnableHealthCheck, appCtx)
+	err := s.applyRoute(appCtx, engine, conf.ContextPath, conf.EnableHealthCheck)
 	if err != nil {
 		return fmt.Errorf("failed to apply routes: %w", err)
 	}
@@ -143,11 +107,6 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 		// wait some time for the server to start
 		s.conf = &conf
 		s.server = &serve
-		err = appCtx.RegisterBean("ginEngine", engine)
-		if err != nil {
-			return fmt.Errorf("failed to register Gin engine in IoC container: %w", err)
-		}
-		gplog.Debug(fmt.Sprintf("Gin engine instance is now available in the IoC container as 'ginEngine'"))
 	}
 
 	return nil
@@ -197,22 +156,23 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 
 // apply attaches all APIs to the Gin engine.
 // This function iterates through the registered routes and their methods,
-// and registers them to the provided Gin engine under the specified gpctx path.
 // It also optionally registers a health check endpoint if `enableHealth` is true.
 //
 // Args:
+//   - appCtx: The application context
 //   - engine: The Gin engine to which the routes will be applied.
 //   - contextPath: The base path for the APIs, which will be prefixed to all routes.
 //   - enableHealth: A boolean flag to enable or disable health check endpoints.
-//   - ctx: The application context
 //
 // Note: this function is system-internal and should not be used directly in application code.
-func (s *GinServer) applyRoute(engine *gin.Engine, contextPath string, enableHealth bool, ctx *app.Context) error {
-	if len(s.routes) == 0 {
-		return nil // No routes to apply
+func (s *GinServer) applyRoute(appCtx *app.Context, engine *gin.Engine, contextPath string, enableHealth bool) error {
+	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeOf((*mvc.AbstractController)(nil)).Elem())
+
+	if !found {
+		return nil
 	}
+
 	baseRouter := engine.Group(contextPath)
-	ginCtxType := reflectutil.PtrOf[gin.Context]()
 
 	if enableHealth {
 		baseRouter.Any("/health", func(c *gin.Context) {
@@ -220,74 +180,11 @@ func (s *GinServer) applyRoute(engine *gin.Engine, contextPath string, enableHea
 		})
 	}
 
-	for _, route := range s.routes {
-		var ctrlValue reflect.Value
-		var ctrlRouter *gin.RouterGroup
-
-		if route.BasePath != "" {
-			ctrlRouter = baseRouter.Group(route.BasePath)
-		} else {
-			ctrlRouter = baseRouter
-		}
-
-		for _, method := range route.Methods {
-			var handler gin.HandlerFunc
-			var err error
-
-			switch v := method.NameOrFunc.(type) {
-			case string:
-				// If the method name is a string, we assume it's the name of a method in the controller.
-				if v == "" {
-					gplog.Warn(fmt.Sprintf("Method name is empty for route %s, path=%s, skipping registration", route.Name, method.Path))
-					continue
-				}
-				if !ctrlValue.IsValid() {
-					ctrlInstance, exist := ctx.GetBean(strutil.FirstToLower(route.Name))
-					if !exist {
-						gplog.Warn(fmt.Sprintf("Controller %s not found in IOC container, skipping route registration", route.Name))
-						continue
-					}
-					ctrlValue = reflect.ValueOf(ctrlInstance)
-				}
-
-				handler, err = convertMethodToHandler(ctrlValue, v, route.Name, ginCtxType)
-				if err != nil {
-					gplog.Warn(fmt.Sprintf("Failed to convert method %s.%s: %v", route.Name, v, err))
-					continue
-				}
-
-			case gin.HandlerFunc:
-				handler = v
-			default:
-				gplog.Warn(fmt.Sprintf("Invalid NameOrFunc type for route %s, path=%s, skipping registration", route.Name, method.Path))
-				continue
-			}
-
-			ctrlRouter.Handle(method.HttpMethod, method.Path, handler)
-		}
+	for _, ctrl := range ctrls {
+		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
 	}
 
-	s.routes = nil
-	gplog.Info("All routes applied successfully...")
+	gplog.Info("All routes have been loaded successfully.")
 
 	return nil
-}
-
-// convertMethodToHandler converts a method of a controller to a gin.HandlerFunc.
-func convertMethodToHandler(ctrlValue reflect.Value, methodName, ctrlName string, ginCtxType reflect.Type) (gin.HandlerFunc, error) {
-	methodValue := ctrlValue.MethodByName(methodName)
-	if !methodValue.IsValid() {
-		return nil, fmt.Errorf("method %s not found in controller %s", methodName, ctrlName)
-	}
-
-	if methodValue.Type().NumIn() != 1 || methodValue.Type().In(0) != ginCtxType {
-		return nil, fmt.Errorf("method %s.%s must accept exactly one *gin.Context parameter", ctrlName, methodName)
-	}
-
-	handlerFunc, ok := methodValue.Interface().(func(*gin.Context))
-	if !ok {
-		return nil, fmt.Errorf("method %s.%s cannot be converted to gin.HandlerFunc", ctrlName, methodName)
-	}
-
-	return handlerFunc, nil
 }

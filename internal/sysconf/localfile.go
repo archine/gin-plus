@@ -34,7 +34,7 @@ func NewLocalFileConfigure() config.Configure {
 	}
 
 	lc := &LocalFileConfigure{v: v}
-	fmt.Printf("Configuration loaded successfully from: %s\n", configFile)
+	fmt.Printf("======> Configuration loaded successfully from: %s\n", configFile)
 
 	return lc
 }
@@ -101,7 +101,7 @@ func (l *LocalFileConfigure) Unmarshal(key string, obj any) error {
 		return l.v.Unmarshal(obj)
 	}
 	if !l.v.IsSet(key) {
-		return fmt.Errorf("config key '%s' not found", key)
+		return nil
 	}
 	return l.v.UnmarshalKey(key, obj)
 }

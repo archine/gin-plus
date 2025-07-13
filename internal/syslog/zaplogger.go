@@ -92,7 +92,7 @@ func NewZapLogger(configure config.Configure) gplog.Logger {
 		ctxKeys: cf.CtxKeys,
 	}
 
-	zl.Info("syslog initialized, the level is " + cf.Level)
+	zl.Info(fmt.Sprintf("Default logger initialized with level: [%s]", cf.Level))
 	return zl
 }
 

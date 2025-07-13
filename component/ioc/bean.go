@@ -1,7 +1,21 @@
 package ioc
 
-// Bean marks a struct as a Bean in the dependency injection container.
-// Any struct implementing this interface will be recognized and managed as a Bean.
+// AbstractBean defines the basic contract for beans managed by the dependency injection container.
+// Any struct implementing this interface can be recognized and managed as a bean.
+type AbstractBean interface {
+	// BeanName returns the unique name of the bean.
+	// If the returned name is empty, the container will use the struct name with the first letter in lowercase as the default.
+	// This name is used for bean identification and dependency injection.
+	BeanName() string
+
+	// IsPrototype indicates whether the bean should be treated as a prototype.
+	// If true, the container will create a new instance each time the bean is requested.
+	// If false, the same singleton instance will be returned for every request.
+	IsPrototype() bool
+}
+
+// Bean is a base struct that can be embedded into other structs to mark them as beans.
+// Embedding Bean provides default implementations for AbstractBean methods.
 //
 // Usage:
 //
@@ -9,30 +23,31 @@ package ioc
 //	    ioc.Bean
 //	    // your fields...
 //	}
-type Bean interface {
-	// BeanName returns the name of the bean.
-	// If the name is empty, it defaults to the struct name with the first letter in lowercase.
-	BeanName() string
+type Bean struct{}
 
-	// IsPrototype indicates whether the bean is a prototype.
-	IsPrototype() bool
+func (b *Bean) BeanName() string {
+	return ""
 }
 
-// BeanPostConstruct defines the lifecycle callback interface for Bean initialization.
-// Beans implementing this interface will have their BeanPostConstruct method
-// called automatically after instantiation and dependency injection.
+func (b *Bean) IsPrototype() bool {
+	return false
+}
+
+// BeanPostConstruct defines a lifecycle callback interface for bean initialization.
+// Any bean that implements this interface will have its BeanPostConstruct method
+// automatically invoked by the container after instantiation and dependency injection.
 //
 // Usage:
 //
-//		type UserService struct {
-//		    // your fields...
-//		}
+//	type UserService struct {
+//	    // your fields...
+//	}
 //
-//	 func (s *UserService) BeanPostConstruct(beanName string) {
-//	     // initialization logic here
-//	 }
+//	func (s *UserService) BeanPostConstruct() {
+//	    // initialization logic here
+//	}
 type BeanPostConstruct interface {
 	// BeanPostConstruct is invoked after the bean is instantiated
 	// and all its dependencies have been injected.
-	BeanPostConstruct(beanName string)
+	BeanPostConstruct()
 }

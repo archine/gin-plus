@@ -34,7 +34,7 @@ type Resp interface {
 	WithContext(ctx *gin.Context) Resp
 
 	// To sends the response to the client. The optional httpCode parameter allows specifying an HTTP status code.
-	To(httpCode ...int)
+	To(httpCode int)
 }
 
 // PaginationResult represents a paginated response.
@@ -68,16 +68,12 @@ func (r *Result) WithContext(ctx *gin.Context) Resp {
 }
 
 // To sends the Result as a JSON response to the client and releases the object back to the pool.
-func (r *Result) To(httpCode ...int) {
+func (r *Result) To(httpCode int) {
 	if r.ctx == nil {
 		panic("Response gpctx is nil")
 	}
 
-	if len(httpCode) > 0 {
-		r.ctx.JSON(httpCode[0], r)
-	} else {
-		r.ctx.JSON(http.StatusOK, r)
-	}
+	r.ctx.JSON(httpCode, r)
 
 	r.ctx.Abort()
 	r.ctx = nil
@@ -99,7 +95,7 @@ func BadRequest(ctx *gin.Context, format string, args ...any) {
 	if message == "" {
 		message = http.StatusText(http.StatusBadRequest)
 	}
-	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, message, nil).To()
+	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, message, nil).To(http.StatusOK)
 }
 
 // ParamValidation performs parameter validation.
@@ -109,7 +105,7 @@ func ParamValidation(ctx *gin.Context, obj any) bool {
 	if err == nil {
 		return true
 	}
-	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, "Invalid parameters", nil).To()
+	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, "Invalid parameters", nil).To(http.StatusOK)
 	return false
 }
 
@@ -119,7 +115,7 @@ func Forbidden(ctx *gin.Context, format string, args ...any) {
 	if message == "" {
 		message = http.StatusText(http.StatusForbidden)
 	}
-	InitResp(ctx).WithBasic(exception.DefaultForbiddenCode, message, nil).To(http.StatusForbidden)
+	InitResp(ctx).WithBasic(exception.DefaultForbiddenCode, message, nil).To(http.StatusOK)
 }
 
 // NoLogin handles situations where the user is not logged in.
@@ -142,17 +138,17 @@ func LoginExpired(ctx *gin.Context, format string, args ...any) {
 
 // Ok sends a standard success response with no data.
 func Ok(ctx *gin.Context) {
-	InitResp(ctx).WithBasic(0, "ok", nil).To()
+	InitResp(ctx).WithBasic(0, "ok", nil).To(http.StatusOK)
 }
 
 // Json sends a standard success response with data.
 func Json(ctx *gin.Context, data any) {
-	InitResp(ctx).WithBasic(0, "ok", data).To()
+	InitResp(ctx).WithBasic(0, "ok", data).To(http.StatusOK)
 }
 
 // Code responds with a custom business code and message.
 func Code(ctx *gin.Context, code int, format string, args ...any) {
-	InitResp(ctx).WithBasic(code, fmt.Sprintf(format, args...), nil).To()
+	InitResp(ctx).WithBasic(code, fmt.Sprintf(format, args...), nil).To(http.StatusOK)
 }
 
 // Error responds with an error
@@ -176,10 +172,10 @@ func Error(ctx *gin.Context, err error) {
 
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {
-		InitResp(ctx).WithBasic(businessErr.Code(), businessErr.Error(), nil).To()
+		InitResp(ctx).WithBasic(businessErr.Code(), businessErr.Error(), nil).To(http.StatusOK)
 		return
 	}
 
 	gplog.ErrorWithCtx(ctx, fmt.Sprintf("Internal Server Error: %v", err))
-	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To()
+	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
 }

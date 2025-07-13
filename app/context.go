@@ -7,8 +7,8 @@ import (
 )
 
 type Context struct {
-	container *container.Container
 	cf        config.Configure
+	container *container.Container
 }
 
 // NewContext creates a new application context with an IoC container and configuration provider.
@@ -43,24 +43,35 @@ func (c *Context) GetBean(name string) (any, bool) {
 }
 
 // GetBeanByType retrieves a bean from the IoC container by its type.
-func (c *Context) GetBeanByType(typ reflect.Type) (any, error) {
+func (c *Context) GetBeanByType(typ reflect.Type) (any, bool) {
 	if c.container == nil {
 		panic("container is nil, please ensure the IoC container is initialized")
 	}
 	return c.container.GetBeanByType(typ)
 }
 
-// RegisterBean manually registers a bean instance to the IOC container.
-// This method allows registration of pre-created objects that don't need to go through
-// the automatic bean creation process.
-//
-// Args:
-//   - name: bean name for registration. If empty, defaults to the struct name with first letter lowercase
-//   - objPtr: pointer to the struct instance to register (must not be nil)
-//   - implementedTypes: optional interface types that the object implements for type-based lookup
-func (c *Context) RegisterBean(name string, objPtr any, implementedTypes ...reflect.Type) error {
+// GetAllBeansByType retrieves all beans from the IoC container that match a specific type.
+func (c *Context) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 	if c.container == nil {
 		panic("container is nil, please ensure the IoC container is initialized")
 	}
-	return c.container.RegisterBean(name, objPtr, implementedTypes...)
+	return c.container.GetAllBeansByType(typ)
+}
+
+// RegisterBean registers an already instantiated bean instance into the IOC container.
+//
+// Parameters:
+//   - name: the bean name for registration.
+//   - instance: a pointer to the struct instance that has already been instantiated.
+//   - itypes: optional interface types that the object implements, used for type-based lookup.
+//
+// Note:
+//   - According to the IOC container design, all beans registered by this method are singletons.
+//   - If a bean with the specified name already exists, an error will be returned.
+//   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
+func (c *Context) RegisterBean(name string, instance any, itypes ...reflect.Type) error {
+	if c.container == nil {
+		panic("container is nil, please ensure the IoC container is initialized")
+	}
+	return c.container.RegisterBean(name, instance, itypes...)
 }

@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"time"
 )
 
@@ -107,7 +105,6 @@ type TLSConfig struct {
 
 func (c *Config) Validate() {
 	if c.Port <= 0 || c.Port > 65535 {
-		gplog.Warn(fmt.Sprintf("Invalid server port (%d), using default port 4006", c.Port))
 		c.Port = 4006
 	}
 	if c.Host == "" {
@@ -119,7 +116,6 @@ func (c *Config) Validate() {
 	if c.Mode == "" {
 		c.Mode = "debug"
 	} else if c.Mode != "debug" && c.Mode != "release" && c.Mode != "test" {
-		gplog.Warn(fmt.Sprintf("Invalid server mode (%s), using default mode 'debug'", c.Mode))
 		c.Mode = "debug"
 	}
 	if c.MaxMultipartMemory <= 0 {

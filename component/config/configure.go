@@ -27,7 +27,7 @@ type Configure interface {
 	Sub(s string) (Configure, error)
 
 	// Unmarshal the configuration into the provided object
-	Unmarshal(s string, obj interface{}) error
+	Unmarshal(s string, obj any) error
 
 	// GetStringSlice retrieves a string slice for the given key
 	GetStringSlice(s string) []string
