@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/mvc"
+	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"net/http"
 	"reflect"
 	"time"
@@ -18,9 +19,6 @@ import (
 
 // GinServer represents a Gin-based HTTP server with additional features
 type GinServer struct {
-	// address is the address the server will listen on, formatted as "host:port"
-	address string
-
 	// conf holds the configuration for the Gin server
 	conf *Config
 
@@ -32,6 +30,22 @@ type GinServer struct {
 	middlewares []gin.HandlerFunc
 }
 
+// NewGinServer creates a new instance of GinServer with the provided configuration.
+// It initializes the server with the specified address and configuration.
+func NewGinServer() *GinServer {
+	return &GinServer{}
+}
+
+// Init initializes the Gin server
+func (s *GinServer) Init() {
+	var conf Config
+	if err := sysconf.ProjectConfigure.Unmarshal("gin-plus.server", &conf); err != nil {
+		gplog.Fatal(fmt.Sprintf("failed to load gin-plus server configuration: %v", err))
+	}
+	conf.Validate()
+	s.conf = &conf
+}
+
 // RegisterMiddleware registers a middleware to the Gin server
 func (s *GinServer) RegisterMiddleware(middleware ...gin.HandlerFunc) {
 	s.middlewares = append(s.middlewares, middleware...)
@@ -39,25 +53,22 @@ func (s *GinServer) RegisterMiddleware(middleware ...gin.HandlerFunc) {
 
 // GetAddress returns the address the Gin server will listen on
 func (s *GinServer) GetAddress() string {
-	return s.address
+	return fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port)
+}
+
+// GetName returns the name of the Gin server
+func (s *GinServer) GetName() string {
+	return s.conf.Name
 }
 
 // Run starts the Gin server with the provided configuration.
 func (s *GinServer) Run(appCtx *app.Context) error {
-	var conf Config
-	if err := appCtx.GetConfigure().Unmarshal("gin-plus.server", &conf); err != nil {
-		return fmt.Errorf("failed to unmarshal gin-plus config: %w", err)
-	}
-	conf.Validate()
-
-	s.address = fmt.Sprintf("%s:%d", conf.Host, conf.Port)
-
-	gin.SetMode(conf.Mode)
+	gin.SetMode(s.conf.Mode)
 	engine := gin.New()
 	engine.RemoveExtraSlash = true
-	engine.MaxMultipartMemory = conf.MaxMultipartMemory
+	engine.MaxMultipartMemory = s.conf.MaxMultipartMemory
 
-	if conf.AllowedCors {
+	if s.conf.AllowedCors {
 		engine.Use(middleware.Cors())
 	}
 	if len(s.middlewares) > 0 {
@@ -65,32 +76,32 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 		s.middlewares = nil
 	}
 
-	err := s.applyRoute(appCtx, engine, conf.ContextPath, conf.EnableHealthCheck)
+	err := s.applyRoute(appCtx, engine, s.conf.ContextPath, s.conf.EnableHealthCheck)
 	if err != nil {
 		return fmt.Errorf("failed to apply routes: %w", err)
 	}
 
 	serve := http.Server{
-		Addr:                         s.address,
+		Addr:                         fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port),
 		Handler:                      engine,
 		DisableGeneralOptionsHandler: true,
-		ReadTimeout:                  conf.ReadTimeout,
-		WriteTimeout:                 conf.WriteTimeout,
-		ReadHeaderTimeout:            conf.ReadHeaderTimeout,
-		IdleTimeout:                  conf.IdleTimeout,
+		ReadTimeout:                  s.conf.ReadTimeout,
+		WriteTimeout:                 s.conf.WriteTimeout,
+		ReadHeaderTimeout:            s.conf.ReadHeaderTimeout,
+		IdleTimeout:                  s.conf.IdleTimeout,
 	}
 
 	errChan := make(chan error, 1)
 
-	if conf.TLS != nil && conf.TLS.Enabled {
-		if conf.TLS.CertFile == "" || conf.TLS.KeyFile == "" {
+	if s.conf.TLS != nil && s.conf.TLS.Enabled {
+		if s.conf.TLS.CertFile == "" || s.conf.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS is enabled but cert file or key file is not provided")
 		}
 		serve.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12, // Ensure a minimum TLS version
 		}
 		go func() {
-			errChan <- serve.ListenAndServeTLS(conf.TLS.CertFile, conf.TLS.KeyFile)
+			errChan <- serve.ListenAndServeTLS(s.conf.TLS.CertFile, s.conf.TLS.KeyFile)
 		}()
 	} else {
 		go func() {
@@ -105,7 +116,6 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 		}
 	case <-time.After(10 * time.Millisecond):
 		// wait some time for the server to start
-		s.conf = &conf
 		s.server = &serve
 	}
 
@@ -184,7 +194,7 @@ func (s *GinServer) applyRoute(appCtx *app.Context, engine *gin.Engine, contextP
 		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
 	}
 
-	gplog.Info("All routes have been loaded successfully.")
+	gplog.Info("API route registration completed: all routes are mapped and active")
 
 	return nil
 }

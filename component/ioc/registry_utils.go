@@ -2,7 +2,7 @@ package ioc
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/internal/container/definition"
+	"github.com/archine/gin-plus/v4/internal/container/registry"
 	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
 )
@@ -38,7 +38,7 @@ func RegisterBeanDefinition(instance any) error {
 
 	originTyp := typ.Elem()
 
-	if definition.LookupType(originTyp) {
+	if registry.LookupType(originTyp) {
 		return fmt.Errorf("type '%s' has already been registered", typ.Name())
 	}
 
@@ -47,7 +47,7 @@ func RegisterBeanDefinition(instance any) error {
 		beanName = strutil.FirstToLower(originTyp.Name())
 	}
 
-	definition.RegisterBeanDefinition(&definition.BeanDefinition{
+	registry.RegisterBeanDefinition(&registry.BeanDefinition{
 		PtrType:     typ,
 		Name:        beanName,
 		Bean:        instance,

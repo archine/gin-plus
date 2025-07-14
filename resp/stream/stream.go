@@ -35,15 +35,15 @@ type Writer struct {
 	ctx *gin.Context
 }
 
-// NewWriter creates a new SSE writer for the given gpctx.
+// NewWriter creates a new SSE writer.
 func NewWriter(ctx *gin.Context) *Writer {
 	if ctx == nil {
-		panic("gpctx cannot be nil")
+		panic("ctx cannot be nil")
 	}
 	w := _pool.Get()
 	w.ctx = ctx
 	w.ctx.Writer.Header().Set("Content-Type", "text/event-stream")
-	w.ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	w.ctx.Writer.Header().Set("Cache-Control", "no-vars")
 	w.ctx.Writer.Header().Set("Connection", "keep-alive")
 	w.ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 

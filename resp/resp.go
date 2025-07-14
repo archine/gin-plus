@@ -30,7 +30,7 @@ type Resp interface {
 	// WithBasic sets the basic properties of the response.
 	WithBasic(businessCode int, msg string, data any) Resp
 
-	// WithContext sets the gpctx, which is mandatory to avoid null pointer exceptions.
+	// WithContext sets the ctx, which is mandatory to avoid null pointer exceptions.
 	WithContext(ctx *gin.Context) Resp
 
 	// To sends the response to the client. The optional httpCode parameter allows specifying an HTTP status code.
@@ -74,8 +74,8 @@ func (r *Result) To(httpCode int) {
 	}
 
 	r.ctx.JSON(httpCode, r)
-
 	r.ctx.Abort()
+
 	r.ctx = nil
 	r.Code = 0
 	r.Message = ""

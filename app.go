@@ -5,16 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
+	confImpl "github.com/archine/gin-plus/v4/component/config/impl"
+	logImpl "github.com/archine/gin-plus/v4/component/gplog/impl"
 	"github.com/archine/gin-plus/v4/internal/container"
+	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/internal/server"
-	"github.com/archine/gin-plus/v4/internal/sysconf"
-	"github.com/archine/gin-plus/v4/internal/syslog"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -34,7 +36,6 @@ type App struct {
 	eventManager *eventManager
 	server       *server.GinServer
 	appContext   *app.Context
-	container    *container.Container
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -45,10 +46,9 @@ func New(opts ...Option) *App {
 	a := &App{
 		state:        StateInit,
 		eventManager: &eventManager{},
-		server:       &server.GinServer{},
-		container:    container.NewContainer(),
+		appContext:   app.NewContext(),
+		server:       server.NewGinServer(),
 	}
-	a.appContext = app.NewContext(a.container)
 
 	for _, opt := range opts {
 		opt(a)
@@ -62,8 +62,8 @@ func New(opts ...Option) *App {
 // a default logger, and some global middlewares.
 func Default() *App {
 	return New(
-		WithConfigure(sysconf.NewLocalFileConfigure),
-		WithLogger(syslog.NewZapLogger),
+		WithConfigure(confImpl.NewLocalFileConfigure),
+		WithLogger(logImpl.NewZapLogger),
 		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
 	)
 }
@@ -83,28 +83,33 @@ func (a *App) With(opts ...Option) *App {
 // Only call this method directly if you need to initialize the container without starting the server (e.g., for testing or tooling purposes).
 func (a *App) RefreshContainer() {
 	if a.state&StateContainerRefreshed != 0 {
-		gplog.Warn("Application container is already prepared.")
+		gplog.Warn("Application container is already prepared")
 		return
 	}
 
+	syscontainer.Container = container.NewContainer()
+
 	a.eventManager.TriggerContainerRefreshBefore(a.appContext)
-	a.container.Refresh()
+	syscontainer.Container.Refresh()
 	a.eventManager.TriggerContainerRefreshAfter(a.appContext)
 
 	a.state |= StateContainerRefreshed
-	gplog.Info("Application container prepared with refresh completed.")
+	gplog.Info("Application container has been refreshed and is ready for use")
 }
 
 // Run starts the application.
 func (a *App) Run() {
 	if a.state&StateRunning != 0 {
-		gplog.Warn("Application is already running.")
+		gplog.Warn("Application is already running")
 		return
 	}
 
 	if a.state&StateContainerRefreshed == 0 {
 		a.RefreshContainer()
 	}
+
+	a.server.Init()
+	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
 
 	continueRun := a.eventManager.TriggerOnStarting()
 	if !continueRun {
@@ -113,27 +118,28 @@ func (a *App) Run() {
 
 	printBanner()
 
+	startTime := time.Now()
 	err := a.server.Run(a.appContext)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		gplog.Error(fmt.Sprintf("Application failed to start: %v", err))
+		gplog.Error(fmt.Sprintf("Starting %s failed: %v", a.server.GetName(), err))
 		return
 	}
 
 	a.state |= StateRunning
 	a.eventManager.TriggerOnStarted()
-	gplog.Info(fmt.Sprintf("Application started successfully on [%s]", a.server.GetAddress()))
+	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
 
 	stopSignalCh := make(chan os.Signal, 1)
 	signal.Notify(stopSignalCh, syscall.SIGTERM, syscall.SIGINT)
 	<-stopSignalCh
-	gplog.Info("Application received shutdown signal, starting graceful shutdown...")
+	gplog.Info("Received shutdown signal, starting graceful shutdown...")
 
 	if err = a.server.Shutdown(func(ctx context.Context) {
 		a.eventManager.TriggerOnStopped(ctx)
 	}); err != nil {
-		gplog.Warn(fmt.Sprintf("Application failed to gracefully shutdown: %v", err))
+		gplog.Warn(fmt.Sprintf("Graceful shutdown failed: %v", err))
 		return
 	}
 
-	gplog.Info("Application gracefully shutdown completed.")
+	gplog.Info("Application shutdown completed successfully")
 }

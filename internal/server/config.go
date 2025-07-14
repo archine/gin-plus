@@ -104,6 +104,9 @@ type TLSConfig struct {
 }
 
 func (c *Config) Validate() {
+	if c.Name == "" {
+		c.Name = "GinPlus Application"
+	}
 	if c.Port <= 0 || c.Port > 65535 {
 		c.Port = 4006
 	}

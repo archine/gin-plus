@@ -1,12 +1,13 @@
-package syslog
+package impl
 
 import (
 	"context"
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"os"
+	"strings"
 
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -92,7 +93,7 @@ func NewZapLogger(configure config.Configure) gplog.Logger {
 		ctxKeys: cf.CtxKeys,
 	}
 
-	zl.Info(fmt.Sprintf("Default logger initialized with level: [%s]", cf.Level))
+	zl.Info(fmt.Sprintf("Logging system initialization completed: default level set to [%s]", strings.ToUpper(cf.Level)))
 	return zl
 }
 

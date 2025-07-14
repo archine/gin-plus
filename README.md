@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v4.x-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.21-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v4.x-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.23-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 # Gin-Plus
 
@@ -7,20 +7,24 @@
 ## 特性
 
 - 🚀 **简化路由配置** - 更直观的路由定义方式
-- 🧩 **依赖注入支持** - 内置依赖注入容器，便于解耦与测试
+- 🧩 **依赖注入** - 支持依赖注入，简化服务管理
+- 🔒 **配置注入** - 支持配置文件注入，简化配置管理
 - 📊 **响应封装** - 统一的 API 响应格式
 
 ## 一、前言
+
 详细文档点击前往：[文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
 
 ### 1、安装
 
 * Get
+
 ```bash
 go get github.com/archine/gin-plus/v4@v4.0.0
 ```
 
 * Mod
+
 ```bash
 # go.mod文件加入下面的一条
 github.com/archine/gin-plus/v4 v4.0.0
@@ -29,29 +33,49 @@ github.com/archine/gin-plus/v4 v4.0.0
 ## 二、快速开始
 
 ### 1、基础使用
+* API 接口
+```go
+package controller
 
+import (
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/component/mvc"
+	"github.com/archine/gin-plus/v4/resp"
+	"github.com/gin-gonic/gin"
+)
+
+func init() {
+	_ = ioc.RegisterBeanDefinition(&UserController{})
+}
+
+type UserController struct {
+	mvc.Controller
+}
+
+func (u *UserController) SetRoutes(group *gin.RouterGroup) {
+	group.GET("/user/list", u.GetUserList)
+}
+
+// GetUserList retrieves a list of users.
+func (u *UserController) GetUserList(ctx *gin.Context) {
+	resp.Json(ctx, []string{"user1", "user2", "user3"})
+}
+```
+* 启动服务
 ```go
 package main
 
 import (
-    "github.com/archine/gin-plus/v4"
-    "github.com/gin-gonic/gin"
+	_ "gin-plus-demo-v4/controller" // 引入控制器包，确保控制器被注册到 IOC 容器中
+	ginplus "github.com/archine/gin-plus/v4"
 )
 
 func main() {
-    // 创建 gin-plus 应用
-    app := ginplus.New()
-    
-    // 基础路由
-    app.GET("/hello", func(c *gin.Context) {
-        ginplus.Success(c, "Hello, Gin-Plus!")
-    })
-    
-    // 启动服务
-    app.Run(":8080")
+	ginplus.Default().Run()
 }
 ```
-## 六、贡献指南
+
+## 贡献指南
 
 欢迎提交 Issue 和 Pull Request 来改进这个项目。
 

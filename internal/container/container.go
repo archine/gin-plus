@@ -3,10 +3,14 @@ package container
 import (
 	"errors"
 	"fmt"
+	"github.com/archine/gin-plus/v4/component/ioc"
+	"github.com/archine/gin-plus/v4/internal/container/injection"
+	"reflect"
+	"sync"
+
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/mvc"
-	"github.com/archine/gin-plus/v4/internal/container/definition"
-	"reflect"
+	"github.com/archine/gin-plus/v4/internal/container/registry"
 )
 
 // BeanDef represents a bean definition in the IOC container.
@@ -24,11 +28,13 @@ type BeanDef struct {
 	isPrototype bool
 
 	// AutowireFields contains fields that need to be autowired.
-	autowireFields []*definition.AutowireField
+	autowireFields []*registry.AutowireField
 }
 
 // Container responsible for managing the lifecycle of all beans
 type Container struct {
+	once sync.Once
+
 	// beans stores all registered beans by their names.
 	beans map[string]*BeanDef
 
@@ -153,7 +159,104 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	c.typeMapping[structType] = append(c.typeMapping[structType], name)
 
 	if _, ok := instance.(mvc.AbstractController); ok {
+		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
 		c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
 	}
 	return nil
+}
+
+// Refresh refreshes the container by processing all bean definitions.
+// It creates beans in the order defined by their dependencies and clears the vars after creation.
+// This method should be called only once, typically during application startup.
+// It ensures that all beans are created and dependencies are injected correctly.
+// If any bean creation fails, it logs a fatal error and stops the application.
+func (c *Container) Refresh() {
+	c.once.Do(func() {
+		err := processDefinitions(c)
+		if err != nil {
+			gplog.Fatal("Failed to process bean definitions: " + err.Error())
+		}
+
+		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
+
+		for beanName, bean := range c.beans {
+			if bean.ready {
+				continue
+			}
+
+			if err := inject(c, reflect.ValueOf(bean.value).Elem(), bean.autowireFields); err != nil {
+				gplog.Fatal(fmt.Sprintf("Failed to inject dependencies for bean '%s': %s", beanName, err.Error()))
+			}
+		}
+
+		refresh(c, ctrlType)
+		injection.CleanInjectCache()
+	})
+}
+
+// createPrototypeBean creates a prototype bean instance
+func createPrototypeBean(c *Container, def *BeanDef) any {
+	beanValue := reflect.New(def.originTyp)
+
+	err := inject(c, beanValue.Elem(), def.autowireFields)
+	if err != nil {
+		gplog.Fatal(fmt.Sprintf("Failed to create prototype bean '%s': %s", def.originTyp.Name(), err.Error()))
+	}
+
+	beanValueIf := beanValue.Interface()
+
+	if postConstruct, ok := beanValueIf.(ioc.BeanPostConstruct); ok {
+		postConstruct.BeanPostConstruct()
+	}
+
+	return beanValueIf
+}
+
+// injectDependency injects a single dependency into a bean field
+func inject(c *Container, structValue reflect.Value, autoFields []*registry.AutowireField) error {
+	for _, autoField := range autoFields {
+
+		if autoField.ValueTag != "" {
+			injection.InjectConfig(structValue.Field(autoField.Index), autoField.Field.Type, autoField.ValueTag)
+			continue
+		}
+
+		var bean any
+		var exist bool
+
+		if autoField.AutowireTag == "-" {
+			bean, exist = c.GetBeanByType(autoField.Field.Type)
+		} else {
+			bean, exist = c.GetBean(autoField.AutowireTag)
+		}
+
+		if !exist {
+			return fmt.Errorf("not found bean for field '%s' in '%s'", autoField.Name, structValue.Type().String())
+		}
+
+		err := injection.InjectBean(bean, structValue.Field(autoField.Index), autoField)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func refresh(c *Container, ctrlType reflect.Type) {
+	for beanName, bean := range c.beans {
+		if bean.ready {
+			continue
+		}
+
+		if postConstruct, ok := bean.value.(ioc.BeanPostConstruct); ok {
+			postConstruct.BeanPostConstruct()
+		}
+
+		if _, ok := bean.value.(mvc.AbstractController); ok {
+			c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], beanName)
+		}
+
+		bean.ready = true
+	}
 }

@@ -3,6 +3,7 @@ package gin_plus
 import (
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,7 +20,7 @@ func WithConfigure(confFunc func() config.Configure) Option {
 		if cf == nil {
 			panic("configuration provider is nil, please use WithConfigure() to set a configuration provider")
 		}
-		app.appContext.SetConfigure(cf)
+		sysconf.ProjectConfigure = cf
 		app.eventManager.TriggerConfigAfterLoad(cf)
 	}
 }
