@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v4.x-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.23-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v4-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.23-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 # Gin-Plus
 
@@ -20,14 +20,14 @@
 * Get
 
 ```bash
-go get github.com/archine/gin-plus/v4@v4.0.0
+go get github.com/archine/gin-plus/v4@v4.0.1
 ```
 
 * Mod
 
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v4 v4.0.0
+github.com/archine/gin-plus/v4 v4.0.1
 ```
 
 ## 二、快速开始

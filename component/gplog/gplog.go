@@ -2,127 +2,98 @@ package gplog
 
 import (
 	"context"
+	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
+	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 )
 
-var (
-	// globalLog is the global logger instance used throughout the application.
-	globalLog Logger
-)
+// Field is an alias for Field. Aliasing this type dramatically
+// improves the navigability of this package's API documentation.
+type Field = gplogcore.Field
 
-// Set initializes the global logger with the provided Logger instance.
-// This function should be called during application initialization to set the logger.
-// It panics if the logger is nil, ensuring that the application does not run without a logger.
-// This is typically done in the main application entry point or during the configuration phase.
-//
-// Args:
-//   - l: The Logger instance to set as the global logger.
-//
-// Usage:
-//
-//	app.WithLogger(func(ctx *app.Context) gplog.Logger {
-//	    return myCustomLogger
-//	})
-func Set(l Logger) {
-	globalLog = l
-}
-
-// Field represents a key-value pair for structured logging.
-type Field struct {
-	Key   string
-	Value any
-}
-
-// Logger defines the logging interface for the application.
-type Logger interface {
-	Info(text string, fields ...Field)
-	Debug(text string, fields ...Field)
-	Warn(text string, fields ...Field)
-	Error(text string, fields ...Field)
-	Fatal(text string, fields ...Field)
-
-	InfoWithCtx(ctx context.Context, text string, fields ...Field)
-	DebugWithCtx(ctx context.Context, text string, fields ...Field)
-	WarnWithCtx(ctx context.Context, text string, fields ...Field)
-	ErrorWithCtx(ctx context.Context, text string, fields ...Field)
-	FatalWithCtx(ctx context.Context, text string, fields ...Field)
+// GetLogger returns the global logger instance.
+func GetLogger() gplogcore.Logger {
+	if syslog.GlobalLog == nil {
+		panic("globalLog is not initialized")
+	}
+	return syslog.GlobalLog
 }
 
 // Info logs an info level message.
 func Info(text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.Info(text, fields...)
+	syslog.GlobalLog.Info(text, fields...)
 }
 
 // Debug logs a debug level message.
 func Debug(text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.Debug(text, fields...)
+	syslog.GlobalLog.Debug(text, fields...)
 }
 
 // Warn logs a warning level message.
 func Warn(text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.Warn(text, fields...)
+	syslog.GlobalLog.Warn(text, fields...)
 }
 
 // Error logs an error level message.
 func Error(text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.Error(text, fields...)
+	syslog.GlobalLog.Error(text, fields...)
 }
 
 // Fatal logs a fatal level message and exits the application.
 func Fatal(text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.Fatal(text, fields...)
+	syslog.GlobalLog.Fatal(text, fields...)
 }
 
-// InfoWithCtx logs an info level message with gpctx fields.
+// InfoWithCtx logs an info level message with fields.
 func InfoWithCtx(ctx context.Context, text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.InfoWithCtx(ctx, text, fields...)
+	syslog.GlobalLog.InfoWithCtx(ctx, text, fields...)
 }
 
-// DebugWithCtx logs a debug level message with gpctx fields.
+// DebugWithCtx logs a debug level message with  fields.
 func DebugWithCtx(ctx context.Context, text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.DebugWithCtx(ctx, text, fields...)
+	syslog.GlobalLog.DebugWithCtx(ctx, text, fields...)
 }
 
-// WarnWithCtx logs a warning level message with gpctx fields.
+// WarnWithCtx logs a warning level message with fields.
 func WarnWithCtx(ctx context.Context, text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.WarnWithCtx(ctx, text, fields...)
+	syslog.GlobalLog.WarnWithCtx(ctx, text, fields...)
 }
 
-// ErrorWithCtx logs an error level message with gpctx fields.
+// ErrorWithCtx logs an error level message with fields.
 func ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.ErrorWithCtx(ctx, text, fields...)
+	syslog.GlobalLog.ErrorWithCtx(ctx, text, fields...)
 }
 
-// FatalWithCtx logs a fatal level message with gpctx fields and exits the application.
+// FatalWithCtx logs a fatal level message with fields and exits the application.
 func FatalWithCtx(ctx context.Context, text string, fields ...Field) {
-	if globalLog == nil {
+	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}
-	globalLog.FatalWithCtx(ctx, text, fields...)
+	syslog.GlobalLog.FatalWithCtx(ctx, text, fields...)
 }

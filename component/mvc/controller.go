@@ -8,7 +8,7 @@ import (
 // Any struct implementing this interface can be recognized and managed as a controller.
 type AbstractController interface {
 	// SetRoutes is used to register the controller's routes with a given Gin router group.
-	// the group is a global project router group, is specfic to context-path
+	// the group is a global project router group, is specific to context-path
 	SetRoutes(group *gin.RouterGroup)
 }
 

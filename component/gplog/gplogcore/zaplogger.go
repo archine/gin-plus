@@ -1,13 +1,12 @@
-package impl
+package gplogcore
 
 import (
 	"context"
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"os"
 	"strings"
 
-	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/gpconf"
 	"github.com/archine/gin-plus/v4/exception"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -31,7 +30,7 @@ type conf struct {
 	ConsoleSeparator string `yaml:"console-separator"`
 
 	// CtxKeys When using WithContext for syslog output.
-	// the value of the specified key is obtained from the gpctx and added to the syslog.
+	// the value of the specified key is obtained from the context and added to the syslog.
 	CtxKeys []string `yaml:"ctx-keys"`
 }
 
@@ -41,10 +40,10 @@ type zaplog struct {
 	ctxKeys []string
 }
 
-func NewZapLogger(configure config.Configure) gplog.Logger {
+func NewZapLogger(configure gpconf.Configure) Logger {
 	var cf conf
 	if err := configure.Unmarshal("gin-plus.log", &cf); err != nil {
-		panic(exception.NewStackErr("Init syslog config failed: " + err.Error()))
+		panic(exception.NewStackErr("Init syslog gpconf failed: " + err.Error()))
 	}
 	if cf.Level == "" {
 		cf.Level = "info"
@@ -97,47 +96,47 @@ func NewZapLogger(configure config.Configure) gplog.Logger {
 	return zl
 }
 
-func (d *zaplog) Info(text string, fields ...gplog.Field) {
+func (d *zaplog) Info(text string, fields ...Field) {
 	d.core.Info(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) Debug(text string, fields ...gplog.Field) {
+func (d *zaplog) Debug(text string, fields ...Field) {
 	d.core.Debug(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) Warn(text string, fields ...gplog.Field) {
+func (d *zaplog) Warn(text string, fields ...Field) {
 	d.core.Warn(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) Error(text string, fields ...gplog.Field) {
+func (d *zaplog) Error(text string, fields ...Field) {
 	d.core.Error(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) Fatal(text string, fields ...gplog.Field) {
+func (d *zaplog) Fatal(text string, fields ...Field) {
 	d.core.Fatal(text, d.buildFields(nil, fields)...)
 }
 
-func (d *zaplog) InfoWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+func (d *zaplog) InfoWithCtx(ctx context.Context, text string, fields ...Field) {
 	d.core.Info(text, d.buildFields(ctx, fields)...)
 }
 
-func (d *zaplog) DebugWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+func (d *zaplog) DebugWithCtx(ctx context.Context, text string, fields ...Field) {
 	d.core.Debug(text, d.buildFields(ctx, fields)...)
 }
 
-func (d *zaplog) WarnWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+func (d *zaplog) WarnWithCtx(ctx context.Context, text string, fields ...Field) {
 	d.core.Warn(text, d.buildFields(ctx, fields)...)
 }
 
-func (d *zaplog) ErrorWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+func (d *zaplog) ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
 	d.core.Error(text, d.buildFields(ctx, fields)...)
 }
 
-func (d *zaplog) FatalWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
+func (d *zaplog) FatalWithCtx(ctx context.Context, text string, fields ...Field) {
 	d.core.Fatal(text, d.buildFields(ctx, fields)...)
 }
 
-func (d *zaplog) buildFields(ctx context.Context, gpFields []gplog.Field) []zap.Field {
+func (d *zaplog) buildFields(ctx context.Context, gpFields []Field) []zap.Field {
 	totalCapacity := len(gpFields) + len(d.ctxKeys)
 	if totalCapacity == 0 {
 		return nil

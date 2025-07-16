@@ -1,9 +1,8 @@
-package impl
+package gpconf
 
 import (
 	"flag"
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/config"
 	"os"
 	"time"
 
@@ -19,7 +18,7 @@ type LocalFileConfigure struct {
 	v *viper.Viper
 }
 
-func NewLocalFileConfigure() config.Configure {
+func NewLocalFileConfigure() Configure {
 	configFile := os.Getenv("GIN_PLUS_CONFIG_FILE") // Check environment variable first
 	if configFile == "" {
 		flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
@@ -112,7 +111,7 @@ func (l *LocalFileConfigure) GetFloat64(key string) float64 {
 	return l.v.GetFloat64(key)
 }
 
-func (l *LocalFileConfigure) Sub(key string) config.Configure {
+func (l *LocalFileConfigure) Sub(key string) Configure {
 	sub := l.v.Sub(key)
 	if sub == nil {
 		return nil

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/gpconf"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
 	"reflect"
@@ -15,7 +15,7 @@ func NewContext() *Context {
 }
 
 // GetConfigure returns the current configuration of the application context.
-func (c *Context) GetConfigure() config.Configure {
+func (c *Context) GetConfigure() gpconf.Configure {
 	return sysconf.ProjectConfigure
 }
 

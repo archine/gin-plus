@@ -5,21 +5,18 @@ import (
 	"strings"
 )
 
-// Wrap formats an error message by wrapping the provided error with additional gpctx.
-// It supports including multiple additional errors in the format string.
+// Wrap wraps the original error, optionally attaches a custom message, and supports chaining multiple additional errors.
+// Args:
+//   - err: The original error to wrap.
+//   - msg: Optional custom message to attach.
+//   - more: Optional additional errors to chain.
 //
-// Parameters:
-// - err: The primary error to be wrapped.
-// - msg: A message to add gpctx to the primary error. If empty, no additional message is included.
-// - more: Additional errors to be appended to the format string for more gpctx.
-//
-// Returns: a formatted error that includes the primary error, optional message, and any additional errors.
-//
-// Example usage:
+// Returns: A formatted error containing the original error, custom message, and all additional errors.
+// Example:
 //
 //	err := errors.New("original error")
-//	wrappedErr := Wrap(err, "additional gpctx", anotherErr)
-//	fmt.Println(wrappedErr) // Output: original error: additional gpctx: anotherErr
+//	wrappedErr := Wrap(err, "extra info", anotherErr)
+//	fmt.Println(wrappedErr) // Output: original error: extra info: anotherErr
 func Wrap(err error, msg string, more ...error) error {
 	if err == nil {
 		return nil
@@ -27,7 +24,6 @@ func Wrap(err error, msg string, more ...error) error {
 	var builder strings.Builder
 	args := make([]any, 0, 2+len(more))
 
-	// Append the first error and message (if any)
 	if msg != "" {
 		builder.WriteString("%s")
 		args = append(args, msg)
@@ -35,7 +31,6 @@ func Wrap(err error, msg string, more ...error) error {
 	builder.WriteString(": %w")
 	args = append(args, err)
 
-	// Append any additional errors
 	for _, e := range more {
 		builder.WriteString(": %w")
 		args = append(args, e)
@@ -48,21 +43,18 @@ func Wrap(err error, msg string, more ...error) error {
 	return fmt.Errorf(builder.String(), args...)
 }
 
-// WrapF formats an error message by wrapping the provided error with additional gpctx.
-// It supports including multiple additional errors in the format string.
+// WrapF wraps the original error with a formatted message and supports chaining multiple additional errors.
+// Args:
+//   - err: The original error to wrap.
+//   - format: Format string for the custom message.
+//   - args: Arguments for formatting the message.
 //
-// Parameters:
-// - err: The primary error to be wrapped.
-// - format: A format specifier for the message to add gpctx to the primary error.
-// - args: Arguments to be formatted into the message.
-//
-// Returns: a formatted error that includes the primary error, formatted message, and any additional errors.
-//
-// Example usage:
+// Returns: A formatted error containing the original error and the formatted message.
+// Example:
 //
 //	err := errors.New("original error")
-//	wrappedErr := WrapF(err, "additional gpctx: %v", anotherErr)
-//	fmt.Println(wrappedErr) // Output: original error: additional gpctx: anotherErr
+//	wrappedErr := WrapF(err, "extra info: %v", anotherErr)
+//	fmt.Println(wrappedErr) // Output: original error: extra info: anotherErr
 func WrapF(err error, format string, args ...any) error {
 	return Wrap(err, fmt.Sprintf(format, args...))
 }

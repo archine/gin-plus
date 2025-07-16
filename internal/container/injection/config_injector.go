@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// ValueTag is used to mark fields for automatic injection of config values.
-	// Note: Unlike the autowire tag, it is only for injecting config values
+	// ValueTag is used to mark fields for automatic injection of gpconf values.
+	// Note: Unlike the autowire tag, it is only for injecting gpconf values
 	ValueTag = "value"
 )
 

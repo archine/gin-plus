@@ -61,7 +61,7 @@ func (r *Result) WithBasic(code int, msg string, data any) Resp {
 	return r
 }
 
-// WithContext sets the Gin gpctx for the Result.
+// WithContext sets the Gin context for the Result.
 func (r *Result) WithContext(ctx *gin.Context) Resp {
 	r.ctx = ctx
 	return r
@@ -70,7 +70,7 @@ func (r *Result) WithContext(ctx *gin.Context) Resp {
 // To sends the Result as a JSON response to the client and releases the object back to the pool.
 func (r *Result) To(httpCode int) {
 	if r.ctx == nil {
-		panic("Response gpctx is nil")
+		panic("Response context is nil, please use WithContext() to set the context before calling To()")
 	}
 
 	r.ctx.JSON(httpCode, r)

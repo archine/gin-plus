@@ -3,7 +3,7 @@ package gin_plus
 import (
 	"context"
 	"github.com/archine/gin-plus/v4/app"
-	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/gpconf"
 	"sort"
 )
 
@@ -49,7 +49,7 @@ type LifecycleEvent interface {
 	//   - Stopping background workers or schedulers
 	//   - Releasing resources
 	// Args:
-	//   - ctx: The gpctx for the shutdown process, which can be used to perform graceful shutdown operations.
+	//   - ctx: The context for the shutdown process, which can be used to perform graceful shutdown operations.
 	OnStopped(ctx context.Context)
 }
 
@@ -58,7 +58,7 @@ type LifecycleEvent interface {
 type ConfigAfterLoadEvent interface {
 	Event
 	// OnConfigAfterLoad is called after all configuration files have been successfully loaded.
-	OnConfigAfterLoad(cf config.Configure)
+	OnConfigAfterLoad(cf gpconf.Configure)
 }
 
 // ContainerRefreshBeforeEvent handles events triggered before container refresh.
@@ -149,7 +149,7 @@ func (m *eventManager) TriggerOnStopped(ctx context.Context) {
 }
 
 // TriggerConfigAfterLoad triggers the ConfigAfterLoad event
-func (m *eventManager) TriggerConfigAfterLoad(configure config.Configure) {
+func (m *eventManager) TriggerConfigAfterLoad(configure gpconf.Configure) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if configEvent, ok := e.(ConfigAfterLoadEvent); ok {

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
-	confImpl "github.com/archine/gin-plus/v4/component/config/impl"
-	logImpl "github.com/archine/gin-plus/v4/component/gplog/impl"
+	"github.com/archine/gin-plus/v4/component/gpconf"
+	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
 	"github.com/archine/gin-plus/v4/internal/container"
 	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
 	"net/http"
@@ -62,8 +62,8 @@ func New(opts ...Option) *App {
 // a default logger, and some global middlewares.
 func Default() *App {
 	return New(
-		WithConfigure(confImpl.NewLocalFileConfigure),
-		WithLogger(logImpl.NewZapLogger),
+		WithConfigure(gpconf.NewLocalFileConfigure),
+		WithLogger(gplogcore.NewZapLogger),
 		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
 	)
 }

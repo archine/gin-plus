@@ -1,9 +1,10 @@
 package gin_plus
 
 import (
-	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/gpconf"
+	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
+	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +15,7 @@ type Option func(app *App)
 
 // WithConfigure sets the configuration provider for the application.
 // If not provided, the app will use a default local file configuration.
-func WithConfigure(confFunc func() config.Configure) Option {
+func WithConfigure(confFunc func() gpconf.Configure) Option {
 	return func(app *App) {
 		cf := confFunc()
 		if cf == nil {
@@ -54,12 +55,12 @@ func WithBanner(banner string) Option {
 //
 // Note: This option should be used after WithConfigure() to ensure configuration is available.
 // The logger will be set as the global logger for the entire application.
-func WithLogger(loggerFunc func(conf config.Configure) gplog.Logger) Option {
+func WithLogger(loggerFunc func(conf gpconf.Configure) gplogcore.Logger) Option {
 	return func(app *App) {
 		logger := loggerFunc(app.appContext.GetConfigure())
 		if logger == nil {
 			panic("logger is nil, please ensure the logger function returns a valid logger instance")
 		}
-		gplog.Set(logger)
+		syslog.GlobalLog = logger
 	}
 }
