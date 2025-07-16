@@ -43,7 +43,7 @@ type zaplog struct {
 func NewZapLogger(configure gpconf.Configure) Logger {
 	var cf conf
 	if err := configure.Unmarshal("gin-plus.log", &cf); err != nil {
-		panic(exception.NewStackErr("Init syslog gpconf failed: " + err.Error()))
+		panic(exception.NewStackErr("Logging system initialization failed: " + err.Error()))
 	}
 	if cf.Level == "" {
 		cf.Level = "info"
@@ -57,7 +57,7 @@ func NewZapLogger(configure gpconf.Configure) Logger {
 
 	zapLevel, err := zapcore.ParseLevel(cf.Level)
 	if err != nil {
-		panic(fmt.Sprintf("Invalid syslog level: %s, error: %v", cf.Level, err))
+		panic(fmt.Sprintf("Logging system initialization failed, invalid syslog level: %s, error: %v", cf.Level, err))
 	}
 
 	ec := zapcore.EncoderConfig{

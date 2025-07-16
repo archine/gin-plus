@@ -30,11 +30,11 @@ func NewLocalFileConfigure() Configure {
 	v.SetConfigFile(configFile)
 
 	if err := v.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("failed to read configuration file: %v, please check the file path: %s", err, configFile))
+		panic(fmt.Sprintf("%s   Failed to read configuration file: %v, please check the file path: %s", time.Now().Format("2006-01-02 15:04:05"), err, configFile))
 	}
 
 	lc := &LocalFileConfigure{v: v}
-	fmt.Printf("%s INFO	Successfully loaded configuration from file: [%s]\n", time.Now().Format("2006-01-02 15:04:05"), configFile)
+	fmt.Printf("%s   Successfully loaded configuration from file: [%s]\n", time.Now().Format("2006-01-02 15:04:05"), configFile)
 
 	return lc
 }

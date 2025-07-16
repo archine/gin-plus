@@ -9,6 +9,7 @@ import (
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
@@ -40,7 +41,7 @@ func NewGinServer() *GinServer {
 func (s *GinServer) Init() {
 	var conf Config
 	if err := sysconf.ProjectConfigure.Unmarshal("gin-plus.server", &conf); err != nil {
-		gplog.Fatal(fmt.Sprintf("failed to load gin-plus server configuration: %v", err))
+		gplog.Fatal(fmt.Sprintf("Starting Gin-Engine failure with PID %d", os.Getpid()))
 	}
 	conf.Validate()
 	s.conf = &conf
@@ -62,7 +63,7 @@ func (s *GinServer) GetName() string {
 }
 
 // Run starts the Gin server with the provided configuration.
-func (s *GinServer) Run(appCtx *app.Context) error {
+func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 	gin.SetMode(s.conf.Mode)
 	engine := gin.New()
 	engine.RemoveExtraSlash = true
@@ -76,10 +77,7 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 		s.middlewares = nil
 	}
 
-	err := s.applyRoute(appCtx, engine, s.conf.ContextPath, s.conf.EnableHealthCheck)
-	if err != nil {
-		return fmt.Errorf("failed to apply routes: %w", err)
-	}
+	s.applyRoute(appCtx, engine, s.conf.ContextPath, s.conf.EnableHealthCheck)
 
 	serve := http.Server{
 		Addr:                         fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port),
@@ -112,7 +110,7 @@ func (s *GinServer) Run(appCtx *app.Context) error {
 	select {
 	case err := <-errChan:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("failed to start server: %w", err)
+			return err
 		}
 	case <-time.After(10 * time.Millisecond):
 		// wait some time for the server to start
@@ -140,7 +138,7 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 
 	err := s.server.Shutdown(shutdownCtx)
 	if err != nil {
-		return fmt.Errorf("failed to shutdown server: %w", err)
+		return err
 	}
 
 	if closeFunc != nil {
@@ -175,11 +173,11 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 //   - enableHealth: A boolean flag to enable or disable health check endpoints.
 //
 // Note: this function is system-internal and should not be used directly in application code.
-func (s *GinServer) applyRoute(appCtx *app.Context, engine *gin.Engine, contextPath string, enableHealth bool) error {
+func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine, contextPath string, enableHealth bool) {
 	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeOf((*mvc.AbstractController)(nil)).Elem())
 
 	if !found {
-		return nil
+		return
 	}
 
 	baseRouter := engine.Group(contextPath)
@@ -195,6 +193,4 @@ func (s *GinServer) applyRoute(appCtx *app.Context, engine *gin.Engine, contextP
 	}
 
 	gplog.Info("API route registration completed: all routes are mapped and active")
-
-	return nil
 }

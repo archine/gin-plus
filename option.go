@@ -22,7 +22,7 @@ func WithConfigure(confFunc func() gpconf.Configure) Option {
 			panic("configuration provider is nil, please use WithConfigure() to set a configuration provider")
 		}
 		sysconf.ProjectConfigure = cf
-		app.eventManager.TriggerConfigAfterLoad(cf)
+		app.eventManager.triggerConfigAfterLoad(cf)
 	}
 }
 
@@ -38,7 +38,7 @@ func WithMiddleware(middlewares ...gin.HandlerFunc) Option {
 // Events are managed by the event manager and triggered during app lifecycle.
 func WithEvent(events ...Event) Option {
 	return func(app *App) {
-		app.eventManager.Register(events...)
+		app.eventManager.register(events...)
 	}
 }
 

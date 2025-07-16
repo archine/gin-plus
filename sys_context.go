@@ -1,0 +1,31 @@
+package gin_plus
+
+import (
+	"github.com/archine/gin-plus/v4/app"
+	"reflect"
+
+	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
+)
+
+// sysContext the system context implementation
+type sysContext struct{}
+
+func newSysContext() app.ApplicationContext {
+	return &sysContext{}
+}
+
+func (s *sysContext) GetBean(name string) (any, bool) {
+	return syscontainer.Container.GetBean(name)
+}
+
+func (s *sysContext) GetBeanByType(typ reflect.Type) (any, bool) {
+	return syscontainer.Container.GetBeanByType(typ)
+}
+
+func (s *sysContext) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
+	return syscontainer.Container.GetAllBeansByType(typ)
+}
+
+func (s *sysContext) RegisterBean(name string, instance any, itypes ...reflect.Type) error {
+	return syscontainer.Container.RegisterBean(name, instance, itypes...)
+}

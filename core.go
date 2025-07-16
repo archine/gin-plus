@@ -35,7 +35,7 @@ type App struct {
 	state        int
 	eventManager *eventManager
 	server       *server.GinServer
-	appContext   *app.Context
+	appContext   app.ApplicationContext
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -45,8 +45,8 @@ type App struct {
 func New(opts ...Option) *App {
 	a := &App{
 		state:        StateInit,
-		eventManager: &eventManager{},
-		appContext:   app.NewContext(),
+		eventManager: newEventManager(),
+		appContext:   newSysContext(),
 		server:       server.NewGinServer(),
 	}
 
@@ -89,9 +89,9 @@ func (a *App) RefreshContainer() {
 
 	syscontainer.Container = container.NewContainer()
 
-	a.eventManager.TriggerContainerRefreshBefore(a.appContext)
+	a.eventManager.triggerContainerRefreshBefore(a.appContext)
 	syscontainer.Container.Refresh()
-	a.eventManager.TriggerContainerRefreshAfter(a.appContext)
+	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 
 	a.state |= StateContainerRefreshed
 	gplog.Info("Application container has been refreshed and is ready for use")
@@ -111,7 +111,7 @@ func (a *App) Run() {
 	a.server.Init()
 	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
 
-	continueRun := a.eventManager.TriggerOnStarting()
+	continueRun := a.eventManager.triggerOnStarting()
 	if !continueRun {
 		return
 	}
@@ -126,7 +126,7 @@ func (a *App) Run() {
 	}
 
 	a.state |= StateRunning
-	a.eventManager.TriggerOnStarted()
+	a.eventManager.triggerOnStarted()
 	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
 
 	stopSignalCh := make(chan os.Signal, 1)
@@ -135,7 +135,7 @@ func (a *App) Run() {
 	gplog.Info("Received shutdown signal, starting graceful shutdown...")
 
 	if err = a.server.Shutdown(func(ctx context.Context) {
-		a.eventManager.TriggerOnStopped(ctx)
+		a.eventManager.triggerOnStopped(ctx)
 	}); err != nil {
 		gplog.Warn(fmt.Sprintf("Graceful shutdown failed: %v", err))
 		return
