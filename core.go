@@ -7,11 +7,13 @@ import (
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/gpconf"
 	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
-	"github.com/archine/gin-plus/v4/internal/container"
+	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
+	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -21,21 +23,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// runMode defines the application's running mode.
+type runMode int
+
 const (
-	// StateInit indicates that the application is in the initial state.
-	StateInit = 1
-	// StateContainerRefreshed indicates that the application container has been refreshed.
-	StateContainerRefreshed = 2
-	// StateRunning indicates that the application is currently running.
-	// This state is set when the application has started successfully and is ready to handle requests.
-	StateRunning = 4
+	// ConfigMode - In this mode, the application initializes with configuration loading and logger setup, but does not start the HTTP server.
+	ConfigMode runMode = iota
+
+	// ContainerMode - Extends ConfigMode by creating and injecting dependencies into the container, while still keeping the HTTP server inactive.
+	ContainerMode
+
+	// ServerMode - Fully operational mode where the application starts the HTTP server after completing all initializations.
+	ServerMode
 )
 
 type App struct {
-	state        int
-	eventManager *eventManager
-	server       *server.GinServer
-	appContext   app.ApplicationContext
+	state         atomic.Bool
+	eventManager  *eventManager
+	server        *server.GinServer
+	appContext    app.ApplicationContext
+	configureFunc func() gpconf.Configure
+	loggerFunc    func(conf gpconf.Configure) gplogcore.Logger
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -44,7 +52,6 @@ type App struct {
 //   - opts: A variadic list of options to configure the App instance.
 func New(opts ...Option) *App {
 	a := &App{
-		state:        StateInit,
 		eventManager: newEventManager(),
 		appContext:   newSysContext(),
 		server:       server.NewGinServer(),
@@ -62,8 +69,6 @@ func New(opts ...Option) *App {
 // a default logger, and some global middlewares.
 func Default() *App {
 	return New(
-		WithConfigure(gpconf.NewLocalFileConfigure),
-		WithLogger(gplogcore.NewZapLogger),
 		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
 	)
 }
@@ -77,35 +82,30 @@ func (a *App) With(opts ...Option) *App {
 	return a
 }
 
-// RefreshContainer refreshes the bean container.
-// This method ensures that all beans are created and injected properly.
-// In most cases, you do not need to call this method explicitly, as it is automatically invoked when the application starts.
-// Only call this method directly if you need to initialize the container without starting the server (e.g., for testing or tooling purposes).
-func (a *App) RefreshContainer() {
-	if a.state&StateContainerRefreshed != 0 {
-		gplog.Warn("Application container is already prepared")
-		return
-	}
-
-	syscontainer.Container = container.NewContainer()
-
-	a.eventManager.triggerContainerRefreshBefore(a.appContext)
-	syscontainer.Container.Refresh()
-	a.eventManager.triggerContainerRefreshAfter(a.appContext)
-
-	a.state |= StateContainerRefreshed
-	gplog.Info("Application container has been refreshed and is ready for use")
-}
-
 // Run starts the application.
-func (a *App) Run() {
-	if a.state&StateRunning != 0 {
+// Args:
+//   - mode: The run mode of the application, either ConfigMode, ContainerMode, or ServerMode.
+func (a *App) Run(mode runMode) {
+	if a.state.Load() {
 		gplog.Warn("Application is already running")
 		return
 	}
 
-	if a.state&StateContainerRefreshed == 0 {
-		a.RefreshContainer()
+	sysconf.InitConfigure(a.configureFunc)
+	a.eventManager.triggerConfigAfterLoad(sysconf.ProjectConfigure)
+
+	syslog.InitializeLogger(a.loggerFunc)
+
+	if mode == ConfigMode {
+		gplog.Info("Started in ConfigMode, configuration loaded and logger initialized")
+		return
+	}
+
+	a.refreshContainer()
+
+	if mode == ContainerMode {
+		gplog.Info("Started in ContainerMode, container initialized with dependencies")
+		return
 	}
 
 	a.server.Init()
@@ -113,6 +113,7 @@ func (a *App) Run() {
 
 	continueRun := a.eventManager.triggerOnStarting()
 	if !continueRun {
+		gplog.Warn("Application startup aborted by event handlers")
 		return
 	}
 
@@ -125,7 +126,7 @@ func (a *App) Run() {
 		return
 	}
 
-	a.state |= StateRunning
+	a.state.Store(true)
 	a.eventManager.triggerOnStarted()
 	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
 
@@ -142,4 +143,18 @@ func (a *App) Run() {
 	}
 
 	gplog.Info("Application shutdown completed successfully")
+}
+
+// RefreshContainer refreshes the bean container.
+// This method ensures that all beans are created and injected properly.
+// In most cases, you do not need to call this method explicitly, as it is automatically invoked when the application starts.
+// Only call this method directly if you need to initialize the container without starting the server (e.g., for testing or tooling purposes).
+func (a *App) refreshContainer() {
+	syscontainer.Initialize()
+
+	a.eventManager.triggerContainerRefreshBefore(a.appContext)
+	syscontainer.Container.Refresh()
+	a.eventManager.triggerContainerRefreshAfter(a.appContext)
+
+	gplog.Info("Application container has been refreshed and is ready for use")
 }

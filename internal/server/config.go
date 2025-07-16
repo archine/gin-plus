@@ -92,7 +92,7 @@ type Config struct {
 type TLSConfig struct {
 	// Enabled enables HTTPS/TLS support.
 	// Default: false
-	Enabled bool `mapstructure:"enabled"`
+	Enable bool `mapstructure:"enable"`
 
 	// CertFile specifies the path to the TLS certificate file.
 	// Required when TLS is enabled.

@@ -91,7 +91,7 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 
 	errChan := make(chan error, 1)
 
-	if s.conf.TLS != nil && s.conf.TLS.Enabled {
+	if s.conf.TLS != nil && s.conf.TLS.Enable {
 		if s.conf.TLS.CertFile == "" || s.conf.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS is enabled but cert file or key file is not provided")
 		}

@@ -3,8 +3,6 @@ package gin_plus
 import (
 	"github.com/archine/gin-plus/v4/component/gpconf"
 	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
-	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
-	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,16 +11,23 @@ import (
 // configuration during App creation via the New() function.
 type Option func(app *App)
 
-// WithConfigure sets the configuration provider for the application.
-// If not provided, the app will use a default local file configuration.
+// WithConfigure sets the application's configuration provider.
+// If not specified, the default local file configuration will be used.
+// Note: Calling this multiple times will overwrite the previous provider.
 func WithConfigure(confFunc func() gpconf.Configure) Option {
 	return func(app *App) {
-		cf := confFunc()
-		if cf == nil {
-			panic("configuration provider is nil, please use WithConfigure() to set a configuration provider")
-		}
-		sysconf.ProjectConfigure = cf
-		app.eventManager.triggerConfigAfterLoad(cf)
+		app.configureFunc = confFunc
+	}
+}
+
+// WithLogger sets a custom logger for the application.
+// The logger function receives the application configuration and should return a configured logger instance.
+// This allows the logger to be configured based on the loaded configuration settings.
+//
+// Note: Calling this multiple times will overwrite the previous provider.
+func WithLogger(loggerFunc func(conf gpconf.Configure) gplogcore.Logger) Option {
+	return func(app *App) {
+		app.loggerFunc = loggerFunc
 	}
 }
 
@@ -46,21 +51,5 @@ func WithEvent(events ...Event) Option {
 func WithBanner(banner string) Option {
 	return func(app *App) {
 		sysBanner = banner
-	}
-}
-
-// WithLogger sets a custom logger for the application.
-// The logger function receives the application configuration and should return a configured logger instance.
-// This allows the logger to be configured based on the loaded configuration settings.
-//
-// Note: This option should be used after WithConfigure() to ensure configuration is available.
-// The logger will be set as the global logger for the entire application.
-func WithLogger(loggerFunc func(conf gpconf.Configure) gplogcore.Logger) Option {
-	return func(app *App) {
-		logger := loggerFunc(sysconf.ProjectConfigure)
-		if logger == nil {
-			panic("logger is nil, please ensure the logger function returns a valid logger instance")
-		}
-		syslog.GlobalLog = logger
 	}
 }

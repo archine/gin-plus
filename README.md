@@ -13,7 +13,7 @@
 
 ## 一、前言
 
-详细文档点击前往：[文档](https://eofhs2ef6g.feishu.cn/docx/AXCvdf5jPogZ12xOXHucmgo5nFb)
+文档点击前往：[文档](https://eofhs2ef6g.feishu.cn/docx/UrDxd2p7coj2cWxuWShcYBF3nve)
 
 ### 1、安装
 
@@ -71,7 +71,7 @@ import (
 )
 
 func main() {
-	ginplus.Default().Run()
+	ginplus.Default().Run(ginplus.ServerMode)
 }
 ```
 

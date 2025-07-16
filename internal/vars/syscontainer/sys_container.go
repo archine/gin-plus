@@ -7,3 +7,7 @@ import (
 var (
 	Container *container.Container // Container is the global IOC container, initialized in main.go
 )
+
+func Initialize() {
+	Container = container.NewContainer()
+}
