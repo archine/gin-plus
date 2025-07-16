@@ -57,7 +57,7 @@ func WithBanner(banner string) Option {
 // The logger will be set as the global logger for the entire application.
 func WithLogger(loggerFunc func(conf gpconf.Configure) gplogcore.Logger) Option {
 	return func(app *App) {
-		logger := loggerFunc(app.appContext.GetConfigure())
+		logger := loggerFunc(sysconf.ProjectConfigure)
 		if logger == nil {
 			panic("logger is nil, please ensure the logger function returns a valid logger instance")
 		}
