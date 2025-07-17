@@ -1,8 +1,8 @@
 package gin_plus
 
 import (
-	"github.com/archine/gin-plus/v4/component/gpconf"
-	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
+	"github.com/archine/gin-plus/v4/component/config"
+	"github.com/archine/gin-plus/v4/component/log/logcore"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,21 +11,21 @@ import (
 // configuration during App creation via the New() function.
 type Option func(app *App)
 
-// WithConfigure sets the application's configuration provider.
-// If not specified, the default local file configuration will be used.
+// WithConfigProvider sets the application's configuration provider.
+// If not specified, the default provider will be used.
 // Note: Calling this multiple times will overwrite the previous provider.
-func WithConfigure(confFunc func() gpconf.Configure) Option {
+func WithConfigProvider(providerFunc func() config.Provider) Option {
 	return func(app *App) {
-		app.configureFunc = confFunc
+		app.confProviderFunc = providerFunc
 	}
 }
 
-// WithLogger sets a custom logger for the application.
-// The logger function receives the application configuration and should return a configured logger instance.
-// This allows the logger to be configured based on the loaded configuration settings.
+// WithLogger sets a custom log for the application.
+// The log function receives the application configuration and should return a configured log instance.
+// This allows the log to be configured based on the loaded configuration settings.
 //
 // Note: Calling this multiple times will overwrite the previous provider.
-func WithLogger(loggerFunc func(conf gpconf.Configure) gplogcore.Logger) Option {
+func WithLogger(loggerFunc func(cp config.Provider) logcore.Logger) Option {
 	return func(app *App) {
 		app.loggerFunc = loggerFunc
 	}

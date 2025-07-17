@@ -1,9 +1,9 @@
-package gpconf
+package config
 
 import "time"
 
-// Configure defines the interface for configuration management operations
-type Configure interface {
+// Provider defines the interface for configuration management operations
+type Provider interface {
 	// Get retrieves a value of any type for the given key
 	Get(key string) any
 
@@ -59,7 +59,7 @@ type Configure interface {
 	GetFloat64(key string) float64
 
 	// Sub returns a sub-configuration for the given key
-	Sub(key string) Configure
+	Sub(key string) Provider
 
 	// Unmarshal the configuration into the provided object
 	Unmarshal(key string, obj any) error

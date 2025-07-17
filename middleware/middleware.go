@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/log"
 	"github.com/archine/gin-plus/v4/exception"
 	"github.com/archine/gin-plus/v4/exception/stacktrace"
 	"github.com/archine/gin-plus/v4/resp"
@@ -35,7 +35,7 @@ func GlobalExceptionInterceptor(ctx *gin.Context) {
 			default:
 				trace := getTrace()
 				resp.Code(ctx, exception.DefaultSystemErrorCode, trace)
-				gplog.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", t, trace))
+				log.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", t, trace))
 			}
 		}
 	}()

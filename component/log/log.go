@@ -1,17 +1,17 @@
-package gplog
+package log
 
 import (
 	"context"
-	"github.com/archine/gin-plus/v4/component/gplog/gplogcore"
+	"github.com/archine/gin-plus/v4/component/log/logcore"
 	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 )
 
 // Field is an alias for Field. Aliasing this type dramatically
 // improves the navigability of this package's API documentation.
-type Field = gplogcore.Field
+type Field = logcore.Field
 
-// GetLogger returns the global logger instance.
-func GetLogger() gplogcore.Logger {
+// GetLogger returns the global log instance.
+func GetLogger() logcore.Logger {
 	if syslog.GlobalLog == nil {
 		panic("globalLog is not initialized")
 	}

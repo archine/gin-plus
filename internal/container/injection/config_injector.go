@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// ValueTag is used to mark fields for automatic injection of gpconf values.
-	// Note: Unlike the autowire tag, it is only for injecting gpconf values
+	// ValueTag is used to mark fields for automatic injection of config values.
+	// Note: Unlike the autowire tag, it is only for injecting config values
 	ValueTag = "value"
 )
 
@@ -40,7 +40,7 @@ func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue str
 	key := submatch[1]
 	defaultValue := submatch[2]
 
-	value := sysconf.ProjectConfigure.Get(key)
+	value := sysconf.GlobalProvider.Get(key)
 	if value == nil {
 		value = defaultValue
 	}

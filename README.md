@@ -20,14 +20,14 @@
 * Get
 
 ```bash
-go get github.com/archine/gin-plus/v4@v4.0.1
+go get github.com/archine/gin-plus/v4@v4.0.5
 ```
 
 * Mod
 
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v4 v4.0.1
+github.com/archine/gin-plus/v4 v4.0.5
 ```
 
 ## 二、快速开始
@@ -45,7 +45,7 @@ import (
 )
 
 func init() {
-	_ = ioc.RegisterBeanDefinition(&UserController{})
+	_ = ioc.PreRegisterBean(&UserController{})
 }
 
 type UserController struct {
@@ -53,11 +53,11 @@ type UserController struct {
 }
 
 func (u *UserController) SetRoutes(group *gin.RouterGroup) {
-	group.GET("/user/list", u.GetUserList)
+	group.GET("/user/list", u.getUserList)
 }
 
 // GetUserList retrieves a list of users.
-func (u *UserController) GetUserList(ctx *gin.Context) {
+func (u *UserController) getUserList(ctx *gin.Context) {
 	resp.Json(ctx, []string{"user1", "user2", "user3"})
 }
 ```

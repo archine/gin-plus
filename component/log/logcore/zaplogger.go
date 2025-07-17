@@ -1,4 +1,4 @@
-package gplogcore
+package logcore
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/archine/gin-plus/v4/component/gpconf"
+	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/exception"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -40,9 +40,9 @@ type zaplog struct {
 	ctxKeys []string
 }
 
-func NewZapLogger(configure gpconf.Configure) Logger {
+func NewZapLogger(cp config.Provider) Logger {
 	var cf conf
-	if err := configure.Unmarshal("gin-plus.log", &cf); err != nil {
+	if err := cp.Unmarshal("gin-plus.log", &cf); err != nil {
 		panic(exception.NewStackErr("Logging system initialization failed: " + err.Error()))
 	}
 	if cf.Level == "" {

@@ -1,4 +1,4 @@
-package gplogcore
+package logcore
 
 import "context"
 

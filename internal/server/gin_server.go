@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/log"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -40,8 +40,8 @@ func NewGinServer() *GinServer {
 // Init initializes the Gin server
 func (s *GinServer) Init() {
 	var conf Config
-	if err := sysconf.ProjectConfigure.Unmarshal("gin-plus.server", &conf); err != nil {
-		gplog.Fatal(fmt.Sprintf("Starting Gin-Engine failure with PID %d", os.Getpid()))
+	if err := sysconf.GlobalProvider.Unmarshal("gin-plus.server", &conf); err != nil {
+		log.Fatal(fmt.Sprintf("Starting Gin-Engine failure with PID %d", os.Getpid()))
 	}
 	conf.Validate()
 	s.conf = &conf
@@ -155,7 +155,7 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 		case <-done:
 			// The close function completed successfully
 		case <-closeCtx.Done():
-			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
+			log.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
 		}
 	}
 
@@ -192,5 +192,5 @@ func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine
 		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
 	}
 
-	gplog.Info("API route registration completed: all routes are mapped and active")
+	log.Info("API route registration completed: all routes are mapped and active")
 }

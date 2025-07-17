@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/log"
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/container/registry"
 )
@@ -85,7 +85,7 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 		return c.GetBean(names[0])
 	}
 
-	gplog.Fatal(fmt.Sprintf("Multiple beans found for type '%s'. Please specify a bean name.", typ.String()))
+	log.Fatal(fmt.Sprintf("Multiple beans found for type '%s'. Please specify a bean name.", typ.String()))
 	return nil, false
 }
 
@@ -119,16 +119,23 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 }
 
 // RegisterBean registers an already instantiated bean instance into the IOC container.
+// This method is used to register fully initialized bean instances that do not require
+// dependency injection or lifecycle management by the container.
 //
 // Parameters:
-//   - name: the bean name for registration.
-//   - instance: a pointer to the struct instance that has already been instantiated.
-//   - itypes: optional interface types that the object implements, used for type-based lookup.
+//   - name: the unique bean name for registration
+//   - instance: a pointer to the struct instance that has already been instantiated
+//   - itypes: optional interface types that the instance implements, used for type-based lookup
 //
-// Note:
-//   - According to the IOC container design, all beans registered by this method are singletons.
+// Notes:
+//   - All beans registered by this method are treated as singletons.
 //   - If a bean with the specified name already exists, an error will be returned.
 //   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
+//   - Unlike PreRegisterBean, this method accepts any struct pointer and does not require embedding Bean or mvc.Controller.
+//   - The registered bean instances are immediately available for use and will not go through the container's lifecycle management.
+//
+// Returns:
+//   - error: nil on success, or an error if registration fails
 func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Type) error {
 	if name == "" || instance == nil {
 		return errors.New("bean name and instance must not be empty or nil")
@@ -174,7 +181,7 @@ func (c *Container) Refresh() {
 	c.once.Do(func() {
 		err := processDefinitions(c)
 		if err != nil {
-			gplog.Fatal("Failed to process bean definitions: " + err.Error())
+			log.Fatal("Failed to process bean definitions: " + err.Error())
 		}
 
 		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
@@ -185,7 +192,7 @@ func (c *Container) Refresh() {
 			}
 
 			if err := inject(c, reflect.ValueOf(bean.value).Elem(), bean.autowireFields); err != nil {
-				gplog.Fatal(fmt.Sprintf("Failed to inject dependencies for bean '%s': %s", beanName, err.Error()))
+				log.Fatal(fmt.Sprintf("Failed to inject dependencies for bean '%s': %s", beanName, err.Error()))
 			}
 		}
 
@@ -200,7 +207,7 @@ func createPrototypeBean(c *Container, def *BeanDef) any {
 
 	err := inject(c, beanValue.Elem(), def.autowireFields)
 	if err != nil {
-		gplog.Fatal(fmt.Sprintf("Failed to create prototype bean '%s': %s", def.originTyp.Name(), err.Error()))
+		log.Fatal(fmt.Sprintf("Failed to create prototype bean '%s': %s", def.originTyp.Name(), err.Error()))
 	}
 
 	beanValueIf := beanValue.Interface()

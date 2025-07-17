@@ -7,21 +7,26 @@ import (
 	"reflect"
 )
 
-// RegisterBeanDefinition registers a bean definition in the IoC container.
-// This function is used to register struct pointers that implement the AbstractBean interface for management by the IoC container.
+// PreRegisterBean pre-registers a bean definition in the IoC container for later instantiation.
+// This function is designed for struct pointers that embed either Bean or mvc.Controller,
+// allowing them to be managed by the IoC container.
 //
 // Args:
-//   - instance: a struct pointer that implements the AbstractBean interface.
+//   - instance: a struct pointer that embeds Bean or mvc.Controller
 //
-// Notes:
-//   - In most cases, you only need to manually register root bean instances (such as controller beans).
-//     When the container creates a root bean, it will automatically resolve and instantiate all required dependent beans,
-//     as long as these dependencies implement the AbstractBean interface.
-//   - You may also choose to manually register all beans to avoid the performance overhead of reflection-based instantiation,
-//     but this increases code complexity and is generally unnecessary.
-//   - If a root bean contains fields of interface type that require dependency injection,
-//     please ensure all implementations of these interfaces are registered in advance using this method before
-func RegisterBeanDefinition(instance any) error {
+// Usage Notes:
+//   - This method only registers the bean definition; actual bean instances are created during container refresh.
+//   - Typically, only root beans (such as controllers) need manual pre-registration.
+//     The container will automatically resolve and instantiate all dependent beans during root bean creation,
+//     provided those dependencies also embed Bean or mvc.Controller.
+//   - While you can pre-register all beans to avoid reflection overhead during instantiation,
+//     this approach increases code complexity and is generally unnecessary.
+//   - For root beans with interface-type dependencies, ensure all interface implementations
+//     are pre-registered beforehand, otherwise dependency injection will fail.
+//
+// Returns:
+//   - error: nil on success, or an error if registration fails
+func PreRegisterBean(instance any) error {
 	if instance == nil {
 		return nil
 	}

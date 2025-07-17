@@ -3,7 +3,7 @@ package gin_plus
 import (
 	"context"
 	"github.com/archine/gin-plus/v4/app"
-	"github.com/archine/gin-plus/v4/component/gpconf"
+	"github.com/archine/gin-plus/v4/component/config"
 )
 
 // Event is the base interface for all app events.
@@ -57,7 +57,7 @@ type LifecycleEvent interface {
 type ConfigAfterLoadEvent interface {
 	Event
 	// OnConfigAfterLoad is called after all configuration files have been successfully loaded.
-	OnConfigAfterLoad(cf gpconf.Configure)
+	OnConfigAfterLoad(cp config.Provider)
 }
 
 // ContainerRefreshBeforeEvent handles events triggered before container refresh.

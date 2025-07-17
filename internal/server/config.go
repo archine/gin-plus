@@ -25,7 +25,7 @@ type Config struct {
 
 	// Mode specifies the Gin mode: "debug", "release", or "test".
 	// In debug mode, Gin provides more detailed logging and error information.
-	// Default: "debug"
+	// Default: "release"
 	Mode string `mapstructure:"mode"`
 
 	// AllowedCors enables Cross-Origin Resource Sharing (CORS) support.
@@ -117,9 +117,9 @@ func (c *Config) Validate() {
 		c.ContextPath = "/"
 	}
 	if c.Mode == "" {
-		c.Mode = "debug"
+		c.Mode = "release"
 	} else if c.Mode != "debug" && c.Mode != "release" && c.Mode != "test" {
-		c.Mode = "debug"
+		c.Mode = "release"
 	}
 	if c.MaxMultipartMemory <= 0 {
 		c.MaxMultipartMemory = 8388608 // 8MB

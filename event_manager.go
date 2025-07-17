@@ -3,7 +3,7 @@ package gin_plus
 import (
 	"context"
 	"github.com/archine/gin-plus/v4/app"
-	"github.com/archine/gin-plus/v4/component/gpconf"
+	"github.com/archine/gin-plus/v4/component/config"
 	"sort"
 )
 
@@ -69,11 +69,11 @@ func (m *eventManager) triggerOnStopped(ctx context.Context) {
 }
 
 // triggerConfigAfterLoad triggers the ConfigAfterLoad event
-func (m *eventManager) triggerConfigAfterLoad(configure gpconf.Configure) {
+func (m *eventManager) triggerConfigAfterLoad(cp config.Provider) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if configEvent, ok := e.(ConfigAfterLoadEvent); ok {
-			configEvent.OnConfigAfterLoad(configure)
+			configEvent.OnConfigAfterLoad(cp)
 		}
 	}
 }
