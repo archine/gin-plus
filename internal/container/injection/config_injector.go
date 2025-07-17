@@ -46,11 +46,10 @@ func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue str
 	}
 
 	value = convert(fieldType, value)
-
 	setFieldValue(fieldValue, value)
 }
 
-// convert converts a string value to the appropriate type based on the targetType.
+// convert converts value to the appropriate type based on the targetType.
 func convert(targetType reflect.Type, val any) any {
 	if targetType.Kind() == reflect.Ptr {
 		originTyp := targetType.Elem()
@@ -121,35 +120,37 @@ func convertSliceValue(targetType reflect.Type, val any) any {
 		return cast.ToStringSlice(val)
 	case reflect.Int:
 		return cast.ToIntSlice(val)
-	case reflect.Int8, reflect.Int16, reflect.Int32:
-		intSlice := cast.ToIntSlice(val)
-		return convertIntSlice(intSlice, elemType)
+	case reflect.Int8:
+		v, _ := cast.ToInt8SliceE(val)
+		return v
+	case reflect.Int16:
+		v, _ := cast.ToInt16SliceE(val)
+		return v
+	case reflect.Int32:
+		v, _ := cast.ToInt32SliceE(val)
+		return v
+	case reflect.Int64:
+		return cast.ToInt64Slice(val)
+	case reflect.Uint:
+		return cast.ToUintSlice(val)
+	case reflect.Uint8:
+		v, _ := cast.ToUint8SliceE(val)
+		return v
+	case reflect.Uint16:
+		v, _ := cast.ToUint16SliceE(val)
+		return v
+	case reflect.Uint32:
+		v, _ := cast.ToUint32SliceE(val)
+		return v
+	case reflect.Uint64:
+		v, _ := cast.ToUint64SliceE(val)
+		return v
+	case reflect.Float32:
+		v, _ := cast.ToFloat32SliceE(val)
+		return v
+	case reflect.Float64:
+		return cast.ToFloat64Slice(val)
 	default:
 		return nil
-	}
-}
-
-func convertIntSlice(intSlice []int, elemType reflect.Type) any {
-	switch elemType.Kind() {
-	case reflect.Int8:
-		result := make([]int8, len(intSlice))
-		for i, v := range intSlice {
-			result[i] = int8(v)
-		}
-		return result
-	case reflect.Int16:
-		result := make([]int16, len(intSlice))
-		for i, v := range intSlice {
-			result[i] = int16(v)
-		}
-		return result
-	case reflect.Int32:
-		result := make([]int32, len(intSlice))
-		for i, v := range intSlice {
-			result[i] = int32(v)
-		}
-		return result
-	default:
-		return intSlice
 	}
 }

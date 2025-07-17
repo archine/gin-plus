@@ -7,7 +7,12 @@ import (
 
 // setFieldValue sets the value of a field in a struct, handling both settable and unsafe cases.
 func setFieldValue(fieldValue reflect.Value, value any) {
-	reflectValue := reflect.ValueOf(value)
+	var reflectValue reflect.Value
+	if value == nil {
+		reflectValue = reflect.Zero(fieldValue.Type())
+	} else {
+		reflectValue = reflect.ValueOf(value)
+	}
 
 	if fieldValue.CanSet() {
 		if reflectValue.Type().AssignableTo(fieldValue.Type()) {
