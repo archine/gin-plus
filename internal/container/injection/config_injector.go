@@ -45,13 +45,17 @@ func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue str
 		value = defaultValue
 	}
 
-	value = convert(fieldType, value)
-	setFieldValue(fieldValue, value)
+	setFieldValue(fieldValue, convert(fieldType, value))
 }
 
 // convert converts value to the appropriate type based on the targetType.
 func convert(targetType reflect.Type, val any) any {
+	if val == nil {
+		return nil
+	}
+
 	if targetType.Kind() == reflect.Ptr {
+		// if targetType is a pointer, we need to dereference it to get the element type
 		originTyp := targetType.Elem()
 
 		if elemValue := convert(originTyp, val); elemValue != nil {

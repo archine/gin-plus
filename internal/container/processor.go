@@ -77,6 +77,11 @@ func analyzeStruct(c *Container, def *registry.BeanDefinition) error {
 
 		fieldType := field.Type
 
+		if registry.LookupType(fieldType) {
+			// If the field type is already registered, skip it.
+			continue
+		}
+
 		autoField := registry.AutowireField{
 			Index:       i,
 			Name:        field.Name,
@@ -91,7 +96,7 @@ func analyzeStruct(c *Container, def *registry.BeanDefinition) error {
 			if !exist {
 				implBeanNames = findImplBeanNames(fieldType)
 				if len(implBeanNames) == 0 {
-					return fmt.Errorf("no definitions found for field '%s' in '%s'", field.Name, def.OriginType.String())
+					continue
 				}
 			}
 			c.typeMapping[fieldType] = implBeanNames
@@ -100,6 +105,7 @@ func analyzeStruct(c *Container, def *registry.BeanDefinition) error {
 			if fieldType.Kind() != reflect.Ptr {
 				return fmt.Errorf("field '%s' in '%s' must be a pointer type", field.Name, def.OriginType.String())
 			}
+
 			fieldOriginType := fieldType.Elem()
 
 			if fieldOriginType == def.OriginType {
@@ -107,27 +113,26 @@ func analyzeStruct(c *Container, def *registry.BeanDefinition) error {
 					field.Name, fieldType.String(), def.OriginType.String())
 			}
 
-			if !registry.LookupType(fieldOriginType) {
-				if fieldType.Implements(beanType) {
-					fieldInstance := reflect.New(fieldOriginType).Interface()
-					ib, _ := fieldInstance.(ioc.AbstractBean)
+			if fieldType.Implements(beanType) {
+				fieldInstance := reflect.New(fieldOriginType).Interface()
+				ib, _ := fieldInstance.(ioc.AbstractBean)
 
-					newDef := &registry.BeanDefinition{
-						Bean:        fieldInstance,
-						Name:        ib.BeanName(),
-						PtrType:     fieldType,
-						OriginType:  fieldOriginType,
-						IsPrototype: ib.IsPrototype(),
-					}
-					if newDef.Name == "" {
-						newDef.Name = strutil.FirstToLower(fieldOriginType.Name())
-					}
-
-					registry.RegisterBeanDefinition(newDef)
-				} else {
-					return fmt.Errorf("field '%s' in '%s' is not a bean and cannot be auto-registered",
-						field.Name, def.OriginType.String())
+				newDef := &registry.BeanDefinition{
+					Bean:        fieldInstance,
+					Name:        ib.BeanName(),
+					PtrType:     fieldType,
+					OriginType:  fieldOriginType,
+					IsPrototype: ib.IsPrototype(),
 				}
+				if newDef.Name == "" {
+					newDef.Name = strutil.FirstToLower(fieldOriginType.Name())
+				}
+
+				registry.RegisterBeanDefinition(newDef)
+
+			} else {
+				return fmt.Errorf("field '%s' in struct '%s' is not declared as a Bean and cannot be automatically registered as a BeanDefinition",
+					field.Name, def.OriginType.String())
 			}
 		}
 

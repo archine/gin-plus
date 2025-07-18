@@ -6,10 +6,10 @@
 
 ## 特性
 
-- 🚀 **简化路由配置** - 更直观的路由定义方式
-- 🧩 **依赖注入** - 支持依赖注入，简化服务管理
-- 🔒 **配置注入** - 支持配置文件注入，简化配置管理
-- 📊 **响应封装** - 统一的 API 响应格式
+- 🚀 路由配置 - 规范路由定义方式
+- 🧩 依赖注入 - 简化对象管理
+- 🔒 配置注入 - 简化配置读取
+- 📊 响应封装 - 规范 API 响应方式
 
 ## 一、前言
 
@@ -20,14 +20,14 @@
 * Get
 
 ```bash
-go get github.com/archine/gin-plus/v4@v4.0.5
+go get github.com/archine/gin-plus/v4@v4.0.6
 ```
 
 * Mod
 
 ```bash
 # go.mod文件加入下面的一条
-github.com/archine/gin-plus/v4 v4.0.5
+github.com/archine/gin-plus/v4 v4.0.6
 ```
 
 ## 二、快速开始
@@ -45,7 +45,7 @@ import (
 )
 
 func init() {
-	_ = ioc.PreRegisterBean(&UserController{})
+	_ = ioc.RegisterBeanDef(&UserController{})
 }
 
 type UserController struct {

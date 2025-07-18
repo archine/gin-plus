@@ -94,8 +94,11 @@ func (r *BeanRegistry) Reset() {
 	r.idx = 0
 }
 
-func LookupType(originType reflect.Type) bool {
-	return defaultRegistry.IsTypeRegistered(originType)
+func LookupType(typ reflect.Type) bool {
+	if typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	return defaultRegistry.IsTypeRegistered(typ)
 }
 
 func RegisterBeanDefinition(def *BeanDefinition) {
