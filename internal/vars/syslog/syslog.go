@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	GlobalLog logcore.Logger // GlobalLog is the global log instance used throughout the application.
+	Log logcore.Logger // Log instance used throughout the application.
 )

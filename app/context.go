@@ -1,11 +1,15 @@
 package app
 
 import (
+	"github.com/archine/gin-plus/v4/component/config"
 	"reflect"
 )
 
 // ApplicationContext the interface defines methods for managing the application context,
 type ApplicationContext interface {
+	// GetConfigProvider gets the configuration provider for the application context.
+	GetConfigProvider() config.Provider
+
 	// GetBean retrieves a bean from the IoC container by its name.
 	// It returns the bean instance and a boolean indicating if the bean was found.
 	GetBean(name string) (any, bool)

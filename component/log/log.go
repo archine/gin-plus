@@ -12,88 +12,88 @@ type Field = logcore.Field
 
 // GetLogger returns the global log instance.
 func GetLogger() logcore.Logger {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	return syslog.GlobalLog
+	return syslog.Log
 }
 
 // Info logs an info level message.
 func Info(text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.Info(text, fields...)
+	syslog.Log.Info(text, fields...)
 }
 
 // Debug logs a debug level message.
 func Debug(text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.Debug(text, fields...)
+	syslog.Log.Debug(text, fields...)
 }
 
 // Warn logs a warning level message.
 func Warn(text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.Warn(text, fields...)
+	syslog.Log.Warn(text, fields...)
 }
 
 // Error logs an error level message.
 func Error(text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.Error(text, fields...)
+	syslog.Log.Error(text, fields...)
 }
 
 // Fatal logs a fatal level message and exits the application.
 func Fatal(text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.Fatal(text, fields...)
+	syslog.Log.Fatal(text, fields...)
 }
 
 // InfoWithCtx logs an info level message with fields.
 func InfoWithCtx(ctx context.Context, text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.InfoWithCtx(ctx, text, fields...)
+	syslog.Log.InfoWithCtx(ctx, text, fields...)
 }
 
 // DebugWithCtx logs a debug level message with  fields.
 func DebugWithCtx(ctx context.Context, text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.DebugWithCtx(ctx, text, fields...)
+	syslog.Log.DebugWithCtx(ctx, text, fields...)
 }
 
 // WarnWithCtx logs a warning level message with fields.
 func WarnWithCtx(ctx context.Context, text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.WarnWithCtx(ctx, text, fields...)
+	syslog.Log.WarnWithCtx(ctx, text, fields...)
 }
 
 // ErrorWithCtx logs an error level message with fields.
 func ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.ErrorWithCtx(ctx, text, fields...)
+	syslog.Log.ErrorWithCtx(ctx, text, fields...)
 }
 
 // FatalWithCtx logs a fatal level message with fields and exits the application.
 func FatalWithCtx(ctx context.Context, text string, fields ...Field) {
-	if syslog.GlobalLog == nil {
-		panic("globalLog is not initialized")
+	if syslog.Log == nil {
+		panic("application log is not initialized")
 	}
-	syslog.GlobalLog.FatalWithCtx(ctx, text, fields...)
+	syslog.Log.FatalWithCtx(ctx, text, fields...)
 }

@@ -40,7 +40,7 @@ func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue str
 	key := submatch[1]
 	defaultValue := submatch[2]
 
-	value := sysconf.GlobalProvider.Get(key)
+	value := sysconf.Provider.Get(key)
 	if value == nil {
 		value = defaultValue
 	}

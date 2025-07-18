@@ -40,7 +40,7 @@ func NewGinServer() *GinServer {
 // Init initializes the Gin server
 func (s *GinServer) Init() {
 	var conf Config
-	if err := sysconf.GlobalProvider.Unmarshal("gin-plus.server", &conf); err != nil {
+	if err := sysconf.Provider.Unmarshal("gin-plus.server", &conf); err != nil {
 		log.Fatal(fmt.Sprintf("Starting Gin-Engine failure with PID %d", os.Getpid()))
 	}
 	conf.Validate()

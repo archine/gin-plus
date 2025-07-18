@@ -126,13 +126,13 @@ func (a *App) initialize() {
 	if a.confProviderFunc == nil {
 		a.confProviderFunc = config.NewFileProvider
 	}
-	sysconf.GlobalProvider = a.confProviderFunc()
-	a.eventManager.triggerConfigAfterLoad(sysconf.GlobalProvider)
+	sysconf.Provider = a.confProviderFunc()
+	a.eventManager.triggerConfigAfterLoad(sysconf.Provider)
 
 	if a.loggerFunc == nil {
 		a.loggerFunc = logcore.NewZapLogger
 	}
-	syslog.GlobalLog = a.loggerFunc(sysconf.GlobalProvider)
+	syslog.Log = a.loggerFunc(sysconf.Provider)
 
 	a.confProviderFunc = nil
 	a.loggerFunc = nil
