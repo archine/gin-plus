@@ -1,11 +1,11 @@
-package ioc
+package bean
 
-// AbstractBean defines the basic contract for beans managed by the dependency injection container.
+// AbstractBean defines the basic contract for beans managed by the dependency injector container.
 // Any struct implementing this interface can be recognized and managed as a bean.
 type AbstractBean interface {
 	// BeanName returns the unique name of the bean.
 	// If the returned name is empty, the container will use the struct name with the first letter in lowercase as the default.
-	// This name is used for bean identification and dependency injection.
+	// This name is used for bean identification and dependency injector.
 	BeanName() string
 
 	// IsPrototype indicates whether the bean should be treated as a prototype.
@@ -33,9 +33,9 @@ func (b *Bean) IsPrototype() bool {
 	return false
 }
 
-// BeanPostConstruct defines a lifecycle callback interface for bean initialization.
+// PostConstruct defines a lifecycle callback interface for bean initialization.
 // Any bean that implements this interface will have its BeanPostConstruct method
-// automatically invoked by the container after instantiation and dependency injection.
+// automatically invoked by the container after instantiation and dependency injector.
 //
 // Usage:
 //
@@ -46,7 +46,7 @@ func (b *Bean) IsPrototype() bool {
 //	func (s *UserService) BeanPostConstruct() {
 //	    // initialization logic here
 //	}
-type BeanPostConstruct interface {
+type PostConstruct interface {
 	// BeanPostConstruct is invoked after the bean is instantiated
 	// and all its dependencies have been injected.
 	BeanPostConstruct()

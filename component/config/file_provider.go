@@ -30,11 +30,12 @@ func NewFileProvider() Provider {
 	v.SetConfigFile(configFile)
 
 	if err := v.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("%s  Failed to read configuration file: %v, please check the file path: %s", time.Now().Format("2006-01-02 15:04:05"), err, configFile))
+		panic(fmt.Sprintf("failed to read configuration file: %s, %s", configFile, err.Error()))
 	}
 
 	lc := &FileProvider{v: v}
-	_, _ = fmt.Fprintf(os.Stderr, "%s  Successfully loaded configuration from file: [%s]\n", time.Now().Format("2006-01-02 15:04:05"), configFile)
+	_, _ = fmt.Fprintf(os.Stderr, "%s  Successfully loaded configuration from file: [%s]\n",
+		time.Now().Format("2006-01-02 15:04:05"), configFile)
 
 	return lc
 }

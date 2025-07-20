@@ -7,9 +7,8 @@ import (
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/log/logcore"
-	"github.com/archine/gin-plus/v4/internal/container"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
-	"github.com/archine/gin-plus/v4/internal/vars/syscontainer"
+	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
 	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 	"net/http"
 	"os"
@@ -51,18 +50,11 @@ type App struct {
 }
 
 // New creates a new instance of the App with optional configurations.
-//
-// Args:
-//   - opts: A variadic list of options to configure the App instance.
-func New(opts ...Option) *App {
+func New() *App {
 	a := &App{
 		eventManager: newEventManager(),
 		appContext:   newSysContext(),
 		server:       server.NewGinServer(),
-	}
-
-	for _, opt := range opts {
-		opt(a)
 	}
 
 	return a
@@ -72,8 +64,11 @@ func New(opts ...Option) *App {
 // This function sets up the application with a local file configuration,
 // a default log, and some global middlewares.
 func Default() *App {
-	return New(
-		WithMiddleware(middleware.GlobalExceptionInterceptor, gin.Logger()),
+	return New().With(
+		WithMiddleware(
+			middleware.GlobalExceptionInterceptor,
+			gin.Logger(),
+		),
 	)
 }
 
@@ -127,7 +122,7 @@ func (a *App) initialize() {
 		a.confProviderFunc = config.NewFileProvider
 	}
 	sysconf.Provider = a.confProviderFunc()
-	a.eventManager.triggerConfigAfterLoad(sysconf.Provider)
+	a.eventManager.triggerConfigLoaded(sysconf.Provider)
 
 	if a.loggerFunc == nil {
 		a.loggerFunc = logcore.NewZapLogger
@@ -141,12 +136,8 @@ func (a *App) initialize() {
 
 // refreshContainer refreshes the bean container.
 func (a *App) refreshContainer() {
-	if syscontainer.Container == nil {
-		syscontainer.Container = container.NewContainer()
-	}
-
 	a.eventManager.triggerContainerRefreshBefore(a.appContext)
-	syscontainer.Container.Refresh()
+	sysctr.Container.Refresh()
 	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 
 	log.Info("Application container refreshed and ready")
@@ -154,16 +145,17 @@ func (a *App) refreshContainer() {
 
 // startServer extracts the server startup logic for better readability
 func (a *App) startServer() {
-	a.server.Init()
-	log.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
-
-	if !a.eventManager.triggerOnStarting() {
-		log.Warn("Application startup aborted by event handlers")
+	err := a.server.Init()
+	if err != nil {
+		log.Error(fmt.Sprintf("Starting server failed: %v", err))
 		return
 	}
+	log.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
+
+	a.eventManager.triggerOnStarting()
 
 	startTime := time.Now()
-	if err := a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err = a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error(fmt.Sprintf("Starting %s failed: %v", a.server.GetName(), err))
 		return
 	}

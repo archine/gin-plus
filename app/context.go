@@ -31,5 +31,5 @@ type ApplicationContext interface {
 	//   - According to the IOC container design, all beans registered by this method are singletons.
 	//   - If a bean with the specified name already exists, an error will be returned.
 	//   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
-	RegisterBean(name string, instance any, itypes ...reflect.Type) error
+	RegisterBean(name string, instance any, itypes ...reflect.Type)
 }

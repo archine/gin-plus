@@ -1,17 +1,35 @@
 package container
 
 import (
-	"errors"
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/ioc"
-	"github.com/archine/gin-plus/v4/internal/container/injection"
+	"github.com/archine/gin-plus/v4/internal/container/injector"
+	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
 	"sync"
 
-	"github.com/archine/gin-plus/v4/component/log"
 	"github.com/archine/gin-plus/v4/component/mvc"
-	"github.com/archine/gin-plus/v4/internal/container/registry"
 )
+
+// AutowireField represents a field that requires autowiring
+type AutowireField struct {
+	// Index is the index of the field in the struct.
+	Index int
+
+	// IsInterface indicates whether the field is an interface type.
+	IsInterface bool
+
+	// Name is the name of the field.
+	Name string
+
+	// ValueTag value tag value, used for config values
+	ValueTag string
+
+	// AutowireTag is the tag used to autowire the field.
+	AutowireTag string
+
+	// Field is the reflect.StructField representing the field.
+	Field reflect.StructField
+}
 
 // BeanDef represents a bean definition in the IOC container.
 type BeanDef struct {
@@ -19,20 +37,25 @@ type BeanDef struct {
 	ready bool
 
 	// Value is the actual bean instance.
-	value any
+	Value any
 
-	// Typ is the origin type of the bean instance.
-	originTyp reflect.Type
+	// type is the type of the bean instance.
+	Type reflect.Type
+
+	// originType is the original type of the bean instance.
+	// It is used to create new instances for prototype beans.
+	OriginType reflect.Type
 
 	// IsPrototype indicates whether the bean is a prototype (new instance for each request)
-	isPrototype bool
+	IsPrototype bool
 
 	// AutowireFields contains fields that need to be autowired.
-	autowireFields []*registry.AutowireField
+	AutowireFields []*AutowireField
 }
 
 // Container responsible for managing the lifecycle of all beans
 type Container struct {
+	mu   sync.RWMutex
 	once sync.Once
 
 	// beans stores all registered beans by their names.
@@ -49,21 +72,50 @@ func NewContainer() *Container {
 	}
 }
 
+func (c *Container) RegisterBeanDef(name string, def *BeanDef) {
+	if name == "" {
+		name = strutil.FirstToLower(def.OriginType.Name())
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.beans[name] = def
+	c.typeMapping[def.OriginType] = []string{name}
+}
+
+// LookupType checks if a type is registered in the container.
+func (c *Container) LookupType(typ reflect.Type) bool {
+	if typ == nil {
+		return false
+	}
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, exists := c.typeMapping[typ]
+	return exists
+}
+
 // GetBean gets bean instance by bean name
 func (c *Container) GetBean(name string) (any, bool) {
 	if name == "" {
 		return nil, false
 	}
 
+	c.mu.RLock()
+
 	def, exists := c.beans[name]
 	if !exists {
+		c.mu.RUnlock()
 		return nil, false
 	}
-	if def.isPrototype {
+	c.mu.RUnlock()
+
+	if def.IsPrototype {
 		return createPrototypeBean(c, def), true
 	}
 
-	return def.value, true
+	return def.Value, true
 }
 
 // GetBeanByType gets bean instance by type
@@ -75,7 +127,9 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 		typ = typ.Elem()
 	}
 
+	c.mu.RLock()
 	names, exists := c.typeMapping[typ]
+	c.mu.RUnlock()
 
 	if !exists || len(names) == 0 {
 		return nil, false
@@ -85,8 +139,7 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 		return c.GetBean(names[0])
 	}
 
-	log.Fatal(fmt.Sprintf("Multiple beans found for type '%s'. Please specify a bean name.", typ.String()))
-	return nil, false
+	panic("multiple beans found for type: " + typ.String())
 }
 
 // GetAllBeansByType retrieves all beans that implement the specified type
@@ -98,20 +151,23 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 		typ = typ.Elem()
 	}
 
+	c.mu.RLock()
 	names, exists := c.typeMapping[typ]
 	if !exists || len(names) == 0 {
+		c.mu.RUnlock()
 		return nil, false
 	}
+	c.mu.RUnlock()
 
 	beans := make([]any, 0, len(names))
 	for _, name := range names {
 		if def, exists := c.beans[name]; exists {
-			if def.isPrototype {
+			if def.IsPrototype {
 				prototypeBean := createPrototypeBean(c, def)
 				beans = append(beans, prototypeBean)
 				continue
 			}
-			beans = append(beans, def.value)
+			beans = append(beans, def.Value)
 		}
 	}
 
@@ -120,7 +176,7 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 
 // RegisterBean registers an already instantiated bean instance into the IOC container.
 // This method is used to register fully initialized bean instances that do not require
-// dependency injection or lifecycle management by the container.
+// dependency injector or lifecycle management by the container.
 //
 // Parameters:
 //   - name: the unique bean name for registration
@@ -133,43 +189,47 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 //   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
 //   - Unlike PreRegisterBean, this method accepts any struct pointer and does not require embedding Bean or mvc.Controller.
 //   - The registered bean instances are immediately available for use and will not go through the container's lifecycle management.
-//
-// Returns:
-//   - error: nil on success, or an error if registration fails
-func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Type) error {
+func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Type) {
 	if name == "" || instance == nil {
-		return errors.New("bean name and instance must not be empty or nil")
+		panic("bean name and instance cannot be empty")
 	}
 
 	beanTyp := reflect.TypeOf(instance)
 	if beanTyp.Kind() != reflect.Ptr || beanTyp.Elem().Kind() != reflect.Struct {
-		return errors.New("instance must be a pointer to a struct")
+		panic("instance must be a pointer to a struct")
 	}
 
 	structType := beanTyp.Elem()
 
+	c.mu.RLock()
 	if _, exists := c.beans[name]; exists {
-		return fmt.Errorf("duplicate bean name '%s'", name)
+		c.mu.RUnlock()
+		panic(fmt.Sprintf("bean with name '%s' already exists", name))
 	}
+	c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	for _, itype := range itypes {
 		if !beanTyp.Implements(itype) {
-			return fmt.Errorf("instance type '%s' does not implement interface '%s'", beanTyp.Name(), itype.Name())
+			continue
 		}
 		c.typeMapping[itype] = append(c.typeMapping[itype], name)
 	}
 
-	c.beans[name] = &BeanDef{
-		ready: true,
-		value: instance,
-	}
-	c.typeMapping[structType] = append(c.typeMapping[structType], name)
+	if _, exists := c.beans[name]; !exists {
+		c.beans[name] = &BeanDef{
+			ready: true,
+			Value: instance,
+		}
+		c.typeMapping[structType] = append(c.typeMapping[structType], name)
 
-	if _, ok := instance.(mvc.AbstractController); ok {
-		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
-		c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
+		if _, ok := instance.(mvc.AbstractController); ok {
+			ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
+			c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
+		}
 	}
-	return nil
 }
 
 // Refresh refreshes the container by processing all bean definitions.
@@ -179,91 +239,22 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 // If any bean creation fails, it logs a fatal error and stops the application.
 func (c *Container) Refresh() {
 	c.once.Do(func() {
-		err := processDefinitions(c)
-		if err != nil {
-			log.Fatal("Failed to process bean definitions: " + err.Error())
-		}
-
 		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
 
-		for beanName, bean := range c.beans {
-			if bean.ready {
+		for beanName, beanDef := range c.beans {
+			if beanDef.ready {
 				continue
 			}
 
-			if err := inject(c, reflect.ValueOf(bean.value).Elem(), bean.autowireFields); err != nil {
-				log.Fatal(fmt.Sprintf("Failed to inject dependencies for bean '%s': %s", beanName, err.Error()))
+			analyzeDefinition(c, beanDef)
+
+			err := doProcessFields(c, reflect.ValueOf(beanDef.Value).Elem(), beanDef.AutowireFields)
+			if err != nil {
+				panic(fmt.Sprintf("failed to initialize bean '%s': %s", beanName, err.Error()))
 			}
 		}
 
-		refresh(c, ctrlType)
-		injection.CleanInjectCache()
+		initializeBeans(c, ctrlType)
+		injector.CleanWireConfigCache()
 	})
-}
-
-// createPrototypeBean creates a prototype bean instance
-func createPrototypeBean(c *Container, def *BeanDef) any {
-	beanValue := reflect.New(def.originTyp)
-
-	err := inject(c, beanValue.Elem(), def.autowireFields)
-	if err != nil {
-		log.Fatal(fmt.Sprintf("Failed to create prototype bean '%s': %s", def.originTyp.Name(), err.Error()))
-	}
-
-	beanValueIf := beanValue.Interface()
-
-	if postConstruct, ok := beanValueIf.(ioc.BeanPostConstruct); ok {
-		postConstruct.BeanPostConstruct()
-	}
-
-	return beanValueIf
-}
-
-// injectDependency injects a single dependency into a bean field
-func inject(c *Container, structValue reflect.Value, autoFields []*registry.AutowireField) error {
-	for _, autoField := range autoFields {
-
-		if autoField.ValueTag != "" {
-			injection.InjectConfig(structValue.Field(autoField.Index), autoField.Field.Type, autoField.ValueTag)
-			continue
-		}
-
-		var bean any
-		var exist bool
-
-		if autoField.AutowireTag == "-" {
-			bean, exist = c.GetBeanByType(autoField.Field.Type)
-		} else {
-			bean, exist = c.GetBean(autoField.AutowireTag)
-		}
-
-		if !exist {
-			return fmt.Errorf("not found bean for field '%s' in '%s'", autoField.Name, structValue.Type().String())
-		}
-
-		err := injection.InjectBean(bean, structValue.Field(autoField.Index), autoField)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func refresh(c *Container, ctrlType reflect.Type) {
-	for beanName, bean := range c.beans {
-		if bean.ready {
-			continue
-		}
-
-		if postConstruct, ok := bean.value.(ioc.BeanPostConstruct); ok {
-			postConstruct.BeanPostConstruct()
-		}
-
-		if _, ok := bean.value.(mvc.AbstractController); ok {
-			c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], beanName)
-		}
-
-		bean.ready = true
-	}
 }

@@ -36,16 +36,13 @@ func (m *eventManager) ensureSorted() {
 }
 
 // triggerOnStarting triggers the OnStarting event
-func (m *eventManager) triggerOnStarting() bool {
+func (m *eventManager) triggerOnStarting() {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if lifecycleEvent, ok := e.(LifecycleEvent); ok {
-			if !lifecycleEvent.OnStarting() {
-				return false
-			}
+			lifecycleEvent.OnStarting()
 		}
 	}
-	return true
 }
 
 // triggerOnStarted triggers the OnStarted event
@@ -68,12 +65,12 @@ func (m *eventManager) triggerOnStopped(ctx context.Context) {
 	}
 }
 
-// triggerConfigAfterLoad triggers the ConfigAfterLoad event
-func (m *eventManager) triggerConfigAfterLoad(cp config.Provider) {
+// triggerConfigLoaded triggers the ConfigAfterLoad event
+func (m *eventManager) triggerConfigLoaded(cp config.Provider) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if configEvent, ok := e.(ConfigAfterLoadEvent); ok {
-			configEvent.OnConfigAfterLoad(cp)
+		if configEvent, ok := e.(ConfigEvent); ok {
+			configEvent.OnConfigLoaded(cp)
 		}
 	}
 }
@@ -82,7 +79,7 @@ func (m *eventManager) triggerConfigAfterLoad(cp config.Provider) {
 func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if refreshBeforeEvent, ok := e.(ContainerRefreshBeforeEvent); ok {
+		if refreshBeforeEvent, ok := e.(ContainerEvent); ok {
 			refreshBeforeEvent.OnContainerRefreshBefore(ctx)
 		}
 	}
@@ -92,7 +89,7 @@ func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext)
 func (m *eventManager) triggerContainerRefreshAfter(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if refreshAfterEvent, ok := e.(ContainerRefreshAfterEvent); ok {
+		if refreshAfterEvent, ok := e.(ContainerEvent); ok {
 			refreshAfterEvent.OnContainerRefreshAfter(ctx)
 		}
 	}

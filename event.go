@@ -25,12 +25,7 @@ type LifecycleEvent interface {
 	//   - Setting up monitoring and health checks
 	//   - Performing pre-flight checks
 	//   - Registering middleware or routes
-	// Return value:
-	//   - true: Allows the application to start normally
-	//   - false: Prevents the application from starting (aborts startup)
-	//
-	// If any listener returns false, startup is aborted immediately.
-	OnStarting() bool
+	OnStarting()
 
 	// OnStarted is called after the application has started successfully.
 	// Use this method to perform post-start tasks, such as:
@@ -52,17 +47,15 @@ type LifecycleEvent interface {
 	OnStopped(ctx context.Context)
 }
 
-// ConfigAfterLoadEvent handles events after configuration loading completes.
-// Implement this interface to perform post-loading tasks such as validation or derived value calculation.
-type ConfigAfterLoadEvent interface {
+// ConfigEvent is the interface for events related to configuration loading.
+type ConfigEvent interface {
 	Event
-	// OnConfigAfterLoad is called after all configuration files have been successfully loaded.
-	OnConfigAfterLoad(cp config.Provider)
+	// OnConfigLoaded is called after all configuration files have been successfully loaded.
+	OnConfigLoaded(cp config.Provider)
 }
 
-// ContainerRefreshBeforeEvent handles events triggered before container refresh.
-// Implement this interface to perform pre-refresh setup and configuration tasks.
-type ContainerRefreshBeforeEvent interface {
+// ContainerEvent is the interface for events related to the IoC container lifecycle.
+type ContainerEvent interface {
 	Event
 	// OnContainerRefreshBefore is called before the IoC container begins its refresh process.
 	// This is the ideal place to perform container preparation tasks such as:
@@ -73,12 +66,7 @@ type ContainerRefreshBeforeEvent interface {
 	//  - Performing pre-refresh validations
 	//  - Setting up custom bean processors
 	OnContainerRefreshBefore(ctx app.ApplicationContext)
-}
 
-// ContainerRefreshAfterEvent handles events triggered after container refresh completion.
-// Implement this interface to perform post-refresh finalization and validation tasks.
-type ContainerRefreshAfterEvent interface {
-	Event
 	// OnContainerRefreshAfter is called after the IoC container has completed its refresh process.
 	// At this point, all beans have been created, dependencies injected, and the container is ready for use.
 	// This is the ideal place to perform post-refresh tasks such as:

@@ -3,35 +3,27 @@ package logcore
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
-
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/exception"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
 )
 
 type conf struct {
 	// Level syslog level, default info.
-	// 	Supports: error、info、trace、warn、panic、fatal、debug
-	Level string `yaml:"level"`
-
-	// LevelColor whether to enable color output for syslog levels, default true.
-	// Note: this option only works when the formatter is console.
-	EnableColor bool `yaml:"enable-color"`
+	// 	Supports: error、info、warn、panic、fatal、debug
+	Level string `mapstructure:"level"`
 
 	// Formatter syslog format, default console (supports: json、console)
-	// 	json: output syslog in json format.
-	Format string `json:"format" yaml:"format"`
+	Format string `mapstructure:"format"`
 
 	// ConsoleSeparator console separator.
 	// Note: when the formatter is console, the separator between the fields, default is "\t".
-	ConsoleSeparator string `yaml:"console-separator"`
+	ConsoleSeparator string `mapstructure:"console-sep"`
 
 	// CtxKeys When using WithContext for syslog output.
 	// the value of the specified key is obtained from the context and added to the syslog.
-	CtxKeys []string `yaml:"ctx-keys"`
+	CtxKeys []string `mapstructure:"ctx-keys"`
 }
 
 // defaultLogger is the default implementation of the syslog interface.
@@ -43,7 +35,7 @@ type zaplog struct {
 func NewZapLogger(cp config.Provider) Logger {
 	var cf conf
 	if err := cp.Unmarshal("gin-plus.log", &cf); err != nil {
-		panic(exception.NewStackErr("Logging system initialization failed: " + err.Error()))
+		panic("initialization of logging system failed, unable to read configuration: " + err.Error())
 	}
 	if cf.Level == "" {
 		cf.Level = "info"
@@ -57,7 +49,7 @@ func NewZapLogger(cp config.Provider) Logger {
 
 	zapLevel, err := zapcore.ParseLevel(cf.Level)
 	if err != nil {
-		panic(fmt.Sprintf("Logging system initialization failed, invalid syslog level: %s, error: %v", cf.Level, err))
+		panic(fmt.Sprintf("initialization of logging system failed, invalid log level [%s]: %s", cf.Level, err.Error()))
 	}
 
 	ec := zapcore.EncoderConfig{
@@ -75,7 +67,7 @@ func NewZapLogger(cp config.Provider) Logger {
 		ConsoleSeparator: cf.ConsoleSeparator,
 	}
 
-	if cf.EnableColor && cf.Format == "console" {
+	if cf.Format == "console" {
 		ec.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
 	var encoder zapcore.Encoder
@@ -92,7 +84,6 @@ func NewZapLogger(cp config.Provider) Logger {
 		ctxKeys: cf.CtxKeys,
 	}
 
-	zl.Info(fmt.Sprintf("Logging system initialization completed: default level set to [%s]", strings.ToUpper(cf.Level)))
 	return zl
 }
 

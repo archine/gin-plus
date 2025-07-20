@@ -9,7 +9,6 @@ import (
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"net/http"
-	"os"
 	"reflect"
 	"time"
 
@@ -38,13 +37,14 @@ func NewGinServer() *GinServer {
 }
 
 // Init initializes the Gin server
-func (s *GinServer) Init() {
+func (s *GinServer) Init() error {
 	var conf Config
 	if err := sysconf.Provider.Unmarshal("gin-plus.server", &conf); err != nil {
-		log.Fatal(fmt.Sprintf("Starting Gin-Engine failure with PID %d", os.Getpid()))
+		return err
 	}
 	conf.Validate()
 	s.conf = &conf
+	return nil
 }
 
 // RegisterMiddleware registers a middleware to the Gin server
@@ -183,7 +183,7 @@ func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine
 	baseRouter := engine.Group(contextPath)
 
 	if enableHealth {
-		baseRouter.Any("/health", func(c *gin.Context) {
+		baseRouter.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
 	}

@@ -1,17 +1,16 @@
-package injection
+package util
 
 import (
+	"errors"
 	"reflect"
 	"unsafe"
 )
 
-// setFieldValue sets a struct field to the given value, supporting both direct assignment and type conversion.
+// SetFieldValue sets a struct field to the given value, supporting both direct assignment and type conversion.
 // If the field cannot be set directly, it uses unsafe pointers to assign the value.
-// Commonly used for autowiring in dependency injection scenarios.
-// Does nothing if the provided value is nil.
-func setFieldValue(fieldValue reflect.Value, value any) {
+func SetFieldValue(fieldValue reflect.Value, value any) error {
 	if value == nil {
-		return
+		return nil
 	}
 
 	reflectValue := reflect.ValueOf(value)
@@ -20,14 +19,18 @@ func setFieldValue(fieldValue reflect.Value, value any) {
 
 	if valueType == fieldType {
 		setValue(fieldValue, reflectValue)
-		return
+		return nil
 	}
 
 	if valueType.AssignableTo(fieldType) {
 		setValue(fieldValue, reflectValue)
 	} else if valueType.ConvertibleTo(fieldType) {
 		setValue(fieldValue, reflectValue.Convert(fieldType))
+	} else {
+		return errors.New("type mismatch")
 	}
+
+	return nil
 }
 
 func setValue(fieldValue reflect.Value, value reflect.Value) {

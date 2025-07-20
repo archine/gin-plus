@@ -1,65 +1,58 @@
 package ioc
 
 import (
-	"fmt"
-	"github.com/archine/gin-plus/v4/internal/container/registry"
-	"github.com/archine/gin-plus/v4/util/strutil"
+	"github.com/archine/gin-plus/v4/component/ioc/bean"
 	"reflect"
+
+	"github.com/archine/gin-plus/v4/internal/container"
+	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
 )
 
-// RegisterBeanDef registers a bean definition in the IoC container for later instantiation.
-// This function is designed for struct pointers that embed either Bean or mvc.Controller,
-// allowing them to be managed by the IoC container.
+// BeanDefinition is an alias for container.BeanDef. Aliasing this type dramatically
+// improves the navigability of this package's API documentation.
+type BeanDefinition = container.BeanDef
+
+// AutowireField is an alias for container.AutowireField. This alias is used to
+// improve the readability of the API documentation for this package.
+type AutowireField = container.AutowireField
+
+// RegisterBeanDef registers a bean definition in the IoC container registry
 //
 // Parameters:
-//   - instance: a struct pointer embedding Bean or mvc.Controller.
+//   - instance: a struct pointer to be registered.
 //
 // Usage Notes:
-//   - This method registers the bean definition; actual bean instances are created during container refresh.
-//   - Typically, only root beans (such as controllers) need manual registration.
-//     The container will automatically resolve and instantiate all dependent beans during root bean creation,
-//     provided those dependencies also embed Bean or mvc.Controller.
-//   - While you can register all beans to avoid reflection overhead during instantiation,
-//     this approach increases code complexity and is generally unnecessary.
-//   - For root beans with interface-type dependencies, ensure all interface implementations
-//     are registered beforehand; otherwise, dependency injection will fail.
-//
-// Returns:
-//   - error: nil on success, or an error if the registration fails.
-func RegisterBeanDef(instance any) error {
+//   - Typically, only top-level objects require manual registration—these are objects that are not used as field types depended on by other structures.
+//   - When the container parses the Bean definition, it scans the fields with injection tags in the structure;
+//     If the type of dependent field is not registered in the registry, the container will automatically generate and register a Bean definition for it.
+//   - Although all objects can be manually registered to reduce the reflection overhead during instantiation,
+//     this approach is usually unnecessary and will increase the complexity of the code.
+func RegisterBeanDef(instance any) {
 	if instance == nil {
-		return nil
-	}
-
-	ib, ok := instance.(AbstractBean)
-	if !ok {
-		return fmt.Errorf("instance '%s' does not embed Bean or mvc.Controller and cannot be registered as a BeanDefinition",
-			reflect.TypeOf(instance).Name())
+		return
 	}
 
 	typ := reflect.TypeOf(instance)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("type '%s' must be a pointer to a struct", typ.Name())
+		panic("bean instance must be a pointer to a struct")
 	}
 
 	originTyp := typ.Elem()
 
-	if registry.LookupType(originTyp) {
-		return fmt.Errorf("type '%s' has already been registered in the IoC container", typ.Name())
+	if sysctr.Container.LookupType(originTyp) {
+		return
 	}
 
-	beanName := ib.BeanName()
-	if beanName == "" {
-		beanName = strutil.FirstToLower(originTyp.Name())
+	def := &BeanDefinition{
+		Type:       typ,
+		Value:      instance,
+		OriginType: originTyp,
 	}
 
-	registry.RegisterBeanDefinition(&registry.BeanDefinition{
-		PtrType:     typ,
-		Name:        beanName,
-		Bean:        instance,
-		OriginType:  originTyp,
-		IsPrototype: ib.IsPrototype(),
-	})
+	var beanName string
+	if ib, ok := instance.(bean.AbstractBean); ok {
+		beanName, def.IsPrototype = ib.BeanName(), ib.IsPrototype()
+	}
 
-	return nil
+	sysctr.Container.RegisterBeanDef(beanName, def)
 }

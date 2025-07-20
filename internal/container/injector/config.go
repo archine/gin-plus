@@ -1,7 +1,8 @@
-package injection
+package injector
 
 import (
 	"encoding/json"
+	"github.com/archine/gin-plus/v4/internal/container/util"
 	"reflect"
 	"regexp"
 	"strings"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	// ValueTag is used to mark fields for automatic injection of config values.
+	// ValueTag is used to mark fields for automatic injector of config values.
 	// Note: Unlike the autowire tag, it is only for injecting config values
 	ValueTag = "value"
 )
@@ -23,18 +24,18 @@ var (
 	durationType = reflect.TypeOf(time.Duration(0))
 )
 
-// CleanInjectCache cleans up the global state of the injection package.
-func CleanInjectCache() {
+// CleanWireConfigCache clears the cached regular expression and type information used for injecting configuration values.
+func CleanWireConfigCache() {
 	confRegex = nil
 	timeType = nil
 	durationType = nil
 }
 
-// InjectConfig injects configuration values into struct fields based on the provided tag value.
-func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue string) {
+// WireConfigValue injects a configuration value into a struct field based on the provided tag value.
+func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue string) error {
 	submatch := confRegex.FindStringSubmatch(tagValue)
 	if len(submatch) == 0 {
-		return
+		return nil
 	}
 
 	key := submatch[1]
@@ -45,7 +46,7 @@ func InjectConfig(fieldValue reflect.Value, fieldType reflect.Type, tagValue str
 		value = defaultValue
 	}
 
-	setFieldValue(fieldValue, convert(fieldType, value))
+	return util.SetFieldValue(fieldValue, convert(fieldType, value))
 }
 
 // convert converts value to the appropriate type based on the targetType.
