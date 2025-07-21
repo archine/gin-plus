@@ -2,12 +2,13 @@ package injector
 
 import (
 	"encoding/json"
-	"github.com/archine/gin-plus/v4/internal/container/util"
-	"github.com/go-viper/mapstructure/v2"
+	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/archine/gin-plus/v4/internal/container/util"
+	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/spf13/cast"
@@ -16,38 +17,42 @@ import (
 const (
 	// ValueTag is used to mark fields for automatic injector of config values.
 	// Note: Unlike the autowire tag, it is only for injecting config values
+	// Example: `value:"${key:default}"`
 	ValueTag = "value"
 )
 
 var (
-	confRegex    = regexp.MustCompile(`\$\{([^:}]+)(?::([^}]*))?}`)
 	timeType     = reflect.TypeOf(time.Time{})
 	durationType = reflect.TypeOf(time.Duration(0))
 )
 
 // CleanWireConfigCache clears the cached regular expression and type information used for injecting configuration values.
 func CleanWireConfigCache() {
-	confRegex = nil
 	timeType = nil
 	durationType = nil
 }
 
 // WireConfigValue injects a configuration value into a struct field based on the provided tag value.
 func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue string) error {
-	submatch := confRegex.FindStringSubmatch(tagValue)
-	if len(submatch) == 0 {
-		return nil
+	if !strings.HasPrefix(tagValue, "${") || !strings.HasSuffix(tagValue, "}") {
+		return fmt.Errorf("invalid config tag value: %s, must be in the format ${key:default}", tagValue)
 	}
 
-	key := submatch[1]
-	defaultValue := submatch[2]
+	content := tagValue[2 : len(tagValue)-1]
+	parts := strings.SplitN(content, ":", 2)
+
+	key := parts[0]
+	defaultValue := ""
+	if len(parts) > 1 {
+		defaultValue = strings.TrimSpace(parts[1])
+	}
 
 	value := sysconf.Provider.Get(key)
 	if value == nil {
 		if defaultValue == "" {
-			return nil // No value found and no default provided, nothing to do
+			return nil
 		}
-		defaultValue = strings.ReplaceAll(strings.TrimSpace(defaultValue), "'", "\"")
+
 		value = defaultValue
 	}
 
@@ -60,8 +65,10 @@ func convert(fieldValue reflect.Value, fieldType reflect.Type, val any) error {
 	if fieldType.Kind() == reflect.Ptr {
 		actualType = fieldType.Elem()
 	}
+
+	val = parseJSONIfNeeded(val)
+
 	if convertValue := convertBasic(actualType, val); convertValue != nil {
-		// If the field is a pointer, we need to set the value to the pointer
 		if fieldValue.Kind() == reflect.Ptr {
 			newPtr := reflect.New(actualType)
 			newPtr.Elem().Set(reflect.ValueOf(convertValue))
@@ -69,6 +76,7 @@ func convert(fieldValue reflect.Value, fieldType reflect.Type, val any) error {
 		} else {
 			util.DirectSetValue(fieldValue, reflect.ValueOf(convertValue))
 		}
+
 		return nil
 	}
 
@@ -126,10 +134,6 @@ func convertOther(fieldValue reflect.Value, val any) error {
 	if !fieldValue.CanSet() {
 		tempValue = reflect.New(fieldValue.Type())
 	}
-	if varStr, ok := val.(string); ok {
-		// If the value is a string, we need to parse it
-		_ = json.Unmarshal([]byte(varStr), &val)
-	}
 
 	config := &mapstructure.DecoderConfig{
 		Result:           tempValue.Interface(),
@@ -145,8 +149,7 @@ func convertOther(fieldValue reflect.Value, val any) error {
 		return err
 	}
 
-	err = decoder.Decode(val)
-	if err != nil {
+	if err = decoder.Decode(val); err != nil {
 		return err
 	}
 
@@ -157,6 +160,7 @@ func convertOther(fieldValue reflect.Value, val any) error {
 // convertSliceValue converts a value to a slice of the specified type.
 func convertSliceValue(targetType reflect.Type, val any) any {
 	elemType := targetType.Elem()
+
 	switch elemType.Kind() {
 	case reflect.Bool:
 		return cast.ToBoolSlice(val)
@@ -197,4 +201,19 @@ func convertSliceValue(targetType reflect.Type, val any) any {
 	default:
 		return nil
 	}
+}
+
+// parseJSONIfNeeded tries to parse a string as JSON if it looks like a JSON object or array.
+func parseJSONIfNeeded(val any) any {
+	if valStr, ok := val.(string); ok {
+		trimmed := strings.TrimSpace(valStr)
+		if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
+			(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+			var parsed any
+			if err := json.Unmarshal([]byte(valStr), &parsed); err == nil {
+				return parsed
+			}
+		}
+	}
+	return val
 }
