@@ -9,7 +9,7 @@ import (
 )
 
 // analyzeDefinition analyzes the definition of a bean and populates its autowire fields.
-func analyzeDefinition(c *Container, def *BeanDef) error {
+func analyzeDefinition(c *Container, def *BeanDef) {
 	for i := 0; i < def.OriginType.NumField(); i++ {
 		field := def.OriginType.Field(i)
 		if field.Anonymous {
@@ -66,8 +66,6 @@ func analyzeDefinition(c *Container, def *BeanDef) error {
 			c.RegisterBeanDef(beanName, fieldDef)
 		}
 	}
-
-	return nil
 }
 
 // createPrototypeBean creates a prototype bean instance
@@ -118,10 +116,7 @@ func doProcessFields(c *Container, structValue reflect.Value, autoFields []*Auto
 			return fmt.Errorf("no bean found for field '%s'", autoField.Name)
 		}
 
-		err := injector.WireBean(beanVal, structValue.Field(autoField.Index))
-		if err != nil {
-			return fmt.Errorf("wire bean for field '%s' failed: %s", autoField.Name, err.Error())
-		}
+		injector.WireBean(beanVal, structValue.Field(autoField.Index))
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package injector
 import (
 	"encoding/json"
 	"github.com/archine/gin-plus/v4/internal/container/util"
+	"github.com/go-viper/mapstructure/v2"
 	"reflect"
 	"regexp"
 	"strings"
@@ -43,30 +44,39 @@ func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue 
 
 	value := sysconf.Provider.Get(key)
 	if value == nil {
+		if defaultValue == "" {
+			return nil // No value found and no default provided, nothing to do
+		}
+		defaultValue = strings.ReplaceAll(strings.TrimSpace(defaultValue), "'", "\"")
 		value = defaultValue
 	}
 
-	return util.SetFieldValue(fieldValue, convert(fieldType, value))
+	return convert(fieldValue, fieldType, value)
 }
 
-// convert converts value to the appropriate type based on the targetType.
-func convert(targetType reflect.Type, val any) any {
-	if val == nil {
-		return nil
+// convert converts value to the appropriate type and sets it to fieldValue
+func convert(fieldValue reflect.Value, fieldType reflect.Type, val any) error {
+	actualType := fieldType
+	if fieldType.Kind() == reflect.Ptr {
+		actualType = fieldType.Elem()
 	}
-
-	if targetType.Kind() == reflect.Ptr {
-		// if targetType is a pointer, we need to dereference it to get the element type
-		originTyp := targetType.Elem()
-
-		if elemValue := convert(originTyp, val); elemValue != nil {
-			ptr := reflect.New(originTyp)
-			ptr.Elem().Set(reflect.ValueOf(elemValue))
-			return ptr.Interface()
+	if convertValue := convertBasic(actualType, val); convertValue != nil {
+		// If the field is a pointer, we need to set the value to the pointer
+		if fieldValue.Kind() == reflect.Ptr {
+			newPtr := reflect.New(actualType)
+			newPtr.Elem().Set(reflect.ValueOf(convertValue))
+			util.DirectSetValue(fieldValue, newPtr)
+		} else {
+			util.DirectSetValue(fieldValue, reflect.ValueOf(convertValue))
 		}
 		return nil
 	}
 
+	return convertOther(fieldValue, val)
+}
+
+// convertBasic handles basic types
+func convertBasic(targetType reflect.Type, val any) any {
 	if targetType == timeType {
 		return cast.ToTime(val)
 	}
@@ -92,6 +102,8 @@ func convert(targetType reflect.Type, val any) any {
 	case reflect.Uint:
 		return cast.ToUint(val)
 	case reflect.Uint8:
+		return cast.ToUint8(val)
+	case reflect.Uint16:
 		return cast.ToUint16(val)
 	case reflect.Uint32:
 		return cast.ToUint32(val)
@@ -108,15 +120,42 @@ func convert(targetType reflect.Type, val any) any {
 	}
 }
 
-func convertSliceValue(targetType reflect.Type, val any) any {
-	if valStr, ok := val.(string); ok {
-		valStr = strings.ReplaceAll(strings.TrimSpace(valStr), "'", "\"")
-		err := json.Unmarshal([]byte(valStr), &val)
-		if err != nil {
-			return nil
-		}
+// convertOther handles complex types using map-structure
+func convertOther(fieldValue reflect.Value, val any) error {
+	tempValue := fieldValue
+	if !fieldValue.CanSet() {
+		tempValue = reflect.New(fieldValue.Type())
+	}
+	if varStr, ok := val.(string); ok {
+		// If the value is a string, we need to parse it
+		_ = json.Unmarshal([]byte(varStr), &val)
 	}
 
+	config := &mapstructure.DecoderConfig{
+		Result:           tempValue.Interface(),
+		WeaklyTypedInput: true,
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		),
+	}
+
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		return err
+	}
+
+	err = decoder.Decode(val)
+	if err != nil {
+		return err
+	}
+
+	util.DirectSetValue(fieldValue, tempValue.Elem())
+	return nil
+}
+
+// convertSliceValue converts a value to a slice of the specified type.
+func convertSliceValue(targetType reflect.Type, val any) any {
 	elemType := targetType.Elem()
 	switch elemType.Kind() {
 	case reflect.Bool:

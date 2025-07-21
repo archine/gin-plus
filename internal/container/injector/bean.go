@@ -11,6 +11,6 @@ const (
 )
 
 // WireBean injects a bean into a struct field based on the provided field value.
-func WireBean(bean any, fieldValue reflect.Value) error {
-	return util.SetFieldValue(fieldValue, bean)
+func WireBean(bean any, fieldValue reflect.Value) {
+	util.DirectSetValue(fieldValue, reflect.ValueOf(bean))
 }

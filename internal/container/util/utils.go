@@ -18,14 +18,14 @@ func SetFieldValue(fieldValue reflect.Value, value any) error {
 	fieldType := fieldValue.Type()
 
 	if valueType == fieldType {
-		setValue(fieldValue, reflectValue)
+		DirectSetValue(fieldValue, reflectValue)
 		return nil
 	}
 
 	if valueType.AssignableTo(fieldType) {
-		setValue(fieldValue, reflectValue)
+		DirectSetValue(fieldValue, reflectValue)
 	} else if valueType.ConvertibleTo(fieldType) {
-		setValue(fieldValue, reflectValue.Convert(fieldType))
+		DirectSetValue(fieldValue, reflectValue.Convert(fieldType))
 	} else {
 		return errors.New("type mismatch")
 	}
@@ -33,7 +33,8 @@ func SetFieldValue(fieldValue reflect.Value, value any) error {
 	return nil
 }
 
-func setValue(fieldValue reflect.Value, value reflect.Value) {
+// DirectSetValue sets a value to a field directly, bypassing the normal setter checks.
+func DirectSetValue(fieldValue reflect.Value, value reflect.Value) {
 	if fieldValue.CanSet() {
 		fieldValue.Set(value)
 	} else {
