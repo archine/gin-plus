@@ -2,6 +2,7 @@ package gin_plus
 
 import (
 	"context"
+
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 )
@@ -13,9 +14,9 @@ type Event interface {
 	Order() int
 }
 
-// LifecycleEvent is the base interface for all application lifecycle events.
-// Implement this interface to hook into the application's start and stop lifecycle phases.
-type LifecycleEvent interface {
+// StartingEvent is called before the application starts.
+// Implement this interface to perform initialization tasks.
+type StartingEvent interface {
 	Event
 
 	// OnStarting is called before the application starts.
@@ -26,6 +27,12 @@ type LifecycleEvent interface {
 	//   - Performing pre-flight checks
 	//   - Registering middleware or routes
 	OnStarting()
+}
+
+// StartedEvent is called after the application has started successfully.
+// Implement this interface to perform post-start tasks.
+type StartedEvent interface {
+	Event
 
 	// OnStarted is called after the application has started successfully.
 	// Use this method to perform post-start tasks, such as:
@@ -36,6 +43,12 @@ type LifecycleEvent interface {
 	//   - Triggering external system notifications
 	// Note: At this point, the HTTP server is running and ready to accept requests.
 	OnStarted()
+}
+
+// StoppedEvent is called after the HTTP server has stopped.
+// Implement this interface to perform cleanup tasks.
+type StoppedEvent interface {
+	Event
 
 	// OnStopped is called after the HTTP server has stopped accepting new requests.
 	// Use this method to perform cleanup tasks, such as:
@@ -54,8 +67,9 @@ type ConfigEvent interface {
 	OnConfigLoaded(cp config.Provider)
 }
 
-// ContainerEvent is the interface for events related to the IoC container lifecycle.
-type ContainerEvent interface {
+// ContainerRefreshBeforeEvent is called before the IoC container refresh process.
+// Implement this interface to perform container preparation tasks.
+type ContainerRefreshBeforeEvent interface {
 	Event
 	// OnContainerRefreshBefore is called before the IoC container begins its refresh process.
 	// This is the ideal place to perform container preparation tasks such as:
@@ -66,7 +80,12 @@ type ContainerEvent interface {
 	//  - Performing pre-refresh validations
 	//  - Setting up custom bean processors
 	OnContainerRefreshBefore(ctx app.ApplicationContext)
+}
 
+// ContainerRefreshAfterEvent is called after the IoC container refresh process.
+// Implement this interface to perform post-refresh tasks.
+type ContainerRefreshAfterEvent interface {
+	Event
 	// OnContainerRefreshAfter is called after the IoC container has completed its refresh process.
 	// At this point, all beans have been created, dependencies injected, and the container is ready for use.
 	// This is the ideal place to perform post-refresh tasks such as:

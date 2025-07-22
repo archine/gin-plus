@@ -39,7 +39,7 @@ func (m *eventManager) ensureSorted() {
 func (m *eventManager) triggerOnStarting() {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if lifecycleEvent, ok := e.(LifecycleEvent); ok {
+		if lifecycleEvent, ok := e.(StartingEvent); ok {
 			lifecycleEvent.OnStarting()
 		}
 	}
@@ -49,7 +49,7 @@ func (m *eventManager) triggerOnStarting() {
 func (m *eventManager) triggerOnStarted() {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if lifecycleEvent, ok := e.(LifecycleEvent); ok {
+		if lifecycleEvent, ok := e.(StartedEvent); ok {
 			lifecycleEvent.OnStarted()
 		}
 	}
@@ -59,7 +59,7 @@ func (m *eventManager) triggerOnStarted() {
 func (m *eventManager) triggerOnStopped(ctx context.Context) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if lifecycleEvent, ok := e.(LifecycleEvent); ok {
+		if lifecycleEvent, ok := e.(StoppedEvent); ok {
 			lifecycleEvent.OnStopped(ctx)
 		}
 	}
@@ -79,7 +79,7 @@ func (m *eventManager) triggerConfigLoaded(cp config.Provider) {
 func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if refreshBeforeEvent, ok := e.(ContainerEvent); ok {
+		if refreshBeforeEvent, ok := e.(ContainerRefreshBeforeEvent); ok {
 			refreshBeforeEvent.OnContainerRefreshBefore(ctx)
 		}
 	}
@@ -89,7 +89,7 @@ func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext)
 func (m *eventManager) triggerContainerRefreshAfter(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
-		if refreshAfterEvent, ok := e.(ContainerEvent); ok {
+		if refreshAfterEvent, ok := e.(ContainerRefreshAfterEvent); ok {
 			refreshAfterEvent.OnContainerRefreshAfter(ctx)
 		}
 	}
