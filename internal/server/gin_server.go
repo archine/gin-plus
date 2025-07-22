@@ -174,18 +174,18 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 //
 // Note: this function is system-internal and should not be used directly in application code.
 func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine, contextPath string, enableHealth bool) {
-	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeOf((*mvc.AbstractController)(nil)).Elem())
-
-	if !found {
-		return
-	}
-
 	baseRouter := engine.Group(contextPath)
 
 	if enableHealth {
 		baseRouter.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
+	}
+
+	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeOf((*mvc.AbstractController)(nil)).Elem())
+
+	if !found {
+		return
 	}
 
 	for _, ctrl := range ctrls {

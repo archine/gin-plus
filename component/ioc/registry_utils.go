@@ -37,16 +37,10 @@ func RegisterBeanDef(instance any) {
 		panic("bean instance must be a pointer to a struct")
 	}
 
-	originTyp := typ.Elem()
-
-	if sysctr.Container.LookupType(originTyp) {
-		return
-	}
-
 	def := &BeanDefinition{
 		Type:       typ,
 		Value:      instance,
-		OriginType: originTyp,
+		OriginType: typ.Elem(),
 	}
 
 	var beanName string
