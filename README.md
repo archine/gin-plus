@@ -25,7 +25,12 @@ package service
 
 import (
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
+	"github.com/archine/gin-plus/v4/component/ioc"
 )
+
+func init() {
+	ioc.RegisterBeanDef(&TestService{})
+}
 
 type TestService struct {
 	bean.Bean
