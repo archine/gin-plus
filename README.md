@@ -15,7 +15,7 @@
 ## 安装
 
 ```bash
-go get github.com/archine/gin-plus/v4@v4.1.4
+go get github.com/archine/gin-plus/v4@v4.1.5
 ```
 
 ## 快速开始
@@ -77,6 +77,6 @@ import (
 )
 
 func main() {
-	ginplus.Default().Run(ginplus.ServerMode)
+	ginplus.New().Run(ginplus.ServerMode)
 }
 ```

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/archine/gin-plus/v4/component/log"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/pool"
 	"github.com/archine/gin-plus/v4/exception"
 	"github.com/gin-gonic/gin"
@@ -167,7 +167,7 @@ func Error(ctx *gin.Context, err error) {
 	}
 	var stackErr *exception.StackError
 	if errors.As(err, &stackErr) {
-		log.ErrorWithCtx(ctx, stackErr.ToString())
+		gplog.ErrorWithCtx(ctx, stackErr.ToString())
 	}
 
 	var businessErr *exception.BusinessException
@@ -176,6 +176,6 @@ func Error(ctx *gin.Context, err error) {
 		return
 	}
 
-	log.ErrorWithCtx(ctx, fmt.Sprintf("Internal Server Error: %v", err))
+	gplog.ErrorWithCtx(ctx, fmt.Sprintf("Internal Server Error: %v", err))
 	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
 }

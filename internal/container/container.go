@@ -246,7 +246,7 @@ func (c *Container) Refresh() {
 				continue
 			}
 
-			analyzeDefinition(c, beanDef)
+			analyzeDefinition(beanDef)
 
 			err := doProcessFields(c, reflect.ValueOf(beanDef.Value).Elem(), beanDef.AutowireFields)
 			if err != nil {

@@ -9,7 +9,7 @@ import (
 )
 
 // analyzeDefinition analyzes the definition of a bean and populates its autowire fields.
-func analyzeDefinition(c *Container, def *BeanDef) {
+func analyzeDefinition(def *BeanDef) {
 	for i := 0; i < def.OriginType.NumField(); i++ {
 		field := def.OriginType.Field(i)
 		if field.Anonymous {
@@ -34,9 +34,8 @@ func analyzeDefinition(c *Container, def *BeanDef) {
 			continue
 		}
 
-		fieldType := field.Type
-		fieldOriginType := fieldType.Elem()
-		fieldKind := fieldType.Kind()
+		fieldOriginType := field.Type.Elem()
+		fieldKind := field.Type.Kind()
 		isInterface := fieldKind == reflect.Interface
 
 		if !isInterface && (fieldKind != reflect.Ptr || fieldOriginType.Kind() != reflect.Struct) {
@@ -50,21 +49,6 @@ func analyzeDefinition(c *Container, def *BeanDef) {
 			AutowireTag: autowireTag,
 			Field:       field,
 		})
-
-		if !isInterface && !c.LookupType(fieldOriginType) {
-			fieldDef := &BeanDef{
-				Type:       fieldType,
-				OriginType: fieldOriginType,
-				Value:      reflect.New(fieldOriginType).Interface(),
-			}
-
-			var beanName string
-			if ib, ok := fieldDef.Value.(bean.AbstractBean); ok {
-				beanName, def.IsPrototype = ib.BeanName(), ib.IsPrototype()
-			}
-
-			c.RegisterBeanDef(beanName, fieldDef)
-		}
 	}
 }
 

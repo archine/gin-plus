@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/log/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog/logcore"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
 	"github.com/archine/gin-plus/v4/internal/vars/syslog"
@@ -17,10 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/archine/gin-plus/v4/component/log"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/internal/server"
-	"github.com/archine/gin-plus/v4/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 // RunMode defines the application's running mode.
@@ -60,18 +58,6 @@ func New() *App {
 	return a
 }
 
-// Default creates a new App instance with default configurations.
-// This function sets up the application with a local file configuration,
-// a default log, and some global middlewares.
-func Default() *App {
-	return New().With(
-		WithMiddleware(
-			middleware.GlobalExceptionInterceptor,
-			gin.Logger(),
-		),
-	)
-}
-
 // With adds options to the App instance.
 // This method allows you to configure the App instance with various options.
 func (a *App) With(opts ...Option) *App {
@@ -91,7 +77,7 @@ func (a *App) IsRunning() bool {
 //   - mode: The run mode of the application (InitializeMode, ContainerMode, or ServerMode).
 func (a *App) Run(mode RunMode) {
 	if a.state.Load() {
-		log.Warn("Application is already running")
+		gplog.Warn("Application is already running")
 		return
 	}
 
@@ -101,15 +87,15 @@ func (a *App) Run(mode RunMode) {
 
 	switch mode {
 	case InitializeMode:
-		log.Info("Application started in [InitializeMode] - configuration and logger initialized")
+		gplog.Info("Application started in [InitializeMode] - configuration and logger initialized")
 	case ContainerMode:
 		a.refreshContainer()
-		log.Info("Application started in [ContainerMode] - IoC container initialized and ready")
+		gplog.Info("Application started in [ContainerMode] - IoC container initialized and ready")
 	case ServerMode:
 		a.refreshContainer()
 		a.startServer()
 	default:
-		log.Warn("Unknown run mode, defaulting to ServerMode")
+		gplog.Warn("Unknown run mode, defaulting to ServerMode")
 		a.refreshContainer()
 		a.startServer()
 	}
@@ -131,7 +117,7 @@ func (a *App) initialize() {
 
 	a.confProviderFunc = nil
 	a.loggerFunc = nil
-	log.Info("Application configuration and logger initialized")
+	gplog.Info("Application configuration and logger initialized")
 }
 
 // refreshContainer refreshes the bean container.
@@ -140,28 +126,28 @@ func (a *App) refreshContainer() {
 	sysctr.Container.Refresh()
 	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 
-	log.Info("Application container refreshed and ready")
+	gplog.Info("Application container refreshed and ready")
 }
 
 // startServer extracts the server startup logic for better readability
 func (a *App) startServer() {
 	err := a.server.Init()
 	if err != nil {
-		log.Error(fmt.Sprintf("Starting server failed: %v", err))
+		gplog.Error(fmt.Sprintf("Starting server failed: %v", err))
 		return
 	}
-	log.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
+	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
 
 	a.eventManager.triggerOnStarting()
 
 	startTime := time.Now()
 	if err = a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error(fmt.Sprintf("Starting %s failed: %v", a.server.GetName(), err))
+		gplog.Error(fmt.Sprintf("Starting %s failed: %v", a.server.GetName(), err))
 		return
 	}
 
 	a.eventManager.triggerOnStarted()
-	log.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
+	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
 
 	a.waitForShutdown()
 }
@@ -172,14 +158,14 @@ func (a *App) waitForShutdown() {
 	signal.Notify(stopSignalCh, syscall.SIGTERM, syscall.SIGINT)
 	<-stopSignalCh
 
-	log.Info("Received shutdown signal, starting graceful shutdown...")
+	gplog.Info("Received shutdown signal, starting graceful shutdown...")
 
 	if err := a.server.Shutdown(func(ctx context.Context) {
 		a.eventManager.triggerOnStopped(ctx)
 	}); err != nil {
-		log.Warn(fmt.Sprintf("Graceful shutdown failed: %v", err))
+		gplog.Warn(fmt.Sprintf("Graceful shutdown failed: %v", err))
 		return
 	}
 
-	log.Info("Application shutdown completed successfully")
+	gplog.Info("Application shutdown completed successfully")
 }

@@ -1,8 +1,8 @@
-package log
+package gplog
 
 import (
 	"context"
-	"github.com/archine/gin-plus/v4/component/log/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog/logcore"
 	"github.com/archine/gin-plus/v4/internal/vars/syslog"
 )
 

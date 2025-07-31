@@ -19,17 +19,18 @@ type conf struct {
 
 	// ConsoleSeparator console separator.
 	// Note: when the formatter is console, the separator between the fields, default is "\t".
-	ConsoleSeparator string `mapstructure:"console-sep"`
+	ConsoleSeparator string `mapstructure:"console-separator"`
 
-	// CtxKeys When using WithContext for syslog output.
+	// Keys When using WithContext for syslog output.
 	// the value of the specified key is obtained from the context and added to the syslog.
-	CtxKeys []string `mapstructure:"ctx-keys"`
+	Keys []string `mapstructure:"keys"`
 }
 
 // defaultLogger is the default implementation of the syslog interface.
 type zaplog struct {
-	core    *zap.Logger
-	ctxKeys []string
+	format string
+	core   *zap.Logger
+	keys   []string
 }
 
 func NewZapLogger(cp config.Provider) Logger {
@@ -37,11 +38,12 @@ func NewZapLogger(cp config.Provider) Logger {
 	if err := cp.Unmarshal("gin-plus.log", &cf); err != nil {
 		panic("initialization of logging system failed, unable to read configuration: " + err.Error())
 	}
+
 	if cf.Level == "" {
 		cf.Level = "info"
 	}
-	if cf.Format == "" {
-		cf.Format = "console"
+	if cf.Format == "" || (cf.Format != JSONFormat && cf.Format != ConsoleFormat) {
+		cf.Format = ConsoleFormat
 	}
 	if cf.ConsoleSeparator == "" {
 		cf.ConsoleSeparator = "\t"
@@ -67,24 +69,28 @@ func NewZapLogger(cp config.Provider) Logger {
 		ConsoleSeparator: cf.ConsoleSeparator,
 	}
 
-	if cf.Format == "console" {
-		ec.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	}
 	var encoder zapcore.Encoder
-	if cf.Format == "json" {
-		encoder = zapcore.NewJSONEncoder(ec)
-	} else {
+
+	if cf.Format == ConsoleFormat {
+		ec.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		encoder = zapcore.NewConsoleEncoder(ec)
+	} else {
+		encoder = zapcore.NewJSONEncoder(ec)
 	}
 
 	zapCore := zapcore.NewCore(encoder, os.Stderr, zapLevel)
 
 	zl := &zaplog{
-		core:    zap.New(zapCore),
-		ctxKeys: cf.CtxKeys,
+		format: cf.Format,
+		core:   zap.New(zapCore),
+		keys:   cf.Keys,
 	}
 
 	return zl
+}
+
+func (d *zaplog) GetFormat() string {
+	return d.format
 }
 
 func (d *zaplog) Info(text string, fields ...Field) {
@@ -128,7 +134,7 @@ func (d *zaplog) FatalWithCtx(ctx context.Context, text string, fields ...Field)
 }
 
 func (d *zaplog) buildFields(ctx context.Context, gpFields []Field) []zap.Field {
-	totalCapacity := len(gpFields) + len(d.ctxKeys)
+	totalCapacity := len(gpFields) + len(d.keys)
 	if totalCapacity == 0 {
 		return nil
 	}
@@ -138,7 +144,7 @@ func (d *zaplog) buildFields(ctx context.Context, gpFields []Field) []zap.Field 
 		zapFields = append(zapFields, zap.Any(f.Key, f.Value))
 	}
 	if ctx != nil {
-		for _, key := range d.ctxKeys {
+		for _, key := range d.keys {
 			if value := ctx.Value(key); value != nil {
 				zapFields = append(zapFields, zap.Any(key, value))
 			}

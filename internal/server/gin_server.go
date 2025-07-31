@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/archine/gin-plus/v4/app"
+	"github.com/archine/gin-plus/v4/component/gplog/logcore"
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"net/http"
 	"reflect"
 	"time"
 
-	"github.com/archine/gin-plus/v4/component/log"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -42,8 +43,10 @@ func (s *GinServer) Init() error {
 	if err := sysconf.Provider.Unmarshal("gin-plus.server", &conf); err != nil {
 		return err
 	}
+
 	conf.Validate()
 	s.conf = &conf
+
 	return nil
 }
 
@@ -69,9 +72,28 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 	engine.RemoveExtraSlash = true
 	engine.MaxMultipartMemory = s.conf.MaxMultipartMemory
 
-	if s.conf.AllowedCors {
+	if !s.conf.DisableDefaultRecovery {
+		engine.Use(middleware.GlobalExceptionInterceptor)
+	}
+
+	if !s.conf.DisableDefaultLogger {
+		logConf := gin.LoggerConfig{
+			Output:    &logWriter{},
+			SkipPaths: s.conf.SkipLogPaths,
+		}
+		if gplog.GetLogger().GetFormat() == logcore.JSONFormat {
+			logConf.Formatter = jsonFormatter
+		} else {
+			logConf.Formatter = consoleFormatter
+		}
+
+		engine.Use(gin.LoggerWithConfig(logConf))
+	}
+
+	if !s.conf.DisableDefaultCors {
 		engine.Use(middleware.Cors())
 	}
+
 	if len(s.middlewares) > 0 {
 		engine.Use(s.middlewares...)
 		s.middlewares = nil
@@ -155,7 +177,7 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 		case <-done:
 			// The close function completed successfully
 		case <-closeCtx.Done():
-			log.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
+			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
 		}
 	}
 
@@ -192,5 +214,5 @@ func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine
 		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
 	}
 
-	log.Info("API route registration completed: all routes are mapped and active")
+	gplog.Info("API route registration completed: all routes are mapped and active")
 }

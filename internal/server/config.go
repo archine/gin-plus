@@ -28,10 +28,24 @@ type Config struct {
 	// Default: "release"
 	Mode string `mapstructure:"mode"`
 
-	// AllowedCors enables Cross-Origin Resource Sharing (CORS) support.
-	// When enabled, the server automatically adds default CORS middleware to handle cross-origin requests.
-	// Default: false
-	AllowedCors bool `mapstructure:"allowed-cors"`
+	// DisableDefaultCors disables the default CORS middleware.
+	// If true, the server will not apply the default CORS settings.
+	// This is useful if you want to handle CORS manually or use a custom middleware.
+	DisableDefaultCors bool `mapstructure:"disable-default-cors"`
+
+	// DisableDefaultRecovery disables the default recovery middleware.
+	// If true, the server will not recover from panics using the default recovery middleware.
+	// This is useful if you want to handle panics manually or use a custom recovery middleware
+	DisableDefaultRecovery bool `mapstructure:"disable-default-recovery"`
+
+	// DisableDefaultLogger disables the default Gin logger middleware.
+	// If true, the server will not log requests using the default logger.
+	// This is useful if you want to use a custom logging middleware or handler.
+	DisableDefaultLogger bool `mapstructure:"disable-default-logger"`
+
+	// SkipLogPaths is a list of paths that should be skipped by the default logger middleware.
+	// Requests to these paths will not be logged.
+	SkipLogPaths []string `mapstructure:"skip-log-paths"`
 
 	// MaxMultipartMemory sets the maximum memory (in bytes) for multipart form parsing.
 	// Files larger than this limit are written to temporary files instead of being stored in memory.
@@ -79,7 +93,7 @@ type Config struct {
 	ExitDelay time.Duration `mapstructure:"exit-delay"`
 
 	// EnableHealthCheck enables the built-in health check endpoint.
-	// When enabled, the server automatically registers a health check route at /health.
+	// When enabled, the server automatically registers a health check route at ContextPath/health.
 	// This endpoint can be used to monitor the application's health status.
 	// Default: false
 	EnableHealthCheck bool `mapstructure:"enable-health-check"`
@@ -125,6 +139,6 @@ func (c *Config) Validate() {
 		c.MaxMultipartMemory = 8388608 // 8MB
 	}
 	if c.ExitDelay <= 0 {
-		c.ExitDelay = 3 * time.Second // Default exit delay
+		c.ExitDelay = 3 * time.Second
 	}
 }

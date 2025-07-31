@@ -2,7 +2,7 @@ package gin_plus
 
 import (
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/log/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog/logcore"
 	"github.com/gin-gonic/gin"
 )
 

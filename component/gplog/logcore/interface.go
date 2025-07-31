@@ -2,6 +2,11 @@ package logcore
 
 import "context"
 
+const (
+	JSONFormat    = "json"    // JSONFormat specifies the log format as JSON.
+	ConsoleFormat = "console" // ConsoleFormat specifies the log format for console output.
+)
+
 // Field represents a key-value pair for structured logging.
 type Field struct {
 	Key   string
@@ -10,6 +15,7 @@ type Field struct {
 
 // Logger defines the logging interface for the application.
 type Logger interface {
+	GetFormat() string
 	Info(text string, fields ...Field)
 	Debug(text string, fields ...Field)
 	Warn(text string, fields ...Field)

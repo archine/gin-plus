@@ -1,7 +1,7 @@
 package syslog
 
 import (
-	"github.com/archine/gin-plus/v4/component/log/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog/logcore"
 )
 
 var (
