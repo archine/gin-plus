@@ -15,7 +15,7 @@
 ## 安装
 
 ```bash
-go get github.com/archine/gin-plus/v4@v4.1.5
+go get github.com/archine/gin-plus/v4@v4.1.6
 ```
 
 ## 快速开始

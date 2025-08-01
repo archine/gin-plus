@@ -86,7 +86,7 @@ func (r *Result) To(httpCode int) {
 
 // InitResp initializes a new Resp object from the pool.
 func InitResp(ctx *gin.Context) Resp {
-	return _resultPool.Get().(Resp).WithContext(ctx)
+	return _resultPool.Get().WithContext(ctx)
 }
 
 // BadRequest returns a business-related error.

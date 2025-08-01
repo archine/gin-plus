@@ -72,10 +72,6 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 	engine.RemoveExtraSlash = true
 	engine.MaxMultipartMemory = s.conf.MaxMultipartMemory
 
-	if !s.conf.DisableDefaultRecovery {
-		engine.Use(middleware.GlobalExceptionInterceptor)
-	}
-
 	if !s.conf.DisableDefaultLogger {
 		logConf := gin.LoggerConfig{
 			Output:    &logWriter{},
@@ -92,6 +88,10 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 
 	if !s.conf.DisableDefaultCors {
 		engine.Use(middleware.Cors())
+	}
+
+	if !s.conf.DisableDefaultRecovery {
+		engine.Use(middleware.GlobalExceptionInterceptor)
 	}
 
 	if len(s.middlewares) > 0 {

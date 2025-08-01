@@ -29,14 +29,8 @@ func Cors() gin.HandlerFunc {
 func GlobalExceptionInterceptor(ctx *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			switch t := r.(type) {
-			case error:
-				resp.Error(ctx, t)
-			default:
-				trace := getTrace()
-				resp.Code(ctx, exception.DefaultSystemErrorCode, trace)
-				gplog.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", t, trace))
-			}
+			resp.Code(ctx, exception.DefaultSystemErrorCode, "Internal Server Error")
+			gplog.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", r, getTrace()))
 		}
 	}()
 	ctx.Next()

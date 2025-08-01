@@ -6,12 +6,12 @@ import (
 )
 
 // BusinessException represents a service-level exception that includes stack trace information.
-// The default business error code is set to 10400, which corresponds to bcode.BadRequest.
+// The default business error code is set to DefaultBusinessCode, which corresponds to bcode.BadRequest.
 //
 // When returned via resp.DirectRespErr, this error is not treated as an unknown error,
 // so resp.ServerError will not be triggered.
 type BusinessException struct {
-	code int    // Business error code, default is 10400.
+	code int    // Business error code, default is DefaultBusinessCode.
 	msg  string // Error message describing the exception.
 }
 
@@ -24,7 +24,7 @@ func (b *BusinessException) Code() int {
 }
 
 func NewBusinessErr(msg string) *BusinessException {
-	return &BusinessException{code: 10400, msg: msg}
+	return &BusinessException{code: DefaultBusinessCode, msg: msg}
 }
 
 func NewBusinessErrWithCode(bcode int, msg string) *BusinessException {
