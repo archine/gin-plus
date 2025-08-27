@@ -2,6 +2,7 @@ package exception
 
 import (
 	"fmt"
+
 	"github.com/archine/gin-plus/v4/exception/stacktrace"
 )
 

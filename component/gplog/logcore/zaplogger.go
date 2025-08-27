@@ -3,10 +3,11 @@ package logcore
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/archine/gin-plus/v4/component/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 )
 
 type conf struct {

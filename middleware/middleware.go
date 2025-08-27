@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
 	"github.com/archine/gin-plus/v4/exception/stacktrace"

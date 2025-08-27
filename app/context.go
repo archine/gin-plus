@@ -1,8 +1,9 @@
 package app
 
 import (
-	"github.com/archine/gin-plus/v4/component/config"
 	"reflect"
+
+	"github.com/archine/gin-plus/v4/component/config"
 )
 
 // ApplicationContext the interface defines methods for managing the application context,

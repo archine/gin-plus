@@ -2,10 +2,11 @@ package server
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/gin-gonic/gin"
 	"strings"
 	"time"
+
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/gin-gonic/gin"
 )
 
 // logWriter implements gin.LoggerOutput interface

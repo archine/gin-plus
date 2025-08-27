@@ -1,10 +1,11 @@
 package stacktrace
 
 import (
-	"github.com/archine/gin-plus/v4/component/pool"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/archine/gin-plus/v4/component/pool"
 )
 
 const (

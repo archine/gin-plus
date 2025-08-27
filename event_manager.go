@@ -2,9 +2,10 @@ package gin_plus
 
 import (
 	"context"
+	"sort"
+
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
-	"sort"
 )
 
 // eventManager manages all app events with a single slice
