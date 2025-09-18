@@ -77,21 +77,19 @@ func (a *App) IsRunning() bool {
 // Args:
 //   - mode: The run mode of the application (InitializeMode, ContainerMode, or ServerMode).
 func (a *App) Run(mode RunMode) {
-	if a.state.Load() {
+	if !a.state.CompareAndSwap(false, true) {
 		gplog.Warn("Application is already running")
 		return
 	}
 
-	a.state.Store(true)
 	printBanner()
 	a.initialize()
 
 	switch mode {
 	case InitializeMode:
-		gplog.Info("Application started in [InitializeMode] - configuration and logger initialized")
+		// do nothing
 	case ContainerMode:
 		a.refreshContainer()
-		gplog.Info("Application started in [ContainerMode] - IoC container initialized and ready")
 	case ServerMode:
 		a.refreshContainer()
 		a.startServer()
@@ -124,10 +122,11 @@ func (a *App) initialize() {
 // refreshContainer refreshes the bean container.
 func (a *App) refreshContainer() {
 	a.eventManager.triggerContainerRefreshBefore(a.appContext)
-	sysctr.Container.Refresh()
-	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 
+	sysctr.Container.Refresh()
 	gplog.Info("Application container refreshed and ready")
+
+	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 }
 
 // startServer extracts the server startup logic for better readability
@@ -139,7 +138,7 @@ func (a *App) startServer() {
 	}
 	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
 
-	a.eventManager.triggerOnStarting()
+	a.eventManager.triggerOnStarting(a.appContext)
 
 	startTime := time.Now()
 	if err = a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -147,7 +146,7 @@ func (a *App) startServer() {
 		return
 	}
 
-	a.eventManager.triggerOnStarted()
+	a.eventManager.triggerOnStarted(a.appContext)
 	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
 
 	a.waitForShutdown()

@@ -37,21 +37,21 @@ func (m *eventManager) ensureSorted() {
 }
 
 // triggerOnStarting triggers the OnStarting event
-func (m *eventManager) triggerOnStarting() {
+func (m *eventManager) triggerOnStarting(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if lifecycleEvent, ok := e.(StartingEvent); ok {
-			lifecycleEvent.OnStarting()
+			lifecycleEvent.OnStarting(ctx)
 		}
 	}
 }
 
 // triggerOnStarted triggers the OnStarted event
-func (m *eventManager) triggerOnStarted() {
+func (m *eventManager) triggerOnStarted(ctx app.ApplicationContext) {
 	m.ensureSorted()
 	for _, e := range m.events {
 		if lifecycleEvent, ok := e.(StartedEvent); ok {
-			lifecycleEvent.OnStarted()
+			lifecycleEvent.OnStarted(ctx)
 		}
 	}
 }

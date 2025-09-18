@@ -26,7 +26,7 @@ type StartingEvent interface {
 	//   - Setting up monitoring and health checks
 	//   - Performing pre-flight checks
 	//   - Registering middleware or routes
-	OnStarting()
+	OnStarting(ctx app.ApplicationContext)
 }
 
 // StartedEvent is called after the application has started successfully.
@@ -42,7 +42,7 @@ type StartedEvent interface {
 	//   - Logging startup completion status
 	//   - Triggering external system notifications
 	// Note: At this point, the HTTP server is running and ready to accept requests.
-	OnStarted()
+	OnStarted(ctx app.ApplicationContext)
 }
 
 // StoppedEvent is called after the HTTP server has stopped.
