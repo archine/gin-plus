@@ -34,12 +34,17 @@ func analyzeDefinition(def *BeanDef) {
 			continue
 		}
 
-		fieldOriginType := field.Type.Elem()
 		fieldKind := field.Type.Kind()
 		isInterface := fieldKind == reflect.Interface
 
-		if !isInterface && (fieldKind != reflect.Ptr || fieldOriginType.Kind() != reflect.Struct) {
-			panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
+		if !isInterface {
+			if fieldKind == reflect.Ptr {
+				if field.Type.Elem().Kind() != reflect.Struct {
+					panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
+				}
+			} else {
+				panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
+			}
 		}
 
 		def.AutowireFields = append(def.AutowireFields, &AutowireField{
