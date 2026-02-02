@@ -61,7 +61,7 @@ var jsonFormatter = func(param gin.LogFormatterParams) string {
 
 	if param.Keys != nil {
 		for k, v := range param.Keys {
-			fields = append(fields, gplog.Field{Key: k, Value: v})
+			fields = append(fields, gplog.Field{Key: k.(string), Value: v})
 		}
 	}
 

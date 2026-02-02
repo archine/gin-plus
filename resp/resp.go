@@ -105,6 +105,7 @@ func ParamValidation(ctx *gin.Context, obj any) bool {
 	if err == nil {
 		return true
 	}
+	gplog.ErrorWithCtx(ctx, err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, "Invalid parameters", nil).To(http.StatusOK)
 	return false
 }
@@ -176,6 +177,6 @@ func Error(ctx *gin.Context, err error) {
 		return
 	}
 
-	gplog.ErrorWithCtx(ctx, fmt.Sprintf("Internal Server Error: %v", err))
+	gplog.ErrorWithCtx(ctx, err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
 }
