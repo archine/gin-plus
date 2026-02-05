@@ -2,7 +2,7 @@ package gin_plus
 
 import (
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/gplog/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,7 +25,7 @@ func WithConfigProvider(providerFunc func() config.Provider) Option {
 // This allows the log to be configured based on the loaded configuration settings.
 //
 // Note: Calling this multiple times will overwrite the previous provider.
-func WithLogger(loggerFunc func(cp config.Provider) logcore.Logger) Option {
+func WithLogger(loggerFunc func(cp config.Provider) gplog.Logger) Option {
 	return func(app *App) {
 		app.loggerFunc = loggerFunc
 	}

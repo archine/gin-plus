@@ -13,13 +13,11 @@ import (
 
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
-	"github.com/archine/gin-plus/v4/component/gplog/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog"
+	"github.com/archine/gin-plus/v4/component/gplog/zapper"
+	"github.com/archine/gin-plus/v4/internal/server"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
-	"github.com/archine/gin-plus/v4/internal/vars/syslog"
-
-	"github.com/archine/gin-plus/v4/component/gplog"
-	"github.com/archine/gin-plus/v4/internal/server"
 )
 
 // RunMode defines the application's running mode.
@@ -45,7 +43,7 @@ type App struct {
 	server           *server.GinServer
 	appContext       app.ApplicationContext
 	confProviderFunc func() config.Provider
-	loggerFunc       func(cp config.Provider) logcore.Logger
+	loggerFunc       func(cp config.Provider) gplog.Logger
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -110,9 +108,12 @@ func (a *App) initialize() {
 	a.eventManager.triggerConfigLoaded(sysconf.Provider)
 
 	if a.loggerFunc == nil {
-		a.loggerFunc = logcore.NewZapLogger
+		a.loggerFunc = func(cp config.Provider) gplog.Logger {
+			return zapper.NewLogger(cp)
+		}
 	}
-	syslog.Log = a.loggerFunc(sysconf.Provider)
+	logger := a.loggerFunc(sysconf.Provider)
+	gplog.SetLogger(logger)
 
 	a.confProviderFunc = nil
 	a.loggerFunc = nil

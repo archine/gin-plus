@@ -9,6 +9,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.1
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

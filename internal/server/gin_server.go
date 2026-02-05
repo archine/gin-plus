@@ -10,11 +10,9 @@ import (
 	"time"
 
 	"github.com/archine/gin-plus/v4/app"
-	"github.com/archine/gin-plus/v4/component/gplog/logcore"
+	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
-
-	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -78,7 +76,7 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 			Output:    &logWriter{},
 			SkipPaths: s.conf.SkipLogPaths,
 		}
-		if gplog.GetLogger().GetFormat() == logcore.JSONFormat {
+		if gplog.GetLogger().GetFormat() == gplog.JSONFormat {
 			logConf.Formatter = jsonFormatter
 		} else {
 			logConf.Formatter = consoleFormatter
