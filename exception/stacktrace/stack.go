@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	MaximumStack = 16 // Maximum number of stack frames to capture and print, limiting to 16 layers
+	MaximumStack = 32 // Maximum number of stack frames to capture and print, limiting to 32 layers
 	CallerSkip   = 3  // Number of stack frames to skip, including up to the current method
 )
 
