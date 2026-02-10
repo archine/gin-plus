@@ -8,15 +8,7 @@ const (
 )
 
 // Field represents a key-value pair for structured logging.
-type Field struct {
-	Key   string
-	Value any
-}
-
-// F is a shorthand function to create a Field.
-func F(key string, value any) Field {
-	return Field{Key: key, Value: value}
-}
+type Field map[string]any
 
 // Logger defines the logging interface for the application.
 type Logger interface {

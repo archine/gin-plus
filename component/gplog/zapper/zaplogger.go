@@ -239,10 +239,12 @@ func (d *zapLogger) buildFields(ctx context.Context, gpFields []gplog.Field) []z
 		capacity += len(d.keys)
 	}
 
-	zapFields := make([]zap.Field, len(gpFields), capacity)
+	zapFields := make([]zap.Field, 0, capacity)
 
-	for i, f := range gpFields {
-		zapFields[i] = zap.Any(f.Key, f.Value)
+	for _, f := range gpFields {
+		for key, value := range f {
+			zapFields = append(zapFields, zap.Any(key, value))
+		}
 	}
 
 	if ctx != nil {
