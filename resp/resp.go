@@ -76,6 +76,7 @@ func (r *Result) To(httpCode int) {
 	r.ctx.JSON(httpCode, r)
 	r.ctx.Abort()
 
+	// Clean up fields before putting back to pool
 	r.ctx = nil
 	r.Code = 0
 	r.Message = ""
@@ -91,9 +92,11 @@ func InitResp(ctx *gin.Context) Resp {
 
 // BadRequest returns a business-related error.
 func BadRequest(ctx *gin.Context, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	if message == "" {
+	var message string
+	if format == "" {
 		message = http.StatusText(http.StatusBadRequest)
+	} else {
+		message = fmt.Sprintf(format, args...)
 	}
 	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, message, nil).To(http.StatusOK)
 }
@@ -105,34 +108,40 @@ func ParamValidation(ctx *gin.Context, obj any) bool {
 	if err == nil {
 		return true
 	}
-	gplog.ErrorWithCtx(ctx, err.Error())
+	gplog.ErrorWithCtx(ctx.Request.Context(), err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, "Invalid parameters", nil).To(http.StatusOK)
 	return false
 }
 
 // Forbidden handles situations where access is forbidden.
 func Forbidden(ctx *gin.Context, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	if message == "" {
+	var message string
+	if format == "" {
 		message = http.StatusText(http.StatusForbidden)
+	} else {
+		message = fmt.Sprintf(format, args...)
 	}
 	InitResp(ctx).WithBasic(exception.DefaultForbiddenCode, message, nil).To(http.StatusOK)
 }
 
 // NoLogin handles situations where the user is not logged in.
 func NoLogin(ctx *gin.Context, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	if message == "" {
+	var message string
+	if format == "" {
 		message = "Not logged in"
+	} else {
+		message = fmt.Sprintf(format, args...)
 	}
 	InitResp(ctx).WithBasic(exception.DefaultNoLoginCode, message, nil).To(http.StatusUnauthorized)
 }
 
 // LoginExpired handles cases where the user's login session has expired.
 func LoginExpired(ctx *gin.Context, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	if message == "" {
+	var message string
+	if format == "" {
 		message = "Login expired"
+	} else {
+		message = fmt.Sprintf(format, args...)
 	}
 	InitResp(ctx).WithBasic(exception.DefaultTokenExpired, message, nil).To(http.StatusUnauthorized)
 }
@@ -148,8 +157,8 @@ func Json(ctx *gin.Context, data any) {
 }
 
 // Code responds with a custom business code and message.
-func Code(ctx *gin.Context, code int, format string, args ...any) {
-	InitResp(ctx).WithBasic(code, fmt.Sprintf(format, args...), nil).To(http.StatusOK)
+func Code(ctx *gin.Context, bcode int, format string, args ...any) {
+	InitResp(ctx).WithBasic(bcode, fmt.Sprintf(format, args...), nil).To(http.StatusOK)
 }
 
 // Error responds with an error
@@ -168,7 +177,7 @@ func Error(ctx *gin.Context, err error) {
 	}
 	var stackErr *exception.StackError
 	if errors.As(err, &stackErr) {
-		gplog.ErrorWithCtx(ctx, stackErr.ToString())
+		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.ToString())
 	}
 
 	var businessErr *exception.BusinessException
@@ -177,6 +186,6 @@ func Error(ctx *gin.Context, err error) {
 		return
 	}
 
-	gplog.ErrorWithCtx(ctx, err.Error())
+	gplog.ErrorWithCtx(ctx.Request.Context(), err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
 }
