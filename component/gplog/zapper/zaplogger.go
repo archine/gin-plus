@@ -133,7 +133,7 @@ func NewLogger(cp config.Provider, opts ...Option) gplog.Logger {
 	}
 
 	ec := zapcore.EncoderConfig{
-		TimeKey:          "timestamp",
+		TimeKey:          "time",
 		LevelKey:         "level",
 		CallerKey:        "caller",
 		MessageKey:       "msg",
