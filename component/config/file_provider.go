@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -34,9 +35,8 @@ func NewFileProvider() Provider {
 	}
 
 	lc := &FileProvider{v: v}
-	_, _ = fmt.Fprintf(os.Stderr, "%s  Successfully loaded configuration from file: [%s]\n",
-		time.Now().Format("2006-01-02 15:04:05"), configFile)
-
+	
+	log.Printf("Successfully loaded configuration from file: [%s]", configFile)
 	return lc
 }
 

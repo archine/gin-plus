@@ -133,8 +133,8 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
-	case <-time.After(10 * time.Millisecond):
-		// wait some time for the server to start
+	case <-time.After(3 * time.Millisecond):
+		// wait a moment to ensure the server has started before logging
 		s.server = &serve
 	}
 
@@ -143,11 +143,11 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 
 // Shutdown gracefully stops the Gin server
 func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
-	if s == nil {
+	if s.server == nil {
 		return fmt.Errorf("server is not running")
 	}
 	if s.conf == nil {
-		return fmt.Errorf("server configuration is not set")
+		return fmt.Errorf("server configuration is not initialized")
 	}
 
 	shutdownCtx := context.Background()
@@ -161,6 +161,8 @@ func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
 	if err != nil {
 		return err
 	}
+
+	s.server = nil
 
 	if closeFunc != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), s.conf.ExitDelay)
@@ -203,7 +205,7 @@ func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine
 		})
 	}
 
-	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeOf((*mvc.AbstractController)(nil)).Elem())
+	ctrls, found := appCtx.GetAllBeansByType(reflect.TypeFor[mvc.AbstractController]())
 
 	if !found {
 		return
@@ -213,5 +215,5 @@ func (s *GinServer) applyRoute(appCtx app.ApplicationContext, engine *gin.Engine
 		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
 	}
 
-	gplog.Info("API route registration completed: all routes are mapped and active")
+	gplog.Info("All routes have been applied to the Gin engine")
 }

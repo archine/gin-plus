@@ -125,7 +125,7 @@ func (a *App) refreshContainer() {
 	a.eventManager.triggerContainerRefreshBefore(a.appContext)
 
 	sysctr.Container.Refresh()
-	gplog.Info("Application container refreshed and ready")
+	gplog.Info("Bean container refreshed successfully")
 
 	a.eventManager.triggerContainerRefreshAfter(a.appContext)
 }

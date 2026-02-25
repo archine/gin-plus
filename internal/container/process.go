@@ -18,8 +18,8 @@ func analyzeDefinition(def *BeanDef) {
 
 		valueTag, existValueTag := field.Tag.Lookup(injector.ValueTag)
 		if existValueTag && valueTag != "" {
-			// If the field has a configuration tag, it is not an autowire field.
-			// We can skip it for autowiring.
+			// If the field has a value tag, it is treated as a config value injection point.
+			// Config value injection over autowiring, so we skip autowire tag processing for this field.
 			def.AutowireFields = append(def.AutowireFields, &AutowireField{
 				Index:    i,
 				Name:     field.Name,
@@ -29,6 +29,7 @@ func analyzeDefinition(def *BeanDef) {
 			continue
 		}
 
+		// Process autowire tag for dependency injection.
 		autowireTag, existAutowireTag := field.Tag.Lookup(injector.AutowireTag)
 		if !existAutowireTag || autowireTag == "-" {
 			continue
@@ -37,14 +38,8 @@ func analyzeDefinition(def *BeanDef) {
 		fieldKind := field.Type.Kind()
 		isInterface := fieldKind == reflect.Interface
 
-		if !isInterface {
-			if fieldKind == reflect.Ptr {
-				if field.Type.Elem().Kind() != reflect.Struct {
-					panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
-				}
-			} else {
-				panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
-			}
+		if !isInterface && !(fieldKind == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct) {
+			panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
 		}
 
 		def.AutowireFields = append(def.AutowireFields, &AutowireField{
@@ -133,6 +128,7 @@ func initializeBeans(c *Container, ctrlType reflect.Type) {
 // prepareIFaceImplements prepares the interface implementations in the container.
 func prepareIFaceImplements(c *Container, iface reflect.Type) {
 	if c.LookupType(iface) {
+		// If the interface type is already prepared, skip it.
 		return
 	}
 

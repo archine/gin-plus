@@ -2,10 +2,10 @@ package container
 
 import (
 	"fmt"
-	"github.com/archine/gin-plus/v4/internal/container/injector"
-	"github.com/archine/gin-plus/v4/util/strutil"
 	"reflect"
 	"sync"
+
+	"github.com/archine/gin-plus/v4/util/strutil"
 
 	"github.com/archine/gin-plus/v4/component/mvc"
 )
@@ -78,8 +78,11 @@ func (c *Container) RegisterBeanDef(name string, def *BeanDef) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if _, exists := c.beans[name]; exists {
+		panic(fmt.Sprintf("bean with name '%s' already exists", name))
+	}
 	c.beans[name] = def
-	c.typeMapping[def.OriginType] = []string{name}
+	c.typeMapping[def.OriginType] = append(c.typeMapping[def.OriginType], name)
 }
 
 // LookupType checks if a type is registered in the container.
@@ -87,7 +90,7 @@ func (c *Container) LookupType(typ reflect.Type) bool {
 	if typ == nil {
 		return false
 	}
-	if typ.Kind() == reflect.Ptr {
+	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 	c.mu.RLock()
@@ -123,7 +126,7 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 	if typ == nil {
 		return nil, false
 	}
-	if typ.Kind() == reflect.Ptr {
+	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 
@@ -147,7 +150,7 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 	if typ == nil {
 		return nil, false
 	}
-	if typ.Kind() == reflect.Ptr {
+	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 
@@ -201,34 +204,28 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 
 	structType := beanTyp.Elem()
 
-	c.mu.RLock()
-	if _, exists := c.beans[name]; exists {
-		c.mu.RUnlock()
-		panic(fmt.Sprintf("bean with name '%s' already exists", name))
-	}
-	c.mu.RUnlock()
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for _, itype := range itypes {
-		if !beanTyp.Implements(itype) {
-			continue
-		}
-		c.typeMapping[itype] = append(c.typeMapping[itype], name)
+	if _, exists := c.beans[name]; exists {
+		panic(fmt.Sprintf("bean with name '%s' already exists", name))
 	}
 
-	if _, exists := c.beans[name]; !exists {
-		c.beans[name] = &BeanDef{
-			ready: true,
-			Value: instance,
-		}
-		c.typeMapping[structType] = append(c.typeMapping[structType], name)
+	c.beans[name] = &BeanDef{
+		ready: true,
+		Value: instance,
+	}
+	c.typeMapping[structType] = append(c.typeMapping[structType], name)
 
-		if _, ok := instance.(mvc.AbstractController); ok {
-			ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
-			c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
+	for _, itype := range itypes {
+		if beanTyp.Implements(itype) {
+			c.typeMapping[itype] = append(c.typeMapping[itype], name)
 		}
+	}
+
+	if _, ok := instance.(mvc.AbstractController); ok {
+		ctrlType := reflect.TypeFor[mvc.AbstractController]()
+		c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
 	}
 }
 
@@ -239,7 +236,7 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 // If any bean creation fails, it logs a fatal error and stops the application.
 func (c *Container) Refresh() {
 	c.once.Do(func() {
-		ctrlType := reflect.TypeOf((*mvc.AbstractController)(nil)).Elem()
+		ctrlType := reflect.TypeFor[mvc.AbstractController]()
 
 		for beanName, beanDef := range c.beans {
 			if beanDef.ready {
@@ -255,6 +252,5 @@ func (c *Container) Refresh() {
 		}
 
 		initializeBeans(c, ctrlType)
-		injector.CleanWireConfigCache()
 	})
 }

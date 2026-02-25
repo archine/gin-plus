@@ -15,24 +15,30 @@ import (
 )
 
 const (
-	// ValueTag is used to mark fields for automatic injector of config values.
-	// Note: Unlike the autowire tag, it is only for injecting config values
+	// ValueTag is used to mark fields for automatic injection of config values.
+	// Note: Unlike the autowire tag, it is only for injecting config values.
 	// Example: `value:"${key:default}"`
 	ValueTag = "value"
+
+	// DecodeTag is used for mapstructure decoding of complex types (structs, maps, slices).
+	// It allows both "mapstructure" and "json" tags to be used for field names.
+	DecodeTag = "json,mapstructure"
 )
 
 var (
-	timeType     = reflect.TypeOf(time.Time{})
-	durationType = reflect.TypeOf(time.Duration(0))
+	timeType     = reflect.TypeFor[time.Time]()
+	durationType = reflect.TypeFor[time.Duration]()
+
+	// complexDecodeHook is stateless and reused across all decodeComplex calls.
+	complexDecodeHook = mapstructure.ComposeDecodeHookFunc(
+		mapstructure.TextUnmarshallerHookFunc(),
+		mapstructure.StringToTimeDurationHookFunc(),
+		mapstructure.StringToTimeLocationHookFunc(),
+		mapstructure.StringToSliceHookFunc(","),
+	)
 )
 
-// CleanWireConfigCache clears the cached regular expression and type information used for injecting configuration values.
-func CleanWireConfigCache() {
-	timeType = nil
-	durationType = nil
-}
-
-// WireConfigValue injects a configuration value into a struct field based on the provided tag value.
+// WireConfigValue resolves the tag expression, looks up the config value, and sets the field.
 func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue string) error {
 	if !strings.HasPrefix(tagValue, "${") || !strings.HasSuffix(tagValue, "}") {
 		return fmt.Errorf("invalid config tag value: %s, must be in the format ${key:default}", tagValue)
@@ -41,179 +47,193 @@ func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue 
 	content := tagValue[2 : len(tagValue)-1]
 	parts := strings.SplitN(content, ":", 2)
 
-	key := parts[0]
-	defaultValue := ""
+	key := strings.TrimSpace(parts[0])
+	defaultVal := ""
 	if len(parts) > 1 {
-		defaultValue = strings.TrimSpace(parts[1])
+		defaultVal = strings.TrimSpace(parts[1])
 	}
 
-	value := sysconf.Provider.Get(key)
-	if value == nil {
-		if defaultValue == "" {
+	val := sysconf.Provider.Get(key)
+	if val == nil {
+		if defaultVal == "" {
 			return nil
 		}
-
-		value = defaultValue
+		val = defaultVal
 	}
 
-	return convert(fieldValue, fieldType, value)
+	return setField(fieldValue, fieldType, val)
 }
 
-// convert converts value to the appropriate type and sets it to fieldValue
-func convert(fieldValue reflect.Value, fieldType reflect.Type, val any) error {
+// setField is the single dispatch point: it resolves the concrete target type and
+// routes to the appropriate converter. The target type drives all decisions — no
+// speculative parsing is done before we know what we are converting into.
+func setField(fieldValue reflect.Value, fieldType reflect.Type, prepareSetValue any) error {
 	actualType := fieldType
-	if fieldType.Kind() == reflect.Ptr {
+	isPtr := fieldType.Kind() == reflect.Pointer
+	if isPtr {
 		actualType = fieldType.Elem()
 	}
 
-	val = parseJSONIfNeeded(val)
-
-	if convertValue := convertBasic(actualType, val); convertValue != nil {
-		if fieldValue.Kind() == reflect.Ptr {
-			newPtr := reflect.New(actualType)
-			newPtr.Elem().Set(reflect.ValueOf(convertValue))
-			util.DirectSetValue(fieldValue, newPtr)
-		} else {
-			util.DirectSetValue(fieldValue, reflect.ValueOf(convertValue))
-		}
-
-		return nil
-	}
-
-	return convertOther(fieldValue, val)
-}
-
-// convertBasic handles basic types
-func convertBasic(targetType reflect.Type, val any) any {
-	if targetType == timeType {
-		return cast.ToTime(val)
-	}
-	if targetType == durationType {
-		return cast.ToDuration(val)
-	}
-
-	switch targetType.Kind() {
-	case reflect.Bool:
-		return cast.ToBool(val)
-	case reflect.String:
-		return cast.ToString(val)
-	case reflect.Int:
-		return cast.ToInt(val)
-	case reflect.Int8:
-		return cast.ToInt8(val)
-	case reflect.Int16:
-		return cast.ToInt16(val)
-	case reflect.Int32:
-		return cast.ToInt32(val)
-	case reflect.Int64:
-		return cast.ToInt64(val)
-	case reflect.Uint:
-		return cast.ToUint(val)
-	case reflect.Uint8:
-		return cast.ToUint8(val)
-	case reflect.Uint16:
-		return cast.ToUint16(val)
-	case reflect.Uint32:
-		return cast.ToUint32(val)
-	case reflect.Uint64:
-		return cast.ToUint64(val)
-	case reflect.Float32:
-		return cast.ToFloat32(val)
-	case reflect.Float64:
-		return cast.ToFloat64(val)
-	case reflect.Slice:
-		return convertSliceValue(targetType, val)
-	default:
-		return nil
-	}
-}
-
-// convertOther handles complex types using map-structure
-func convertOther(fieldValue reflect.Value, val any) error {
-	tempValue := fieldValue
-	if !fieldValue.CanSet() {
-		tempValue = reflect.New(fieldValue.Type())
-	}
-
-	config := &mapstructure.DecoderConfig{
-		Result:           tempValue.Interface(),
-		WeaklyTypedInput: true,
-		DecodeHook: mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeDurationHookFunc(),
-			mapstructure.StringToSliceHookFunc(","),
-		),
-	}
-
-	decoder, err := mapstructure.NewDecoder(config)
+	converted, err := dispatchConvert(actualType, prepareSetValue)
 	if err != nil {
 		return err
 	}
 
-	if err = decoder.Decode(val); err != nil {
-		return err
+	if converted != nil {
+		if isPtr {
+			ptr := reflect.New(actualType)
+			ptr.Elem().Set(reflect.ValueOf(converted))
+			util.DirectSetValue(fieldValue, ptr)
+		} else {
+			util.DirectSetValue(fieldValue, reflect.ValueOf(converted))
+		}
+		return nil
 	}
 
-	util.DirectSetValue(fieldValue, tempValue.Elem())
+	// Fall through to mapstructure for struct / map / slice-of-struct, etc.
+	// JSON pre-parsing happens here, where we actually need it.
+	// Always pass the dereferenced type so decodeComplex never sees a pointer.
+	result, err := decodeComplex(actualType, prepareSetValue)
+	if err != nil {
+		return err
+	}
+	if isPtr {
+		util.DirectSetValue(fieldValue, result.Addr())
+	} else {
+		util.DirectSetValue(fieldValue, result)
+	}
+
 	return nil
 }
 
-// convertSliceValue converts a value to a slice of the specified type.
-func convertSliceValue(targetType reflect.Type, val any) any {
-	elemType := targetType.Elem()
+// dispatchConvert converts val to the basic/primitive target type.
+// Returns (nil, nil) to signal "not a basic type — caller should use decodeComplex".
+func dispatchConvert(targetType reflect.Type, val any) (any, error) {
+	// Named types based on reflect.Type identity
+	if targetType == timeType {
+		return cast.ToTimeInDefaultLocationE(val, nil)
+	}
+	if targetType == durationType {
+		return cast.ToDurationE(val)
+	}
 
-	switch elemType.Kind() {
-	case reflect.Bool:
-		return cast.ToBoolSlice(val)
+	switch targetType.Kind() {
 	case reflect.String:
-		return cast.ToStringSlice(val)
+		return cast.ToStringE(val)
+	case reflect.Bool:
+		return cast.ToBoolE(val)
 	case reflect.Int:
-		return cast.ToIntSlice(val)
+		return cast.ToIntE(val)
 	case reflect.Int8:
-		v, _ := cast.ToInt8SliceE(val)
-		return v
+		return cast.ToInt8E(val)
 	case reflect.Int16:
-		v, _ := cast.ToInt16SliceE(val)
-		return v
+		return cast.ToInt16E(val)
 	case reflect.Int32:
-		v, _ := cast.ToInt32SliceE(val)
-		return v
+		return cast.ToInt32E(val)
 	case reflect.Int64:
-		return cast.ToInt64Slice(val)
+		return cast.ToInt64E(val)
 	case reflect.Uint:
-		return cast.ToUintSlice(val)
+		return cast.ToUintE(val)
 	case reflect.Uint8:
-		v, _ := cast.ToUint8SliceE(val)
-		return v
+		return cast.ToUint8E(val)
 	case reflect.Uint16:
-		v, _ := cast.ToUint16SliceE(val)
-		return v
+		return cast.ToUint16E(val)
 	case reflect.Uint32:
-		v, _ := cast.ToUint32SliceE(val)
-		return v
+		return cast.ToUint32E(val)
 	case reflect.Uint64:
-		v, _ := cast.ToUint64SliceE(val)
-		return v
+		return cast.ToUint64E(val)
 	case reflect.Float32:
-		v, _ := cast.ToFloat32SliceE(val)
-		return v
+		return cast.ToFloat32E(val)
 	case reflect.Float64:
-		return cast.ToFloat64Slice(val)
+		return cast.ToFloat64E(val)
+	case reflect.Slice:
+		return dispatchSliceConvert(targetType, val)
 	default:
-		return nil
+		return nil, nil
 	}
 }
 
-// parseJSONIfNeeded tries to parse a string as JSON if it looks like a JSON object or array.
-func parseJSONIfNeeded(val any) any {
-	if valStr, ok := val.(string); ok {
-		trimmed := strings.TrimSpace(valStr)
-		if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
-			(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
-			var parsed any
-			if err := json.Unmarshal([]byte(valStr), &parsed); err == nil {
-				return parsed
-			}
-		}
+// dispatchSliceConvert handles slices whose element type is a basic type.
+// Returns (nil, nil) for slices of structs / maps, which fall through to decodeComplex.
+func dispatchSliceConvert(targetType reflect.Type, val any) (any, error) {
+	switch targetType.Elem().Kind() {
+	case reflect.String:
+		return cast.ToStringSliceE(val)
+	case reflect.Bool:
+		return cast.ToBoolSliceE(val)
+	case reflect.Int:
+		return cast.ToIntSliceE(val)
+	case reflect.Int8:
+		return cast.ToInt8SliceE(val)
+	case reflect.Int16:
+		return cast.ToInt16SliceE(val)
+	case reflect.Int32:
+		return cast.ToInt32SliceE(val)
+	case reflect.Int64:
+		return cast.ToInt64SliceE(val)
+	case reflect.Uint:
+		return cast.ToUintSliceE(val)
+	case reflect.Uint8:
+		return cast.ToUint8SliceE(val)
+	case reflect.Uint16:
+		return cast.ToUint16SliceE(val)
+	case reflect.Uint32:
+		return cast.ToUint32SliceE(val)
+	case reflect.Uint64:
+		return cast.ToUint64SliceE(val)
+	case reflect.Float32:
+		return cast.ToFloat32SliceE(val)
+	case reflect.Float64:
+		return cast.ToFloat64SliceE(val)
+	default:
+		return nil, nil
 	}
-	return val
+}
+
+// decodeComplex handles struct, map, and other composite types via mapstructure.
+// If val is a JSON string (object or array), it is parsed first so that mapstructure
+// receives a map/slice rather than a raw string.
+// targetType must be the dereferenced (non-pointer) type.
+func decodeComplex(targetType reflect.Type, val any) (reflect.Value, error) {
+	decoded, err := tryParseJSONString(val)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	ptr := reflect.New(targetType)
+	cfg := &mapstructure.DecoderConfig{
+		Result:           ptr.Interface(),
+		TagName:          DecodeTag,
+		WeaklyTypedInput: true,
+		DecodeHook:       complexDecodeHook,
+	}
+
+	dec, err := mapstructure.NewDecoder(cfg)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	if err = dec.Decode(decoded); err != nil {
+		return reflect.Value{}, err
+	}
+
+	return ptr.Elem(), nil
+}
+
+// tryParseJSONString unmarshal val if it is a string starting with '{' or '['.
+// Plain strings are returned unchanged, and non-string values pass through as-is.
+// An error is returned only when the input looks like JSON but is malformed.
+func tryParseJSONString(val any) (any, error) {
+	s, ok := val.(string)
+	if !ok {
+		return val, nil
+	}
+	s = strings.TrimSpace(s)
+	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
+		return val, nil
+	}
+	var out any
+	if err := json.Unmarshal([]byte(s), &out); err != nil {
+		return nil, fmt.Errorf("failed to parse config value as JSON: %w", err)
+	}
+	return out, nil
 }

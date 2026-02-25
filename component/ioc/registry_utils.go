@@ -23,7 +23,7 @@ func RegisterBeanDef(instance any) {
 
 	typ := reflect.TypeOf(instance)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
-		panic("bean instance must be a pointer to a struct")
+		panic("only struct pointers can be registered as beans")
 	}
 
 	def := &container.BeanDef{
