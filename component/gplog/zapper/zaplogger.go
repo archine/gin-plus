@@ -230,21 +230,20 @@ func (d *zapLogger) FatalWithCtx(ctx context.Context, text string, fields ...gpl
 }
 
 func (d *zapLogger) buildFields(ctx context.Context, gpFields []gplog.Field) []zap.Field {
-	if len(gpFields) == 0 && (ctx == nil || len(d.keys) == 0) {
-		return []zap.Field{}
+	// Estimate capacity: gpFields + all possible context keys
+	capacity := len(gpFields)
+	if ctx != nil && len(d.keys) > 0 {
+		capacity += len(d.keys)
 	}
 
-	capacity := len(gpFields)
-	if len(d.keys) > 0 {
-		capacity += len(d.keys)
+	if capacity == 0 {
+		return nil
 	}
 
 	zapFields := make([]zap.Field, 0, capacity)
 
 	for _, f := range gpFields {
-		for key, value := range f {
-			zapFields = append(zapFields, zap.Any(key, value))
-		}
+		zapFields = append(zapFields, zap.Any(f.Key, f.Value))
 	}
 
 	if ctx != nil {

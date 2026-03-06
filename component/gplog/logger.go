@@ -8,7 +8,27 @@ const (
 )
 
 // Field represents a key-value pair for structured logging.
-type Field map[string]any
+type Field struct {
+	Key   string
+	Value any
+}
+
+// F creates a Field with a single key-value pair.
+// This is a convenience function to reduce allocations compared to map literals.
+// Example: log.Info("message", gplog.F("user_id", 123), gplog.F("action", "login"))
+func F(key string, value any) Field {
+	return Field{Key: key, Value: value}
+}
+
+// M creates multiple fields from a map literal.
+// Example: log.Info("message", gplog.M(map[string]any{"user_id": 123, "action": "login"})...)
+func M(m map[string]any) []Field {
+	fields := make([]Field, 0, len(m))
+	for k, v := range m {
+		fields = append(fields, Field{Key: k, Value: v})
+	}
+	return fields
+}
 
 // Logger defines the logging interface for the application.
 type Logger interface {
