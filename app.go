@@ -44,6 +44,7 @@ type App struct {
 	appContext       app.ApplicationContext
 	confProviderFunc func() config.Provider
 	loggerFunc       func(cp config.Provider) gplog.Logger
+	initialized      atomic.Bool // Track initialization state
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -100,13 +101,21 @@ func (a *App) Run(mode RunMode) {
 
 // initialize initializes the application configuration and logger.
 // This method is called automatically when the application starts.
+// It's safe to call multiple times - subsequent calls are no-ops.
 func (a *App) initialize() {
+	// Fast path: already initialized
+	if a.initialized.Load() {
+		return
+	}
+
+	// Initialize config provider
 	if a.confProviderFunc == nil {
 		a.confProviderFunc = config.NewFileProvider
 	}
 	sysconf.Provider = a.confProviderFunc()
 	a.eventManager.triggerConfigLoaded(sysconf.Provider)
 
+	// Initialize logger
 	if a.loggerFunc == nil {
 		a.loggerFunc = func(cp config.Provider) gplog.Logger {
 			return zapper.NewLogger(cp)
@@ -115,8 +124,11 @@ func (a *App) initialize() {
 	logger := a.loggerFunc(sysconf.Provider)
 	gplog.SetLogger(logger)
 
+	// Clear function references to allow GC
 	a.confProviderFunc = nil
 	a.loggerFunc = nil
+
+	a.initialized.Store(true)
 	gplog.Info("Application configuration and logger initialized")
 }
 
@@ -132,23 +144,25 @@ func (a *App) refreshContainer() {
 
 // startServer extracts the server startup logic for better readability
 func (a *App) startServer() {
-	err := a.server.Init()
-	if err != nil {
-		gplog.Error(fmt.Sprintf("Starting server failed: %v", err))
+	if err := a.server.Init(); err != nil {
+		gplog.Error("Starting server failed: " + err.Error())
 		return
 	}
-	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", a.server.GetName(), a.server.GetAddress(), os.Getpid()))
+
+	serverName := a.server.GetName()
+	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d",
+		serverName, a.server.GetAddress(), os.Getpid()))
 
 	a.eventManager.triggerOnStarting(a.appContext)
 
 	startTime := time.Now()
-	if err = a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		gplog.Error(fmt.Sprintf("Starting %s failed: %v", a.server.GetName(), err))
+	if err := a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		gplog.Error("Starting " + serverName + " failed: " + err.Error())
 		return
 	}
 
 	a.eventManager.triggerOnStarted(a.appContext)
-	gplog.Info(fmt.Sprintf("Started %s in %v", a.server.GetName(), time.Since(startTime)))
+	gplog.Info(fmt.Sprintf("Started %s in %v", serverName, time.Since(startTime)))
 
 	a.waitForShutdown()
 }
@@ -164,7 +178,7 @@ func (a *App) waitForShutdown() {
 	if err := a.server.Shutdown(func(ctx context.Context) {
 		a.eventManager.triggerOnStopped(ctx)
 	}); err != nil {
-		gplog.Warn(fmt.Sprintf("Graceful shutdown failed: %v", err))
+		gplog.Warn("Graceful shutdown failed: " + err.Error())
 		return
 	}
 

@@ -5,18 +5,36 @@ import (
 	"strings"
 )
 
-// Wrap wraps the original error, optionally attaches a custom message, and supports chaining multiple additional errors.
-// Args:
-//   - err: The original error to wrap.
-//   - msg: Optional custom message to attach.
-//   - more: Optional additional errors to chain.
+// Wrap wraps an error with an optional context message and supports chaining multiple errors.
+// It returns nil if the input error is nil, making it safe to use in error propagation chains.
 //
-// Returns: A formatted error containing the original error, custom message, and all additional errors.
-// Example:
+// Parameters:
+//   - err: The error to wrap (returns nil if err is nil)
+//   - msg: Optional context message (can be empty string)
+//   - more: Optional additional errors to chain together
 //
-//	err := errors.New("original error")
-//	wrappedErr := Wrap(err, "extra info", anotherErr)
-//	fmt.Println(wrappedErr) // Output: original error: extra info: anotherErr
+// Returns: A wrapped error that preserves the error chain for errors.Is and errors.As.
+//
+// Examples:
+//
+//	// Basic wrapping with context
+//	err := errors.New("connection failed")
+//	wrapped := Wrap(err, "database operation failed")
+//	// Output: database operation failed: connection failed
+//
+//	// Wrapping without message
+//	wrapped := Wrap(err, "")
+//	// Output: connection failed
+//
+//	// Chaining multiple errors
+//	err1 := errors.New("timeout")
+//	err2 := errors.New("retry failed")
+//	wrapped := Wrap(err1, "operation failed", err2)
+//	// Output: operation failed: timeout: retry failed
+//
+//	// Safe nil handling
+//	wrapped := Wrap(nil, "some context")
+//	// Output: nil
 func Wrap(err error, msg string, more ...error) error {
 	if err == nil {
 		return nil
@@ -25,10 +43,10 @@ func Wrap(err error, msg string, more ...error) error {
 	args := make([]any, 0, 2+len(more))
 
 	if msg != "" {
-		builder.WriteString("%s")
+		builder.WriteString("%s: ")
 		args = append(args, msg)
 	}
-	builder.WriteString(": %w")
+	builder.WriteString("%w")
 	args = append(args, err)
 
 	for _, e := range more {
@@ -36,25 +54,31 @@ func Wrap(err error, msg string, more ...error) error {
 		args = append(args, e)
 	}
 
-	if builder.Len() == 0 {
-		// If no valid message was added, return the original error
-		return err
-	}
 	return fmt.Errorf(builder.String(), args...)
 }
 
-// WrapF wraps the original error with a formatted message and supports chaining multiple additional errors.
-// Args:
-//   - err: The original error to wrap.
-//   - format: Format string for the custom message.
-//   - args: Arguments for formatting the message.
+// WrapF wraps an error with a formatted context message using fmt.Sprintf formatting.
+// It's a convenience wrapper around Wrap that allows printf-style formatting.
 //
-// Returns: A formatted error containing the original error and the formatted message.
-// Example:
+// Parameters:
+//   - err: The error to wrap (returns nil if err is nil)
+//   - format: Printf-style format string for the context message
+//   - args: Arguments for the format string
 //
-//	err := errors.New("original error")
-//	wrappedErr := WrapF(err, "extra info: %v", anotherErr)
-//	fmt.Println(wrappedErr) // Output: original error: extra info: anotherErr
+// Returns: A wrapped error with the formatted message.
+//
+// Examples:
+//
+//	// Format with variables
+//	err := errors.New("not found")
+//	wrapped := WrapF(err, "user %s (id: %d) lookup failed", "zhangsan", 123)
+//	// Output: user zhangsan (id: 123) lookup failed: not found
+//
+//	// Format with error values
+//	err1 := errors.New("timeout")
+//	err2 := errors.New("connection refused")
+//	wrapped := WrapF(err1, "failed after %d retries: %v", 3, err2)
+//	// Output: failed after 3 retries: connection refused: timeout
 func WrapF(err error, format string, args ...any) error {
 	return Wrap(err, fmt.Sprintf(format, args...))
 }

@@ -177,7 +177,7 @@ func Error(ctx *gin.Context, err error) {
 	}
 	var stackErr *exception.StackError
 	if errors.As(err, &stackErr) {
-		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.ToString())
+		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.String())
 	}
 
 	var businessErr *exception.BusinessException

@@ -11,8 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Cors Cross-domain middleware
-func Cors() gin.HandlerFunc {
+// CORS returns a middleware that handles Cross-Origin Resource Sharing (CORS).
+// It allows all origins, common HTTP methods, and credentials by default.
+//
+// Default configuration:
+//   - Allows all origins (AllowOriginFunc returns true)
+//   - Allows methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
+//   - Allows all headers
+//   - Exposes headers: Content-Length, Content-Type, Request-Id, X-Request-Id
+//   - Allows credentials (cookies, authorization headers)
+//
+// Example:
+//
+//	app := gin.New()
+//	app.Use(middleware.CORS())
+func CORS() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"*"},
@@ -24,21 +37,64 @@ func Cors() gin.HandlerFunc {
 	})
 }
 
-// GlobalExceptionInterceptor gin global exception interceptor
-// add via gin middleware.
-// thrown when the exception type is string and the BusinessException
-func GlobalExceptionInterceptor(ctx *gin.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			resp.Code(ctx, exception.DefaultSystemErrorCode, "Internal Server Error")
-			gplog.ErrorWithCtx(ctx, fmt.Sprintf("%v\n%s", r, getTrace()))
-		}
-	}()
-	ctx.Next()
+// Recovery returns a middleware that recovers from panics and logs the error with stack trace.
+// It catches all panics in the request handling chain and returns a standardized error response.
+//
+// Behavior:
+//   - Catches any panic that occurs during request processing
+//   - Returns HTTP 500 with error code DefaultSystemErrorCode
+//   - Logs the panic value and full stack trace for debugging
+//   - Prevents the application from crashing
+//
+// Example:
+//
+//	app := gin.New()
+//	app.Use(middleware.Recovery())
+//
+// Note: This middleware should typically be registered first to catch panics
+// from all subsequent middlewares and handlers.
+func Recovery() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		defer func() {
+			if r := recover(); r != nil {
+				// Return error response to client
+				resp.Code(ctx, exception.DefaultSystemErrorCode, "Internal Server Error")
+
+				// Log panic with stack trace for debugging
+				stack := stacktrace.Capture(3, 16) // Capture up to 16 frames
+				defer stack.Free()
+
+				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.ToString()))
+			}
+		}()
+		ctx.Next()
+	}
 }
 
-func getTrace() string {
-	stack := stacktrace.Capture(3, 8)
-	defer stack.Free()
-	return stack.ToString()
+// RecoveryWithMessage returns a middleware that recovers from panics with a custom error message.
+// Similar to Recovery() but allows customizing the error message returned to clients.
+//
+// Parameters:
+//   - message: Custom error message to return to the client
+//
+// Example:
+//
+//	app := gin.New()
+//	app.Use(middleware.RecoveryWithMessage("Service temporarily unavailable"))
+func RecoveryWithMessage(message string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		defer func() {
+			if r := recover(); r != nil {
+				// Return custom error response to client
+				resp.Code(ctx, exception.DefaultSystemErrorCode, "%s", message)
+
+				// Log panic with stack trace for debugging
+				stack := stacktrace.Capture(3, 16)
+				defer stack.Free()
+
+				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.ToString()))
+			}
+		}()
+		ctx.Next()
+	}
 }

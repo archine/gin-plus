@@ -61,6 +61,9 @@ func (s *Stack) Free() {
 // ToString returns the string representation of the stack trace.
 func (s *Stack) ToString() string {
 	var builder strings.Builder
+	// Pre-allocate reasonable capacity to reduce allocations
+	builder.Grow(512)
+
 	for {
 		frame, more := s.Next()
 		builder.WriteString(frame.Function)
@@ -81,8 +84,10 @@ func (s *Stack) ToString() string {
 func (s *Stack) First() string {
 	frame, _ := s.Next()
 	var sb strings.Builder
+	// Pre-allocate reasonable capacity
+	sb.Grow(128)
 	sb.WriteString(frame.File)
-	sb.WriteString(":")
+	sb.WriteByte(':')
 	sb.WriteString(strconv.Itoa(frame.Line))
 	return sb.String()
 }

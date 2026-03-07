@@ -86,11 +86,11 @@ func (s *GinServer) Run(appCtx app.ApplicationContext) error {
 	}
 
 	if !s.conf.DisableDefaultCors {
-		engine.Use(middleware.Cors())
+		engine.Use(middleware.CORS())
 	}
 
 	if !s.conf.DisableDefaultRecovery {
-		engine.Use(middleware.GlobalExceptionInterceptor)
+		engine.Use(middleware.Recovery())
 	}
 
 	if len(s.middlewares) > 0 {
