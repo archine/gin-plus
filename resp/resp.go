@@ -175,10 +175,8 @@ func Error(ctx *gin.Context, err error) {
 	if err == nil {
 		return
 	}
-	var stackErr *exception.StackError
-	if errors.As(err, &stackErr) {
-		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.String())
-	}
+
+	gplog.ErrorWithCtx(ctx.Request.Context(), fmt.Sprintf("%+v", err))
 
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {
@@ -186,6 +184,5 @@ func Error(ctx *gin.Context, err error) {
 		return
 	}
 
-	gplog.ErrorWithCtx(ctx.Request.Context(), err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
 }

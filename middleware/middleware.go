@@ -5,7 +5,6 @@ import (
 
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/exception"
-	"github.com/archine/gin-plus/v4/exception/stacktrace"
 	"github.com/archine/gin-plus/v4/resp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -57,14 +56,10 @@ func Recovery() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				// Return error response to client
 				resp.Code(ctx, exception.DefaultSystemErrorCode, "Internal Server Error")
 
-				// Log panic with stack trace for debugging
-				stack := stacktrace.Capture(3, 16) // Capture up to 16 frames
-				defer stack.Free()
-
-				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.ToString()))
+				stack := exception.CaptureStackTrace(3, 16)
+				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.Full()))
 			}
 		}()
 		ctx.Next()
@@ -85,14 +80,10 @@ func RecoveryWithMessage(message string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				// Return custom error response to client
 				resp.Code(ctx, exception.DefaultSystemErrorCode, "%s", message)
 
-				// Log panic with stack trace for debugging
-				stack := stacktrace.Capture(3, 16)
-				defer stack.Free()
-
-				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.ToString()))
+				stack := exception.CaptureStackTrace(3, 16)
+				gplog.ErrorWithCtx(ctx, fmt.Sprintf("Panic recovered: %v\n%s", r, stack.Full()))
 			}
 		}()
 		ctx.Next()
