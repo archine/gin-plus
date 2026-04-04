@@ -27,6 +27,10 @@ type AutowireField struct {
 	// AutowireTag is the tag used to autowire the field.
 	AutowireTag string
 
+	// Optional indicates whether the field is optional. When true, missing beans
+	// leave the field as nil instead of causing an error.
+	Optional bool
+
 	// Field is the reflect.StructField representing the field.
 	Field reflect.StructField
 }

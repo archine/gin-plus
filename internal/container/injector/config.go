@@ -55,6 +55,11 @@ func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue 
 
 	val := sysconf.Provider.Get(key)
 	if val == nil {
+		// "?" is the required-value sentinel: `value:"${key:?}"` means the key must
+		// be present in config; start-up fails if it is absent.
+		if defaultVal == "?" {
+			return fmt.Errorf("required config key '%s' is missing", key)
+		}
 		if defaultVal == "" {
 			return nil
 		}
