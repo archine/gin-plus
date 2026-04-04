@@ -1,9 +1,11 @@
 package ioc
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
+	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 
 	"github.com/archine/gin-plus/v4/internal/container"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
@@ -23,18 +25,21 @@ func RegisterBeanDef(instance any) {
 
 	typ := reflect.TypeOf(instance)
 	if typ.Kind() != reflect.Pointer || typ.Elem().Kind() != reflect.Struct {
-		panic("only struct pointers can be registered as beans")
+		panic(fmt.Sprintf("[BeanRegistry] registration failed: '%s' is not a struct pointer", typ.String()))
+	}
+
+	var beanName string
+	if ib, ok := instance.(bean.AbstractBean); ok {
+		if !ib.Condition(sysconf.Provider) {
+			return
+		}
+		beanName = ib.BeanName()
 	}
 
 	def := &container.BeanDef{
 		Type:       typ,
 		Value:      instance,
 		OriginType: typ.Elem(),
-	}
-
-	var beanName string
-	if ib, ok := instance.(bean.AbstractBean); ok {
-		beanName, def.IsPrototype = ib.BeanName(), ib.IsPrototype()
 	}
 
 	sysctr.Container.RegisterBeanDef(beanName, def)
