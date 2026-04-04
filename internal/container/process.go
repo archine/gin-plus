@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"reflect"
+
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/container/injector"
-	"reflect"
 )
 
 // analyzeDefinition analyzes the definition of a bean and populates its autowire fields.
@@ -65,25 +66,6 @@ func analyzeDefinition(def *BeanDef) {
 			Field:       field,
 		})
 	}
-}
-
-// createPrototypeBean creates a prototype bean instance
-func createPrototypeBean(c *Container, def *BeanDef) any {
-	beanValue := reflect.New(def.OriginType)
-
-	err := doProcessFields(c, beanValue.Elem(), def.AutowireFields)
-	if err != nil {
-		panic(fmt.Sprintf("failed to initialize bean '%s': %s",
-			def.OriginType.String(), err.Error()))
-	}
-
-	beanValueIf := beanValue.Interface()
-
-	if postConstruct, ok := beanValueIf.(bean.PostConstruct); ok {
-		postConstruct.BeanPostConstruct()
-	}
-
-	return beanValueIf
 }
 
 // doProcessFields processes the fields of a struct and injects dependencies based on autowire tags.
