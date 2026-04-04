@@ -1,5 +1,7 @@
 package bean
 
+import "github.com/archine/gin-plus/v4/component/config"
+
 // AbstractBean defines the basic contract for beans managed by the dependency injector container.
 // Any struct implementing this interface can be recognized and managed as a bean.
 type AbstractBean interface {
@@ -8,10 +10,11 @@ type AbstractBean interface {
 	// This name is used for bean identification and dependency injector.
 	BeanName() string
 
-	// IsPrototype indicates whether the bean should be treated as a prototype.
-	// If true, the container will create a new instance each time the bean is requested.
-	// If false, the same singleton instance will be returned for every request.
-	IsPrototype() bool
+	// Condition decides whether this bean should be registered.
+	// The container calls Condition at registration time, passing a config.Provider.
+	// Return true to register the bean; return false to skip registration.
+	// The default implementation should return true.
+	Condition(cfg config.Provider) bool
 }
 
 // Bean is a base struct that can be embedded into other structs to mark them as beans.
@@ -20,7 +23,7 @@ type AbstractBean interface {
 // Usage:
 //
 //	type UserService struct {
-//	    ioc.Bean
+//	    bean.Bean
 //	    // your fields...
 //	}
 type Bean struct{}
@@ -29,8 +32,8 @@ func (b *Bean) BeanName() string {
 	return ""
 }
 
-func (b *Bean) IsPrototype() bool {
-	return false
+func (b *Bean) Condition(cfg config.Provider) bool {
+	return true
 }
 
 // PostConstruct defines a lifecycle callback interface for bean initialization.

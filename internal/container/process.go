@@ -2,6 +2,8 @@ package container
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
 	"github.com/archine/gin-plus/v4/component/mvc"
 	"github.com/archine/gin-plus/v4/internal/container/injector"
@@ -42,11 +44,24 @@ func analyzeDefinition(def *BeanDef) {
 			panic(fmt.Sprintf("field '%s' must be a pointer to a struct or an interface", field.Name))
 		}
 
+		// Parse optional flag: `autowire:"name,optional"` or `autowire:",optional"`
+		beanName := autowireTag
+		optional := false
+		if idx := strings.Index(autowireTag, ","); idx >= 0 {
+			beanName = strings.TrimSpace(autowireTag[:idx])
+			option := strings.TrimSpace(autowireTag[idx+1:])
+			if option != "" && option != "optional" {
+				panic(fmt.Sprintf("field '%s' has unsupported autowire option '%s'; only 'optional' is supported", field.Name, option))
+			}
+			optional = option == "optional"
+		}
+
 		def.AutowireFields = append(def.AutowireFields, &AutowireField{
 			Index:       i,
 			Name:        field.Name,
 			IsInterface: isInterface,
-			AutowireTag: autowireTag,
+			AutowireTag: beanName,
+			Optional:    optional,
 			Field:       field,
 		})
 	}
@@ -97,6 +112,9 @@ func doProcessFields(c *Container, structValue reflect.Value, autoFields []*Auto
 		}
 
 		if !exist {
+			if autoField.Optional {
+				continue
+			}
 			return fmt.Errorf("no bean found for field '%s'", autoField.Name)
 		}
 

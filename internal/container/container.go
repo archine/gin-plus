@@ -5,66 +5,43 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/archine/gin-plus/v4/util/strutil"
-
 	"github.com/archine/gin-plus/v4/component/mvc"
+	"github.com/archine/gin-plus/v4/util/strutil"
 )
 
-// AutowireField represents a field that requires autowiring
+// AutowireField represents a field metadata for dependency injection.
 type AutowireField struct {
-	// Index is the index of the field in the struct.
-	Index int
-
-	// IsInterface indicates whether the field is an interface type.
-	IsInterface bool
-
-	// Name is the name of the field.
-	Name string
-
-	// ValueTag value tag value, used for config values
-	ValueTag string
-
-	// AutowireTag is the tag used to autowire the field.
-	AutowireTag string
-
-	// Field is the reflect.StructField representing the field.
-	Field reflect.StructField
+	Index       int                 // Field index in the struct
+	IsInterface bool                // Whether the field is an interface
+	Name        string              // Field name
+	ValueTag    string              // Value from `value` tag (config)
+	AutowireTag string              // Value from `autowire` tag (bean name)
+	Optional    bool                // If true, no error is thrown if bean is missing
+	Field       reflect.StructField // Original reflect field
 }
 
-// BeanDef represents a bean definition in the IOC container.
+// BeanDef represents the definition and lifecycle state of a bean.
 type BeanDef struct {
-	// ready indicates whether the bean is ready for use.
-	ready bool
-
-	// Value is the actual bean instance.
-	Value any
-
-	// type is the type of the bean instance.
-	Type reflect.Type
-
-	// originType is the original type of the bean instance.
-	// It is used to create new instances for prototype beans.
-	OriginType reflect.Type
-
-	// IsPrototype indicates whether the bean is a prototype (new instance for each request)
-	IsPrototype bool
-
-	// AutowireFields contains fields that need to be autowired.
-	AutowireFields []*AutowireField
+	ready          bool             // Initialization status
+	Value          any              // Actual instance (must be a pointer)
+	Type           reflect.Type     // Full type information (e.g., *UserService)
+	OriginType     reflect.Type     // The underlying struct type (e.g., UserService)
+	AutowireFields []*AutowireField // Fields identified for injection
 }
 
-// Container responsible for managing the lifecycle of all beans
+// Container manages the registration, dependency injection, and lifecycle of beans.
 type Container struct {
 	mu   sync.RWMutex
 	once sync.Once
 
-	// beans stores all registered beans by their names.
+	// beans stores definitions indexed by unique bean names.
 	beans map[string]*BeanDef
 
-	// typeMapping maps types to their corresponding bean names for type-based retrieval.
+	// typeMapping stores aliases for types (structs and interfaces) to bean names.
 	typeMapping map[reflect.Type][]string
 }
 
+// NewContainer initializes a new IOC container.
 func NewContainer() *Container {
 	return &Container{
 		beans:       make(map[string]*BeanDef),
@@ -72,20 +49,26 @@ func NewContainer() *Container {
 	}
 }
 
+// RegisterBeanDef registers a bean definition that requires full lifecycle management.
 func (c *Container) RegisterBeanDef(name string, def *BeanDef) {
 	if name == "" {
 		name = strutil.FirstToLower(def.OriginType.Name())
 	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, exists := c.beans[name]; exists {
-		panic(fmt.Sprintf("bean with name '%s' already exists", name))
+
+	// Optimization: Include type details in panic for easier debugging
+	if old, exists := c.beans[name]; exists {
+		panic(fmt.Sprintf("[IOC] bean name conflict: '%s' is already registered as %v, cannot register %v",
+			name, old.Type, def.Type))
 	}
+
 	c.beans[name] = def
 	c.typeMapping[def.OriginType] = append(c.typeMapping[def.OriginType], name)
 }
 
-// LookupType checks if a type is registered in the container.
+// LookupType checks if a specific type (or its pointer element) is registered.
 func (c *Container) LookupType(typ reflect.Type) bool {
 	if typ == nil {
 		return false
@@ -93,59 +76,58 @@ func (c *Container) LookupType(typ reflect.Type) bool {
 	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	_, exists := c.typeMapping[typ]
 	return exists
 }
 
-// GetBean gets bean instance by bean name
+// GetBean retrieves a bean instance by its registered name.
 func (c *Container) GetBean(name string) (any, bool) {
 	if name == "" {
 		return nil, false
 	}
 
 	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	def, exists := c.beans[name]
 	if !exists {
-		c.mu.RUnlock()
 		return nil, false
-	}
-	c.mu.RUnlock()
-
-	if def.IsPrototype {
-		return createPrototypeBean(c, def), true
 	}
 
 	return def.Value, true
 }
 
-// GetBeanByType gets bean instance by type
+// GetBeanByType retrieves a single bean instance by its type.
+// If multiple candidates exist for the same type, it will panic to avoid ambiguity.
 func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 	if typ == nil {
 		return nil, false
 	}
-	if typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
+	// Normalize pointers for struct lookup
+	searchTyp := typ
+	if searchTyp.Kind() == reflect.Pointer {
+		searchTyp = searchTyp.Elem()
 	}
 
 	c.mu.RLock()
-	names, exists := c.typeMapping[typ]
+	names, exists := c.typeMapping[searchTyp]
 	c.mu.RUnlock()
 
 	if !exists || len(names) == 0 {
 		return nil, false
 	}
 
-	if len(names) == 1 {
-		return c.GetBean(names[0])
+	if len(names) > 1 {
+		panic(fmt.Sprintf("[IOC] ambiguous dependency: multiple beans found for type %v: %v", typ, names))
 	}
 
-	panic("multiple beans found for type: " + typ.String())
+	return c.GetBean(names[0])
 }
 
-// GetAllBeansByType retrieves all beans that implement the specified type
+// GetAllBeansByType retrieves all bean instances that match the specified type or interface.
 func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 	if typ == nil {
 		return nil, false
@@ -156,50 +138,32 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 
 	c.mu.RLock()
 	names, exists := c.typeMapping[typ]
+	c.mu.RUnlock()
+
 	if !exists || len(names) == 0 {
-		c.mu.RUnlock()
 		return nil, false
 	}
-	c.mu.RUnlock()
 
 	beans := make([]any, 0, len(names))
 	for _, name := range names {
-		if def, exists := c.beans[name]; exists {
-			if def.IsPrototype {
-				prototypeBean := createPrototypeBean(c, def)
-				beans = append(beans, prototypeBean)
-				continue
-			}
-			beans = append(beans, def.Value)
+		if val, ok := c.GetBean(name); ok {
+			beans = append(beans, val)
 		}
 	}
 
 	return beans, len(beans) > 0
 }
 
-// RegisterBean registers an already instantiated bean instance into the IOC container.
-// This method is used to register fully initialized bean instances that do not require
-// dependency injector or lifecycle management by the container.
-//
-// Parameters:
-//   - name: the unique bean name for registration
-//   - instance: a pointer to the struct instance that has already been instantiated
-//   - itypes: optional interface types that the instance implements, used for type-based lookup
-//
-// Notes:
-//   - All beans registered by this method are treated as singletons.
-//   - If a bean with the specified name already exists, an error will be returned.
-//   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
-//   - Unlike PreRegisterBean, this method accepts any struct pointer and does not require embedding Bean or mvc.Controller.
-//   - The registered bean instances are immediately available for use and will not go through the container's lifecycle management.
+// RegisterBean registers a pre-instantiated object as a singleton bean.
+// It allows mapping the instance to specific interface types for dependency injection.
 func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Type) {
 	if name == "" || instance == nil {
-		panic("bean name and instance cannot be empty")
+		panic("[IOC] registration failed: bean name and instance cannot be empty")
 	}
 
 	beanTyp := reflect.TypeOf(instance)
 	if beanTyp.Kind() != reflect.Ptr || beanTyp.Elem().Kind() != reflect.Struct {
-		panic("instance must be a pointer to a struct")
+		panic(fmt.Sprintf("[IOC] registration failed: expected struct pointer, got %T", instance))
 	}
 
 	structType := beanTyp.Elem()
@@ -207,33 +171,38 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.beans[name]; exists {
-		panic(fmt.Sprintf("bean with name '%s' already exists", name))
+	if old, exists := c.beans[name]; exists {
+		panic(fmt.Sprintf("[IOC] bean name conflict: '%s' is already registered by %v", name, old.Type))
 	}
 
+	// Register as a ready singleton
 	c.beans[name] = &BeanDef{
-		ready: true,
-		Value: instance,
+		ready:      true,
+		Value:      instance,
+		Type:       beanTyp,
+		OriginType: structType,
 	}
+
+	// Map to its own struct type
 	c.typeMapping[structType] = append(c.typeMapping[structType], name)
 
+	// Map to provided interfaces with strict implementation check
 	for _, itype := range itypes {
-		if beanTyp.Implements(itype) {
-			c.typeMapping[itype] = append(c.typeMapping[itype], name)
+		if !beanTyp.Implements(itype) {
+			panic(fmt.Sprintf("[IOC] type mismatch: %v does not implement interface %v", beanTyp, itype))
 		}
+		c.typeMapping[itype] = append(c.typeMapping[itype], name)
 	}
 
+	// Automatic MVC controller detection
 	if _, ok := instance.(mvc.AbstractController); ok {
 		ctrlType := reflect.TypeFor[mvc.AbstractController]()
 		c.typeMapping[ctrlType] = append(c.typeMapping[ctrlType], name)
 	}
 }
 
-// Refresh refreshes the container by processing all bean definitions.
-// It creates beans in the order defined by their dependencies and clears the vars after creation.
-// This method should be called only once, typically during application startup.
-// It ensures that all beans are created and dependencies are injected correctly.
-// If any bean creation fails, it logs a fatal error and stops the application.
+// Refresh triggers the dependency injection process for all uninitialized beans.
+// It should be invoked once after all beans are registered.
 func (c *Container) Refresh() {
 	c.once.Do(func() {
 		ctrlType := reflect.TypeFor[mvc.AbstractController]()
@@ -243,14 +212,20 @@ func (c *Container) Refresh() {
 				continue
 			}
 
+			// Parse tags and prepare AutowireFields
 			analyzeDefinition(beanDef)
 
-			err := doProcessFields(c, reflect.ValueOf(beanDef.Value).Elem(), beanDef.AutowireFields)
+			// Process fields and satisfy dependencies
+			targetVal := reflect.ValueOf(beanDef.Value).Elem()
+			err := doProcessFields(c, targetVal, beanDef.AutowireFields)
 			if err != nil {
-				panic(fmt.Sprintf("failed to initialize bean '%s': %s", beanName, err.Error()))
+				panic(fmt.Sprintf("[IOC] failed to initialize bean '%s' (%v): %v", beanName, beanDef.Type, err))
 			}
+
+			beanDef.ready = true
 		}
 
+		// Perform additional initialization (e.g., MVC routing)
 		initializeBeans(c, ctrlType)
 	})
 }
