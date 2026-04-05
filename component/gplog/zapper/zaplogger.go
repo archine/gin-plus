@@ -156,7 +156,7 @@ func NewLogger(cp config.Provider, opts ...Option) gplog.Logger {
 		encoder = zapcore.NewJSONEncoder(ec)
 	}
 
-	zapCore := zapcore.NewCore(encoder, os.Stderr, zapLevel)
+	zapCore := zapcore.NewCore(encoder, os.Stdout, zapLevel)
 
 	zl := &zapLogger{
 		format: cf.Format,

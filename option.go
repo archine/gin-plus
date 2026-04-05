@@ -50,6 +50,6 @@ func WithEvent(events ...Event) Option {
 // WithBanner sets a custom banner for the application.
 func WithBanner(banner string) Option {
 	return func(app *App) {
-		sysBanner = banner
+		app.banner = banner
 	}
 }

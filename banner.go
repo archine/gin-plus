@@ -1,22 +1,22 @@
 package gin_plus
 
 import (
-	"fmt"
 	"os"
 )
 
-// PrintBanner prints the application banner to the console.
-var sysBanner = `
-   ______    _               ____     __                
-  / ____/   (_)   ____      / __ \   / /  __  __   _____
- / / __    / /   / __ \    / /_/ /  / /  / / / /  / ___/
-/ /_/ /   / /   / / / /   / ____/  / /  / /_/ /  (__  ) 
-\____/   /_/   /_/ /_/   /_/      /_/   \____/  /____/   (v4)
-`
+func getDefaultBanner() string {
+	return "\033[38;2;60;120;255m   ______    _               ____     __                \n" +
+		"\033[38;2;80;140;255m  / ____/   (_)   ____      / __ \\   / /  __  __   _____\n" +
+		"\033[38;2;100;160;255m / / __    / /   / __ \\    / /_/ /  / /  / / / /  / ___/\n" +
+		"\033[38;2;120;180;255m/ /_/ /   / /   / / / /   / ____/  / /  / /_/ /  (__  ) \n" +
+		"\033[38;2;140;200;255m\\____/   /_/   /_/ /_/   /_/      /_/   \\____/  /____/   " +
+		"\033[1;97m" + "(v4)" + "\033[0m" + "\n\n"
+}
 
-func printBanner() {
-	if sysBanner != "" {
-		_, _ = fmt.Fprint(os.Stderr, sysBanner)
-		sysBanner = ""
+func printBanner(customBanner string) {
+	if customBanner != "" {
+		_, _ = os.Stderr.WriteString(customBanner + "\n")
+	} else {
+		_, _ = os.Stderr.WriteString(getDefaultBanner())
 	}
 }

@@ -44,7 +44,8 @@ type App struct {
 	appContext       app.ApplicationContext
 	confProviderFunc func() config.Provider
 	loggerFunc       func(cp config.Provider) gplog.Logger
-	initialized      atomic.Bool // Track initialization state
+	initialized      atomic.Bool
+	banner           string
 }
 
 // New creates a new instance of the App with optional configurations.
@@ -81,7 +82,9 @@ func (a *App) Run(mode RunMode) {
 		return
 	}
 
-	printBanner()
+	printBanner(a.banner)
+	a.banner = ""
+
 	a.initialize()
 
 	switch mode {
