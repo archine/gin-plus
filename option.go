@@ -41,7 +41,7 @@ func WithMiddleware(middlewares ...gin.HandlerFunc) Option {
 
 // WithEvent registers application lifecycle events.
 // Events are managed by the event manager and triggered during app lifecycle.
-func WithEvent(events ...Event) Option {
+func WithEvent(events ...AppEvent) Option {
 	return func(app *App) {
 		app.eventManager.register(events...)
 	}
