@@ -1,13 +1,14 @@
 # Release Drafter 配置（中文模板，基于 label 分组并在条目前添加 emoji）
-# 默认 label → emoji 映射（可在 categories 中修改）：
-#   ✨ enhancement / feat   — 新特性
-#   🐛 bug / fix            — 修复
-#   📝 docs                 — 文档
-#   ⚡️ perf                 — 性能
-#   ♻️ refactor             — 重构
-#   ✅ test                 — 测试
-#   🔒 security             — 安全
-#   🚀 release              — 发布/部署
+# 建议安装 Release Drafter GitHub App（https://github.com/apps/release-drafter）
+# 默认映射（用户已确认）：
+#   ✨: enhancement, feat
+#   🐛: bug, fix
+#   📝: docs
+#   ⚡️: perf
+#   ♻️: refactor
+#   ✅: test
+#   🔒: security
+#   🚀: release
 name-template: 'v$NEXT_PATCH_VERSION'
 tag-template: 'v$NEXT_PATCH_VERSION'
 categories:
@@ -37,11 +38,19 @@ categories:
   - title: "🚀 发布/部署"
     labels:
       - "release"
-change-template: "- $TITLE @$AUTHOR ([#$NUMBER]($URL))"
-no-changes-template: "- 本次发布无显著变更记录"
+change-template: "- {{change}} ({{author}}){{#if pull_request}} <a>PR #{{pull_request.number}}</a>{{/if}}"
 template: |
-  ## $TITLE
+  ## {{name}} - {{date}}
+  以下为本次发布的要点（按 label 分组，含 emoji）：
 
-  $CHANGES
+  {{#if changes}}
+  {{#each groups}}
+  ### {{title}}
+  {{#each this.changes}}
+  - {{this.description}} {{#if this.html_url}}<a>PR</a>{{/if}}
+  {{/each}}
 
-  > 如需调整 emoji 与分组，请修改 `.github/release-drafter.yml` 中的 `categories`。
+  {{/each}}
+  {{/if}}
+
+  > 注：本模板使用仓库 label 来分组变更。若需调整 emoji 对应关系，请修改 .github/release-drafter.yml 中的 categories。  
