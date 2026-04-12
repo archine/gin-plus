@@ -37,9 +37,9 @@ version-resolver:
 
 # 发布说明模板（中文，带 emoji）
 template: |
-  ## 📦 $TITLE
+  ## 📦 版本：$TITLE
 
-  > 发布日期：$DATE
+  > 发布日期：待发布时填写
 
   $CHANGES
 
@@ -82,7 +82,7 @@ categories:
       - 'deploy'
 
 # 每条变更条目的格式
-change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-template: '- 🔖 $TITLE @$AUTHOR (#$NUMBER)'
 
 # 未分类的变更（没有匹配 label 的 PR）单独归入此分组
 change-title-escapes: '\<*_&'

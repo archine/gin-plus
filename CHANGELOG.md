@@ -67,25 +67,25 @@
 - ⚡️ **事件触发零分配**（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）
   - 缓存已分类事件，避免重复类型断言；预分配切片容量优化内存使用
   - 基准：**53.64 ns/op，0 B/op，0 allocs/op**
-- ⚡️ **应用状态检查近零开销**：添加 `atomic.Bool` 实现幂等初始化，基准 **0.22 ns/op，0 allocs/op**
-- ⚡️ **对象池操作优化**：新增 `GetWithReset()` / `PutWithReset()` 方法，基准 **4.43 ns/op，0 allocs/op**
-- ⚡️ **Recovery 中间件**：正常请求处理基准 **267.7 ns/op**
-- ⚡️ **堆栈跟踪内存优化**：预分配 512 字节 builder，用 `WriteByte()` 替代单字符 `WriteString()`
+- ⚡️ **应用状态检查近零开销**（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）：添加 `atomic.Bool` 实现幂等初始化，基准 **0.22 ns/op，0 allocs/op**
+- ⚡️ **对象池操作优化**（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）：新增 `GetWithReset()` / `PutWithReset()` 方法，基准 **4.43 ns/op，0 allocs/op**
+- ⚡️ **Recovery 中间件优化**（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）：正常请求处理基准 **267.7 ns/op**
+- ⚡️ **堆栈跟踪内存优化**（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）：预分配 512 字节 builder，用 `WriteByte()` 替代单字符 `WriteString()`
 
 ### ✨ 新特性
 
-- ✨ 新增 `RecoveryWithMessage` 中间件，支持自定义错误响应消息
-- ✨ 对象池新增 `GetWithReset()` 与 `PutWithReset()` 方法
+- ✨ 新增 `RecoveryWithMessage` 中间件（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)），支持自定义错误响应消息
+- ✨ 对象池新增 `GetWithReset()` 与 `PutWithReset()`（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）
 
 ### ♻️ 代码重构
 
-- ♻️ 重命名 `Cors` → `CORS`（遵循 Go 命名规范）
-- ♻️ 重命名 `GlobalExceptionInterceptor` → `Recovery`，语义更清晰
-- ♻️ 堆栈跟踪帧数从 8 提升至 16
+- ♻️ 重命名 `Cors` → `CORS`（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)），遵循 Go 命名规范
+- ♻️ 重命名 `GlobalExceptionInterceptor` → `Recovery`（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)），语义更清晰
+- ♻️ 堆栈跟踪帧数从 8 提升至 16（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）
 
 ### 📝 文档
 
-- 📝 为中间件、对象池等核心组件添加完整 GoDoc 注释
+- 📝 为中间件、对象池等核心组件添加完整 GoDoc 注释（commit [`c0cb0c6`](https://github.com/archine/gin-plus/commit/c0cb0c6bc31f6825534c08d61a749a82db5d8cae)）
 
 ---
 
@@ -95,7 +95,7 @@
 
 - ✨ **重构日志字段为结构化格式**（commit [`e75f9a3`](https://github.com/archine/gin-plus/commit/e75f9a3d7ea643cfad7a7c033b5b92b1639ac89b)）
   - 日志字段改为结构化键值对，兼容 zap 的 `Field` 类型，便于日志聚合与检索
-- ✨ **增强 SSE Writer 初始化**：改进 Server-Sent Events 写入器的初始化流程，提升稳定性与可用性
+- ✨ **增强 SSE Writer 初始化**（commit [`e75f9a3`](https://github.com/archine/gin-plus/commit/e75f9a3d7ea643cfad7a7c033b5b92b1639ac89b)）：改进 Server-Sent Events 写入器的初始化流程，提升稳定性与可用性
 
 ---
 

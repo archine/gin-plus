@@ -1,60 +1,81 @@
 name: 发布 Release（push tag 触发）
 
-# 当推送 v* 格式的 tag 时（例如 v1.2.3、v4.3.7）自动触发
 on:
   push:
     tags:
       - 'v*'
 
 permissions:
-  contents: write   # 创建/更新 Release 所必需的权限
+  contents: write
 
 jobs:
   publish-release:
-    name: 将草稿发布为正式 Release
+    name: 将 draft release 发布为正式 Release
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------------------------------------------ #
-      # 步骤 1：检出代码（需要读取 tag 信息）
-      # ------------------------------------------------------------------ #
       - name: 检出代码
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0   # 拉取完整历史，便于生成变更日志
+          fetch-depth: 0
 
-      # ------------------------------------------------------------------ #
-      # 步骤 2：从 Release Drafter 创建的 Draft 中找到与当前 tag 对应的草稿
-      #         并将其发布为正式 Release。
-      #         若草稿不存在，则使用 tag 名称直接创建一个新的正式 Release。
-      # ------------------------------------------------------------------ #
-      - name: 发布 Release
-        uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8 # v2.3.2
-        with:
-          # 是否将现有同名草稿发布为正式版（true = 发布；false = 仅创建）
-          draft: false
-          # 是否标记为预发布版本（以 -alpha/-beta/-rc 结尾时自动设为 true）
-          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
-          # Release 标题使用 tag 名称
-          name: ${{ github.ref_name }}
-          # 如果仓库根目录存在 CHANGELOG.md，则将对应版本的说明作为正文；
-          # 否则留空，由 GitHub 自动生成（或使用 Release Drafter 草稿内容）
-          # body_path: CHANGELOG.md   # 可选：启用后将 CHANGELOG.md 全文作为正文
-          generate_release_notes: true   # 由 GitHub 自动汇总此 tag 以来的 PR/commit
-          # ----------------------------------------------------------------
-          # 可选：上传构建产物（二进制资产）
-          # 取消注释并修改 glob 模式以上传对应文件
-          # ----------------------------------------------------------------
-          # files: |
-          #   dist/**
-          #   build/*.tar.gz
+      - name: 发布或创建 Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
 
-      # ------------------------------------------------------------------ #
-      # 步骤 3（可选）：若需要在发布后触发其它动作（例如通知、部署），
-      #                  可在此处添加后续步骤。
-      # ------------------------------------------------------------------ #
-      # - name: 发送发布通知
+          prerelease=false
+          if [[ "${TAG_NAME}" == *-alpha* || "${TAG_NAME}" == *-beta* || "${TAG_NAME}" == *-rc* ]]; then
+            prerelease=true
+          fi
+
+          release_list="$(gh api "repos/${REPOSITORY}/releases?per_page=100")"
+          release_id="$(jq -r --arg tag "${TAG_NAME}" 'map(select(.tag_name == $tag or .name == $tag)) | first | .id // empty' <<<"${release_list}")"
+          release_body="$(jq -r --arg tag "${TAG_NAME}" 'map(select(.tag_name == $tag or .name == $tag)) | first | .body // empty' <<<"${release_list}")"
+
+          if [[ -z "${release_body}" && -f CHANGELOG.md ]]; then
+            release_body="$(awk -v tag="${TAG_NAME}" '
+              $0 ~ "^## \\[" tag "\\]" { in_section = 1 }
+              in_section && $0 ~ "^## \\[" && $0 !~ "^## \\[" tag "\\]" { exit }
+              in_section { print }
+            ' CHANGELOG.md)"
+          fi
+
+          if [[ -z "${release_body}" ]]; then
+            release_body="$(printf '## %s\n\n- 🚀 该版本由 tag push workflow 自动创建。\n- 📝 未找到对应的 draft release 或 CHANGELOG 条目，请按需补充发布说明。\n' "${TAG_NAME}")"
+          fi
+
+          body_file="$(mktemp)"
+          printf '%s\n' "${release_body}" > "${body_file}"
+
+          if [[ -n "${release_id}" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/${REPOSITORY}/releases/${release_id}" \
+              -f tag_name="${TAG_NAME}" \
+              -f name="${TAG_NAME}" \
+              -F body=@"${body_file}" \
+              -F draft=false \
+              -F prerelease="${prerelease}"
+          else
+            gh api \
+              --method POST \
+              "repos/${REPOSITORY}/releases" \
+              -f tag_name="${TAG_NAME}" \
+              -f name="${TAG_NAME}" \
+              -F body=@"${body_file}" \
+              -F draft=false \
+              -F prerelease="${prerelease}"
+          fi
+
+      # 可选：上传二进制资产
+      # - name: 上传构建产物
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #   run: |
-      #     echo "Released ${{ github.ref_name }}"
+      #     gh release upload "${{ github.ref_name }}" dist/** build/*.tar.gz --clobber
