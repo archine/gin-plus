@@ -7,17 +7,21 @@ import (
 	"github.com/archine/gin-plus/v4/component/config"
 )
 
-// Event is the base interface for all app events.
-type Event interface {
+// Comparable is the base ordering contract for all app events.
+type Comparable interface {
 	// Order returns the order of the event.
 	// Lower numbers indicate higher priority.
 	Order() int
 }
 
+// Event is kept as a compatibility alias.
+// Deprecated: use Comparable.
+type Event = Comparable
+
 // StartingEvent is called before the application starts.
 // Implement this interface to perform initialization tasks.
 type StartingEvent interface {
-	Event
+	Comparable
 
 	// OnStarting is called before the application starts.
 	// Use this method to perform initialization tasks, such as:
@@ -32,7 +36,7 @@ type StartingEvent interface {
 // StartedEvent is called after the application has started successfully.
 // Implement this interface to perform post-start tasks.
 type StartedEvent interface {
-	Event
+	Comparable
 
 	// OnStarted is called after the application has started successfully.
 	// Use this method to perform post-start tasks, such as:
@@ -48,7 +52,7 @@ type StartedEvent interface {
 // StoppedEvent is called after the HTTP server has stopped.
 // Implement this interface to perform cleanup tasks.
 type StoppedEvent interface {
-	Event
+	Comparable
 
 	// OnStopped is called after the HTTP server has stopped accepting new requests.
 	// Use this method to perform cleanup tasks, such as:
@@ -62,7 +66,7 @@ type StoppedEvent interface {
 
 // ConfigEvent is the interface for events related to configuration loading.
 type ConfigEvent interface {
-	Event
+	Comparable
 	// OnConfigLoaded is called after all configuration files have been successfully loaded.
 	OnConfigLoaded(cp config.Provider)
 }
@@ -70,7 +74,7 @@ type ConfigEvent interface {
 // ContainerRefreshBeforeEvent is called before the IoC container refresh process.
 // Implement this interface to perform container preparation tasks.
 type ContainerRefreshBeforeEvent interface {
-	Event
+	Comparable
 	// OnContainerRefreshBefore is called before the IoC container begins its refresh process.
 	// This is the ideal place to perform container preparation tasks such as:
 	//
@@ -85,7 +89,7 @@ type ContainerRefreshBeforeEvent interface {
 // ContainerRefreshAfterEvent is called after the IoC container refresh process.
 // Implement this interface to perform post-refresh tasks.
 type ContainerRefreshAfterEvent interface {
-	Event
+	Comparable
 	// OnContainerRefreshAfter is called after the IoC container has completed its refresh process.
 	// At this point, all beans have been created, dependencies injected, and the container is ready for use.
 	// This is the ideal place to perform post-refresh tasks such as:

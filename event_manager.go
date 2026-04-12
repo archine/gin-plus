@@ -1,135 +1,120 @@
 package gin_plus
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
+	"sync"
 
 	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 )
 
-// eventManager manages all app events with categorized storage for better performance.
-// Events are sorted once and cached by type to avoid repeated type assertions.
-type eventManager struct {
-	// Raw events storage
-	events []Event
-	sorted bool
-
-	// Cached typed events (populated after first sort)
-	startingEvents              []StartingEvent
-	startedEvents               []StartedEvent
-	stoppedEvents               []StoppedEvent
-	configEvents                []ConfigEvent
-	containerRefreshBeforeEvents []ContainerRefreshBeforeEvent
-	containerRefreshAfterEvents  []ContainerRefreshAfterEvent
+// Registry is a typed event bucket with lazy sorting and concurrency safety.
+type Registry[T Comparable] struct {
+	mu       sync.Mutex
+	handlers []T
+	sorted   bool
 }
 
-func newEventManager() *eventManager {
-	return &eventManager{
-		events: make([]Event, 0, 8), // Pre-allocate reasonable capacity
-		sorted: false,
+func (r *Registry[T]) Add(handler T) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.handlers = append(r.handlers, handler)
+	r.sorted = false
+}
+
+func (r *Registry[T]) TryAdd(event any) {
+	if handler, ok := event.(T); ok {
+		r.Add(handler)
 	}
 }
 
-// register adds multiple app events to the manager
-func (m *eventManager) register(events ...Event) {
-	m.events = append(m.events, events...)
-	m.sorted = false
-	// Clear cached typed events to force re-categorization
-	m.clearCache()
-}
+func (r *Registry[T]) Trigger(runFn func(T)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-// clearCache clears all cached typed event slices
-func (m *eventManager) clearCache() {
-	m.startingEvents = nil
-	m.startedEvents = nil
-	m.stoppedEvents = nil
-	m.configEvents = nil
-	m.containerRefreshBeforeEvents = nil
-	m.containerRefreshAfterEvents = nil
-}
-
-// ensureSorted sorts events by order and categorizes them by type for efficient access
-func (m *eventManager) ensureSorted() {
-	if m.sorted {
+	if len(r.handlers) == 0 {
 		return
 	}
 
-	if len(m.events) > 1 {
-		sort.Slice(m.events, func(i, j int) bool {
-			return m.events[i].Order() < m.events[j].Order()
+	if !r.sorted {
+		slices.SortFunc(r.handlers, func(a, b T) int {
+			return cmp.Compare(a.Order(), b.Order())
 		})
+		r.sorted = true
 	}
 
-	// Categorize events by type to avoid repeated type assertions
-	for _, e := range m.events {
-		if v, ok := e.(StartingEvent); ok {
-			m.startingEvents = append(m.startingEvents, v)
-		}
-		if v, ok := e.(StartedEvent); ok {
-			m.startedEvents = append(m.startedEvents, v)
-		}
-		if v, ok := e.(StoppedEvent); ok {
-			m.stoppedEvents = append(m.stoppedEvents, v)
-		}
-		if v, ok := e.(ConfigEvent); ok {
-			m.configEvents = append(m.configEvents, v)
-		}
-		if v, ok := e.(ContainerRefreshBeforeEvent); ok {
-			m.containerRefreshBeforeEvents = append(m.containerRefreshBeforeEvents, v)
-		}
-		if v, ok := e.(ContainerRefreshAfterEvent); ok {
-			m.containerRefreshAfterEvents = append(m.containerRefreshAfterEvents, v)
-		}
+	for _, handler := range r.handlers {
+		runFn(handler)
 	}
-
-	m.sorted = true
 }
 
-// triggerOnStarting triggers the OnStarting event
+type eventManager struct {
+	starting      Registry[StartingEvent]
+	started       Registry[StartedEvent]
+	stopped       Registry[StoppedEvent]
+	config        Registry[ConfigEvent]
+	refreshBefore Registry[ContainerRefreshBeforeEvent]
+	refreshAfter  Registry[ContainerRefreshAfterEvent]
+
+	registries []interface{ TryAdd(any) }
+}
+
+func newEventManager() *eventManager {
+	m := &eventManager{}
+	m.registries = []interface{ TryAdd(any) }{
+		&m.starting,
+		&m.started,
+		&m.stopped,
+		&m.config,
+		&m.refreshBefore,
+		&m.refreshAfter,
+	}
+	return m
+}
+
+func (m *eventManager) register(events ...Comparable) {
+	for _, event := range events {
+		for _, registry := range m.registries {
+			registry.TryAdd(event)
+		}
+	}
+}
+
 func (m *eventManager) triggerOnStarting(ctx app.ApplicationContext) {
-	m.ensureSorted()
-	for _, e := range m.startingEvents {
+	m.starting.Trigger(func(e StartingEvent) {
 		e.OnStarting(ctx)
-	}
+	})
 }
 
-// triggerOnStarted triggers the OnStarted event
 func (m *eventManager) triggerOnStarted(ctx app.ApplicationContext) {
-	m.ensureSorted()
-	for _, e := range m.startedEvents {
+	m.started.Trigger(func(e StartedEvent) {
 		e.OnStarted(ctx)
-	}
+	})
 }
 
-// triggerOnStopped triggers the OnStopped event
 func (m *eventManager) triggerOnStopped(ctx context.Context) {
-	m.ensureSorted()
-	for _, e := range m.stoppedEvents {
+	m.stopped.Trigger(func(e StoppedEvent) {
 		e.OnStopped(ctx)
-	}
+	})
 }
 
-// triggerConfigLoaded triggers the ConfigAfterLoad event
 func (m *eventManager) triggerConfigLoaded(cp config.Provider) {
-	m.ensureSorted()
-	for _, e := range m.configEvents {
+	m.config.Trigger(func(e ConfigEvent) {
 		e.OnConfigLoaded(cp)
-	}
+	})
 }
 
-// triggerContainerRefreshBefore triggers the ContainerRefreshBefore event
 func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext) {
-	m.ensureSorted()
-	for _, e := range m.containerRefreshBeforeEvents {
+	m.refreshBefore.Trigger(func(e ContainerRefreshBeforeEvent) {
 		e.OnContainerRefreshBefore(ctx)
-	}
+	})
 }
 
-// triggerContainerRefreshAfter triggers the ContainerRefreshAfter event
 func (m *eventManager) triggerContainerRefreshAfter(ctx app.ApplicationContext) {
-	m.ensureSorted()
-	for _, e := range m.containerRefreshAfterEvents {
+	m.refreshAfter.Trigger(func(e ContainerRefreshAfterEvent) {
 		e.OnContainerRefreshAfter(ctx)
-	}
+	})
 }
