@@ -1,205 +1,84 @@
-name: Publish Release on Tag (auto-generate notes if no draft)
+
+name: 发布 Release（push tag 触发）
+
 on:
   push:
     tags:
-      - 'v*'   # 仅对 v* 标签触发，例如 v1.2.3
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  publish:
+  publish-release:
+    name: 将 draft release 发布为正式 Release
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout (full history & tags)
-        uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Publish or generate release notes and create Release
-        uses: actions/github-script@v7
+      - name: 发布或创建 Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          script: |
-            const exec = require('child_process').execSync;
-            const tag = process.env.GITHUB_REF.replace('refs/tags/','');
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
 
-            // 1) 尝试找到该 tag 对应的 release；若存在并为 draft，则发布它
-            async function tryPublishDraft() {
-              try {
-                const rel = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
-                if (rel && rel.data && rel.data.draft) {
-                  await github.rest.repos.updateRelease({
-                    owner,
-                    repo,
-                    release_id: rel.data.id,
-                    draft: false,
-                    prerelease: false
-                  });
-                  core.info(`Published existing draft release for ${tag}`);
-                  return true;
-                } else if (rel && rel.data && !rel.data.draft) {
-                  core.info(`Release for ${tag} already published`);
-                  return true;
-                }
-              } catch (err) {
-                core.info(`No existing release by tag ${tag}: ${err.message}`);
-                return false;
-              }
-              return false;
-            }
+          prerelease=false
+          if [[ "${TAG_NAME}" =~ -(alpha|beta|rc|preview|dev)([.-].+)?$ ]]; then
+            prerelease=true
+          fi
 
-            const didPublish = await tryPublishDraft();
-            if (didPublish) return;
+          release_list="$(gh api "repos/${REPOSITORY}/releases?per_page=100")"
+          release_id="$(jq -r --arg tag "${TAG_NAME}" 'map(select(.tag_name == $tag or .name == $tag)) | first | .id // empty' <<<"${release_list}")"
+          release_body="$(jq -r --arg tag "${TAG_NAME}" 'map(select(.tag_name == $tag or .name == $tag)) | first | .body // empty' <<<"${release_list}")"
 
-            // 2) 若没有 draft，则自动生成 release notes 并创建 release
-            // 获取按创建时间降序的 tags 列表（最新到最旧）
-            const out = exec("git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags").toString().trim();
-            const tags = out ? out.split(/\r?\n/).map(t=>t.trim()).filter(Boolean) : [];
-            // 找到当前 tag 在 tags 的索引
-            const idx = tags.indexOf(tag);
-            let prevTag = null;
-            if (idx >= 0 && idx < tags.length - 1) {
-              prevTag = tags[idx + 1]; // 因为排序为 newest first
-            }
+          if [[ -z "${release_body}" && -f CHANGELOG.md ]]; then
+            # CHANGELOG 约定使用 "## [vX.Y.Z] — YYYY-MM-DD" 作为版本标题。
+            release_body="$(awk -v tag="${TAG_NAME}" '
+              $0 ~ "^## \\[" tag "\\]([[:space:]]|$)" { in_section = 1; next }
+              in_section && $0 ~ "^## \\[[^]]+\\]([[:space:]]|$)" { exit }
+              in_section && $0 ~ "^\\[v[^]]+\\]:" { exit }
+              in_section { print }
+            ' CHANGELOG.md)"
+          fi
 
-            // 定义范围：如果有 prevTag，范围为 prevTag..tag；否则使用 tag 的 commit 以前的所有合并
-            const range = prevTag ? `${prevTag}..${tag}` : `${tag}`;
+          if [[ -z "${release_body}" ]]; then
+            release_body="$(printf '## %s\n\n- 🚀 该版本由 tag push workflow 自动创建。\n- 📝 未找到对应的 draft release 或 CHANGELOG 条目，请按需补充发布说明。\n' "${TAG_NAME}")"
+          fi
 
-            core.info(`Generating release notes for ${tag} from range: ${range}`);
+          body_file="$(mktemp)"
+          printf '%s\n' "${release_body}" > "${body_file}"
 
-            // 获取 merge commits 的标题（通常含 "Merge pull request #123"）
-            let merges = "";
-            try {
-              merges = exec(`git log --merges --pretty=format:%s ${range}`, {encoding: 'utf8'});
-            } catch (e) {
-              merges = "";
-            }
-            const lines = merges.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+          if [[ -n "${release_id}" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/${REPOSITORY}/releases/${release_id}" \
+              -f tag_name="${TAG_NAME}" \
+              -f name="${TAG_NAME}" \
+              -F body=@"${body_file}" \
+              -F draft=false \
+              -F prerelease="${prerelease}"
+          else
+            gh api \
+              --method POST \
+              "repos/${REPOSITORY}/releases" \
+              -f tag_name="${TAG_NAME}" \
+              -f name="${TAG_NAME}" \
+              -F body=@"${body_file}" \
+              -F draft=false \
+              -F prerelease="${prerelease}"
+          fi
 
-            // 提取 PR 编号
-            const prNumbers = new Set();
-            const prRegex = /#([0-9]+)/g;
-            for (const l of lines) {
-              let m;
-              while ((m = prRegex.exec(l)) !== null) {
-                prNumbers.add(Number(m[1]));
-              }
-            }
-
-            // 如果没有检测到 merge PR，则退回到查找该 tag 到 HEAD 的非-merge commit 的 PR 引用（或直接创建空说明）
-            let prs = [];
-            if (prNumbers.size > 0) {
-              for (const num of prNumbers) {
-                try {
-                  const pr = await github.rest.pulls.get({ owner, repo, pull_number: num });
-                  if (pr && pr.data) {
-                    prs.push(pr.data);
-                  }
-                } catch (e) {
-                  core.info(`Failed to fetch PR #${num}: ${e.message}`);
-                }
-              }
-            } else {
-              core.info('未在 merge commit 中检测到 PR 编号，尝试通过 search API 获取相同日期区间的 merged PRs。');
-              // 备用：通过 search API 按 merged date 区间查找 PR（较宽松），使用 prevTag/ tag commit dates
-              try {
-                // 获取 tag 的 commit 日期
-                const tagCommit = exec(`git rev-list -n 1 ${tag}`).toString().trim();
-                const tagDate = exec(`git show -s --format=%ci ${tagCommit}`).toString().trim().split(' ')[0];
-                let prevDate = '1970-01-01';
-                if (prevTag) {
-                  const prevCommit = exec(`git rev-list -n 1 ${prevTag}`).toString().trim();
-                  prevDate = exec(`git show -s --format=%ci ${prevCommit}`).toString().trim().split(' ')[0];
-                }
-                const q = `repo:${owner}/${repo} is:pr is:merged merged:${prevDate}..${tagDate}`;
-                const sr = await github.rest.search.issuesAndPullRequests({ q, per_page: 100 });
-                for (const it of sr.data.items) {
-                  // it.number 是 PR 编号
-                  try {
-                    const pr = await github.rest.pulls.get({ owner, repo, pull_number: it.number });
-                    prs.push(pr.data);
-                  } catch(e) {
-                    core.info(`skip pr ${it.number}: ${e.message}`);
-                  }
-                }
-              } catch(e) {
-                core.info(`search fallback failed: ${e.message}`);
-              }
-            }
-
-            // 3) 根据 PR labels 映射 emoji 并按 emoji 分组
-            const labelMap = {
-              'enhancement': '✨', 'feat': '✨',
-              'bug': '🐛', 'fix': '🐛',
-              'docs': '📝',
-              'perf': '⚡️',
-              'refactor': '♻️',
-              'test': '✅',
-              'security': '🔒',
-              'release': '🚀'
-            };
-
-            function mapLabelsToEmoji(labels) {
-              if (!labels || labels.length === 0) return '✨';
-              for (const l of labels) {
-                const name = (l.name || '').toLowerCase();
-                if (labelMap[name]) return labelMap[name];
-              }
-              return '✨';
-            }
-
-            // group
-            const groups = {};
-            for (const pr of prs) {
-              const labels = pr.labels || [];
-              const emoji = mapLabelsToEmoji(labels);
-              groups[emoji] = groups[emoji] || [];
-              groups[emoji].push(pr);
-            }
-
-            // build release body (中文)
-            let body = `## ${tag} - 自动生成发布说明\n\n以下为本次发布的要点（根据 PR 的 labels 自动分组）：\n\n`;
-            if (Object.keys(groups).length === 0) {
-              body += '- （未检测到合并的 PR 或无法自动生成详情）\n';
-            } else {
-              for (const emoji of Object.keys(groups)) {
-                // 常见 emoji -> 标题映射（简单）
-                let title = emoji;
-                if (emoji === '✨') title = '✨ 新特性';
-                else if (emoji === '🐛') title = '🐛 修复';
-                else if (emoji === '📝') title = '📝 文档';
-                else if (emoji === '⚡️') title = '⚡️ 性能';
-                else if (emoji === '♻️') title = '♻️ 重构';
-                else if (emoji === '✅') title = '✅ 测试';
-                else if (emoji === '🔒') title = '🔒 安全';
-                else if (emoji === '🚀') title = '🚀 发布/部署';
-
-                body += `### ${title}\n`;
-                for (const pr of groups[emoji]) {
-                  const prnum = pr.number;
-                  const titleLine = pr.title.replace(/\r?\n/g, ' ');
-                  body += `- ${emoji} ${titleLine} [PR #${prnum}](${pr.html_url})\n`;
-                }
-                body += `\n`;
-              }
-            }
-
-            // 4) 创建正式 release
-            try {
-              await github.rest.repos.createRelease({
-                owner,
-                repo,
-                tag_name: tag,
-                name: tag,
-                body: body,
-                draft: false,
-                prerelease: false
-              });
-              core.info(`Created release for tag ${tag}`);
-            } catch (e) {
-              core.setFailed(`Failed to create release: ${e.message}`);
-            }
+      # 可选：上传二进制资产
+      # - name: 上传构建产物
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh release upload "${{ github.ref_name }}" dist/** build/*.tar.gz --clobber

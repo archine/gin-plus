@@ -1,0 +1,24 @@
+name: 更新 Release Draft
+
+on:
+  push:
+    branches:
+      - v4
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-release-draft:
+    name: 生成 / 更新 Release Draft
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 更新草稿发布说明
+        uses: release-drafter/release-drafter@7cf306f56b79636bb76931494ccf29fc893763bd # v6.1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
