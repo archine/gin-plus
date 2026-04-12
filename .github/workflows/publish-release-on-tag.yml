@@ -1,0 +1,77 @@
+name: Publish Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'   # 仅对 v* 标签触发，例如 v1.2.3
+
+permissions:
+  contents: write   # 发布 Release 需要写入权限
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish draft release or create new release
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // 优先查找 Release Drafter 创建的 draft release 并将其发布
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner, repo, tag
+              });
+              if (release.draft) {
+                await github.rest.repos.updateRelease({
+                  owner,
+                  repo,
+                  release_id: release.id,
+                  draft: false,
+                  prerelease: false
+                });
+                core.info(`已将 draft release ${tag} 发布为正式 Release`);
+                return;
+              }
+              core.info(`Tag ${tag} 已有正式 Release，无需操作`);
+              return;
+            } catch (err) {
+              core.info(`未找到 tag ${tag} 对应的 release，将从 CHANGELOG.md 提取内容并创建: ${err.message}`);
+            }
+
+            // 若无 draft，从 CHANGELOG.md 中提取对应版本条目作为 release body
+            const fs = require('fs');
+            let body = `发布 ${tag}`;
+            try {
+              const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+              // 匹配 "## v1.2.3" 开始到下一个 "## " 之前的内容
+              const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const pattern = new RegExp(`(## ${escaped}[\\s\\S]*?)(?=^## |\\Z)`, 'm');
+              const match = changelog.match(pattern);
+              if (match) {
+                body = match[1].trim();
+              } else {
+                body = `发布 ${tag}（CHANGELOG.md 中未找到对应条目）`;
+              }
+            } catch (e) {
+              body = `发布 ${tag}（未找到 CHANGELOG.md）`;
+            }
+
+            await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              name: tag,
+              body,
+              draft: false,
+              prerelease: false
+            });
+            core.info(`已为 tag ${tag} 创建正式 Release`);
