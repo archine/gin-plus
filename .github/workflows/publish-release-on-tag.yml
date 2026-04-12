@@ -40,7 +40,7 @@ jobs:
           if [[ -z "${release_body}" && -f CHANGELOG.md ]]; then
             # CHANGELOG 约定使用 "## [vX.Y.Z] — YYYY-MM-DD" 作为版本标题。
             release_body="$(awk -v tag="${TAG_NAME}" '
-              $0 ~ "^## \\[" tag "\\]" { in_section = 1 }
+              $0 ~ "^## \\[" tag "\\]" { in_section = 1; next }
               in_section && $0 ~ "^## \\[" && $0 !~ "^## \\[" tag "\\]" { exit }
               in_section { print }
             ' CHANGELOG.md)"
