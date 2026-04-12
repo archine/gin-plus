@@ -12,6 +12,7 @@ name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
 # 版本号解析策略（基于 label）
+# 未命中以下 label 时会回退为 patch，因此建议在 PR 合并前维护好语义化 labels。
 version-resolver:
   major:
     labels:

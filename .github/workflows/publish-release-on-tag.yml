@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
 
           prerelease=false
-          if [[ "${TAG_NAME}" == *-alpha* || "${TAG_NAME}" == *-beta* || "${TAG_NAME}" == *-rc* ]]; then
+          if [[ "${TAG_NAME}" =~ -(alpha|beta|rc|preview|dev)([.-]|$) ]]; then
             prerelease=true
           fi
 
@@ -38,6 +38,7 @@ jobs:
           release_body="$(jq -r --arg tag "${TAG_NAME}" 'map(select(.tag_name == $tag or .name == $tag)) | first | .body // empty' <<<"${release_list}")"
 
           if [[ -z "${release_body}" && -f CHANGELOG.md ]]; then
+            # CHANGELOG 约定使用 "## [vX.Y.Z] — YYYY-MM-DD" 作为版本标题。
             release_body="$(awk -v tag="${TAG_NAME}" '
               $0 ~ "^## \\[" tag "\\]" { in_section = 1 }
               in_section && $0 ~ "^## \\[" && $0 !~ "^## \\[" tag "\\]" { exit }
