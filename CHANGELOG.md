@@ -100,7 +100,7 @@
 ---
 
 [v4.3.7]: https://github.com/archine/gin-plus/compare/v4.3.6...v4.3.7
-[v4.3.6]: https://github.com/archine/gin-plus/compare/v4.3.5...v4.3.6
+[v4.3.6]: https://github.com/archine/gin-plus/compare/v4.3.4...v4.3.6
 [v4.3.4]: https://github.com/archine/gin-plus/compare/v4.3.2...v4.3.4
 [v4.3.2]: https://github.com/archine/gin-plus/compare/v4.3.1...v4.3.2
 [v4.3.1]: https://github.com/archine/gin-plus/compare/v4.3.0...v4.3.1
