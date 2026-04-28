@@ -84,7 +84,7 @@ func doProcessFields(c *Container, structValue reflect.Value, autoFields []*Auto
 		var exist bool
 
 		if autoField.IsInterface {
-			prepareIFaceImplements(c, autoField.Field.Type)
+			c.prepareIFaceImplements(autoField.Field.Type)
 		}
 
 		if autoField.AutowireTag == "" {
@@ -126,7 +126,7 @@ func initializeBeans(c *Container, ctrlType reflect.Type) {
 }
 
 // prepareIFaceImplements prepares the interface implementations in the container.
-func prepareIFaceImplements(c *Container, iface reflect.Type) {
+func (c *Container) prepareIFaceImplements(iface reflect.Type) {
 	if c.LookupType(iface) {
 		// If the interface type is already prepared, skip it.
 		return

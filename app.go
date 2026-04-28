@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/gplog/zapper"
@@ -41,7 +40,6 @@ type App struct {
 	state            atomic.Bool
 	eventManager     *eventManager
 	server           *server.GinServer
-	appContext       app.ApplicationContext
 	confProviderFunc func() config.Provider
 	loggerFunc       func(cp config.Provider) gplog.Logger
 	initialized      atomic.Bool
@@ -52,7 +50,6 @@ type App struct {
 func New() *App {
 	a := &App{
 		eventManager: newEventManager(),
-		appContext:   newSysContext(),
 		server:       server.NewGinServer(),
 	}
 
@@ -137,12 +134,12 @@ func (a *App) initialize() {
 
 // refreshContainer refreshes the bean container.
 func (a *App) refreshContainer() {
-	a.eventManager.triggerContainerRefreshBefore(a.appContext)
+	a.eventManager.triggerContainerRefreshBefore()
 
 	sysctr.Container.Refresh()
 	gplog.Info("Bean container refreshed successfully")
 
-	a.eventManager.triggerContainerRefreshAfter(a.appContext)
+	a.eventManager.triggerContainerRefreshAfter()
 }
 
 // startServer extracts the server startup logic for better readability
@@ -156,15 +153,15 @@ func (a *App) startServer() {
 	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d",
 		serverName, a.server.GetAddress(), os.Getpid()))
 
-	a.eventManager.triggerOnStarting(a.appContext)
+	a.eventManager.triggerOnStarting()
 
 	startTime := time.Now()
-	if err := a.server.Run(a.appContext); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := a.server.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		gplog.Error("Starting " + serverName + " failed: " + err.Error())
 		return
 	}
 
-	a.eventManager.triggerOnStarted(a.appContext)
+	a.eventManager.triggerOnStarted()
 	gplog.Info(fmt.Sprintf("Started %s in %v", serverName, time.Since(startTime)))
 
 	a.waitForShutdown()

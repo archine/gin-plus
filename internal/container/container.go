@@ -110,6 +110,9 @@ func (c *Container) GetBeanByType(typ reflect.Type) (any, bool) {
 	searchTyp := typ
 	if searchTyp.Kind() == reflect.Pointer {
 		searchTyp = searchTyp.Elem()
+	} else if searchTyp.Kind() == reflect.Interface {
+		// For interfaces, we want to search by the interface type itself
+		c.prepareIFaceImplements(searchTyp)
 	}
 
 	c.mu.RLock()
@@ -134,6 +137,9 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 	}
 	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
+	} else if typ.Kind() == reflect.Interface {
+		// For interfaces, we want to search by the interface type itself
+		c.prepareIFaceImplements(typ)
 	}
 
 	c.mu.RLock()
@@ -189,7 +195,7 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	// Map to provided interfaces with strict implementation check
 	for _, itype := range itypes {
 		if !beanTyp.Implements(itype) {
-			panic(fmt.Sprintf("[IOC] type mismatch: %v does not implement interface %v", beanTyp, itype))
+			continue
 		}
 		c.typeMapping[itype] = append(c.typeMapping[itype], name)
 	}

@@ -3,11 +3,10 @@ package gin_plus
 import (
 	"context"
 
-	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 )
 
-// Event is the base interface for all app events.
+// AppEvent is the base interface for all app events.
 type AppEvent interface {
 	// Order returns the order of the event.
 	// Lower numbers indicate higher priority.
@@ -26,7 +25,7 @@ type StartingEvent interface {
 	//   - Setting up monitoring and health checks
 	//   - Performing pre-flight checks
 	//   - Registering middleware or routes
-	OnStarting(ctx app.ApplicationContext)
+	OnStarting()
 }
 
 // StartedEvent is called after the application has started successfully.
@@ -42,7 +41,7 @@ type StartedEvent interface {
 	//   - Logging startup completion status
 	//   - Triggering external system notifications
 	// Note: At this point, the HTTP server is running and ready to accept requests.
-	OnStarted(ctx app.ApplicationContext)
+	OnStarted()
 }
 
 // StoppedEvent is called after the HTTP server has stopped.
@@ -79,7 +78,7 @@ type ContainerRefreshBeforeEvent interface {
 	//  - Modifying container configuration
 	//  - Performing pre-refresh validations
 	//  - Setting up custom bean processors
-	OnContainerRefreshBefore(ctx app.ApplicationContext)
+	OnContainerRefreshBefore()
 }
 
 // ContainerRefreshAfterEvent is called after the IoC container refresh process.
@@ -97,5 +96,5 @@ type ContainerRefreshAfterEvent interface {
 	//  - Triggering application-specific initialization logic
 	//
 	// Note: The container state should not be modified at this point.
-	OnContainerRefreshAfter(ctx app.ApplicationContext)
+	OnContainerRefreshAfter()
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"slices"
 
-	"github.com/archine/gin-plus/v4/app"
 	"github.com/archine/gin-plus/v4/component/config"
 )
 
@@ -18,7 +17,7 @@ func newEventManager() *eventManager {
 	return &eventManager{}
 }
 
-// register adds new events to the manager. 
+// register adds new events to the manager.
 // It accepts a variadic list of AppEvent interfaces and appends them to the internal slice.
 func (m *eventManager) register(events ...AppEvent) {
 	m.events = append(m.events, events...)
@@ -44,15 +43,15 @@ func trigger[T AppEvent](m *eventManager, runFn func(T)) {
 	}
 }
 
-func (m *eventManager) triggerOnStarting(ctx app.ApplicationContext) {
+func (m *eventManager) triggerOnStarting() {
 	trigger(m, func(e StartingEvent) {
-		e.OnStarting(ctx)
+		e.OnStarting()
 	})
 }
 
-func (m *eventManager) triggerOnStarted(ctx app.ApplicationContext) {
+func (m *eventManager) triggerOnStarted() {
 	trigger(m, func(e StartedEvent) {
-		e.OnStarted(ctx)
+		e.OnStarted()
 	})
 }
 
@@ -68,14 +67,14 @@ func (m *eventManager) triggerConfigLoaded(cp config.Provider) {
 	})
 }
 
-func (m *eventManager) triggerContainerRefreshBefore(ctx app.ApplicationContext) {
+func (m *eventManager) triggerContainerRefreshBefore() {
 	trigger(m, func(e ContainerRefreshBeforeEvent) {
-		e.OnContainerRefreshBefore(ctx)
+		e.OnContainerRefreshBefore()
 	})
 }
 
-func (m *eventManager) triggerContainerRefreshAfter(ctx app.ApplicationContext) {
+func (m *eventManager) triggerContainerRefreshAfter() {
 	trigger(m, func(e ContainerRefreshAfterEvent) {
-		e.OnContainerRefreshAfter(ctx)
+		e.OnContainerRefreshAfter()
 	})
 }
