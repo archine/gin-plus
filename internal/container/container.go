@@ -221,8 +221,6 @@ func (c *Container) Refresh() {
 			if err != nil {
 				panic(fmt.Sprintf("[IOC] failed to initialize bean '%s' (%v): %v", beanName, beanDef.Type, err))
 			}
-
-			beanDef.ready = true
 		}
 
 		// Perform additional initialization (e.g., MVC routing)
