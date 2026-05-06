@@ -211,8 +211,9 @@ func (s *GinServer) applyRoute(engine *gin.Engine, contextPath string, enableHea
 	}
 
 	for _, ctrl := range ctrls {
-		ctrl.(mvc.AbstractController).SetRoutes(baseRouter)
+		ctrl.SetRoutes(baseRouter)
 	}
 
-	gplog.Info("All routes have been applied to the Gin engine")
+	gplog.Info(fmt.Sprintf("All routes have been applied to the Gin engine, parsed %d controllers", len(ctrls)))
+	gplog.Info(fmt.Sprintf("Application run with context path: '%s'", contextPath))
 }
