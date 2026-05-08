@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
@@ -35,7 +36,7 @@ func NewFileProvider() Provider {
 	}
 
 	lc := &FileProvider{v: v}
-	
+
 	log.Printf("Successfully loaded configuration from file: [%s]", configFile)
 	return lc
 }
@@ -122,7 +123,11 @@ func (f *FileProvider) Sub(key string) Provider {
 
 func (f *FileProvider) Unmarshal(key string, obj any) error {
 	if key == "" {
-		return f.v.Unmarshal(obj)
+		return f.v.Unmarshal(obj, func(dc *mapstructure.DecoderConfig) {
+			dc.TagName = "mapstructure,json"
+		})
 	}
-	return f.v.UnmarshalKey(key, obj)
+	return f.v.UnmarshalKey(key, obj, func(dc *mapstructure.DecoderConfig) {
+		dc.TagName = "mapstructure,json"
+	})
 }
