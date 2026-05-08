@@ -67,15 +67,20 @@ func (s *StackError) Format(f fmt.State, verb rune) {
 
 // NewStackError creates a StackError with a message and captures the current stack trace.
 // The trace captures up to 16 frames starting from the caller's location.
-func NewStackError(msg string) *StackError {
-	st := CaptureStackTrace(1, 16)
+// By default, it skips the NewStackError frame itself (skip=1).
+func NewStackError(msg string, skip ...int) *StackError {
+	s := 1
+	if len(skip) > 0 {
+		s = skip[0]
+	}
+	st := CaptureStackTrace(s, 16)
 	return &StackError{msg: msg, st: st.Full()}
 }
 
 // WrapWithStack adds a stack trace to an existing error.
 // Returns nil if err is nil.
 // If err is already a *StackError, it is returned as-is to avoid redundant nesting.
-func WrapWithStack(err error) *StackError {
+func WrapWithStack(err error, skip ...int) *StackError {
 	if err == nil {
 		return nil
 	}
@@ -83,6 +88,11 @@ func WrapWithStack(err error) *StackError {
 	if errors.As(err, &se) {
 		return se
 	}
-	st := CaptureStackTrace(1, 16)
+
+	s := 1
+	if len(skip) > 0 {
+		s = skip[0]
+	}
+	st := CaptureStackTrace(s, 16)
 	return &StackError{err: err, st: st.Full()}
 }

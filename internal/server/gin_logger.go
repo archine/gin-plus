@@ -50,27 +50,27 @@ var jsonFormatter = func(param gin.LogFormatterParams) string {
 		param.Latency = param.Latency.Truncate(time.Second)
 	}
 
-	fields := []gplog.Field{
-		gplog.F("status", param.StatusCode),
-		gplog.F("latency", param.Latency.String()),
-		gplog.F("client_ip", param.ClientIP),
-		gplog.F("req_path", param.Path),
-		gplog.F("req_method", param.Method),
+	keyvals := []any{
+		"status", param.StatusCode,
+		"latency", param.Latency.String(),
+		"client_ip", param.ClientIP,
+		"req_path", param.Path,
+		"req_method", param.Method,
 	}
 
 	if param.Keys != nil {
 		for k, v := range param.Keys {
-			fields = append(fields, gplog.F(k.(string), v))
+			keyvals = append(keyvals, k.(string), v)
 		}
 	}
 
 	switch {
 	case param.StatusCode >= 500:
-		gplog.Error("HTTP Request", fields...)
+		gplog.Error("HTTP Request", keyvals...)
 	case param.StatusCode >= 400:
-		gplog.Warn("HTTP Request", fields...)
+		gplog.Warn("HTTP Request", keyvals...)
 	default:
-		gplog.Info("HTTP Request", fields...)
+		gplog.Info("HTTP Request", keyvals...)
 	}
 
 	return ""

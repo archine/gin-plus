@@ -189,49 +189,49 @@ func (d *zapLogger) GetFormat() string {
 	return d.format
 }
 
-func (d *zapLogger) Info(text string, fields ...gplog.Field) {
-	d.core.Info(text, d.buildFields(context.TODO(), fields)...)
+func (d *zapLogger) Info(text string, keyvals ...any) {
+	d.core.Info(text, d.buildFields(context.TODO(), keyvals)...)
 }
 
-func (d *zapLogger) Debug(text string, fields ...gplog.Field) {
-	d.core.Debug(text, d.buildFields(context.TODO(), fields)...)
+func (d *zapLogger) Debug(text string, keyvals ...any) {
+	d.core.Debug(text, d.buildFields(context.TODO(), keyvals)...)
 }
 
-func (d *zapLogger) Warn(text string, fields ...gplog.Field) {
-	d.core.Warn(text, d.buildFields(context.TODO(), fields)...)
+func (d *zapLogger) Warn(text string, keyvals ...any) {
+	d.core.Warn(text, d.buildFields(context.TODO(), keyvals)...)
 }
 
-func (d *zapLogger) Error(text string, fields ...gplog.Field) {
-	d.core.Error(text, d.buildFields(context.TODO(), fields)...)
+func (d *zapLogger) Error(text string, keyvals ...any) {
+	d.core.Error(text, d.buildFields(context.TODO(), keyvals)...)
 }
 
-func (d *zapLogger) Fatal(text string, fields ...gplog.Field) {
-	d.core.Fatal(text, d.buildFields(context.TODO(), fields)...)
+func (d *zapLogger) Fatal(text string, keyvals ...any) {
+	d.core.Fatal(text, d.buildFields(context.TODO(), keyvals)...)
 }
 
-func (d *zapLogger) InfoWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
-	d.core.Info(text, d.buildFields(ctx, fields)...)
+func (d *zapLogger) InfoWithCtx(ctx context.Context, text string, keyvals ...any) {
+	d.core.Info(text, d.buildFields(ctx, keyvals)...)
 }
 
-func (d *zapLogger) DebugWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
-	d.core.Debug(text, d.buildFields(ctx, fields)...)
+func (d *zapLogger) DebugWithCtx(ctx context.Context, text string, keyvals ...any) {
+	d.core.Debug(text, d.buildFields(ctx, keyvals)...)
 }
 
-func (d *zapLogger) WarnWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
-	d.core.Warn(text, d.buildFields(ctx, fields)...)
+func (d *zapLogger) WarnWithCtx(ctx context.Context, text string, keyvals ...any) {
+	d.core.Warn(text, d.buildFields(ctx, keyvals)...)
 }
 
-func (d *zapLogger) ErrorWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
-	d.core.Error(text, d.buildFields(ctx, fields)...)
+func (d *zapLogger) ErrorWithCtx(ctx context.Context, text string, keyvals ...any) {
+	d.core.Error(text, d.buildFields(ctx, keyvals)...)
 }
 
-func (d *zapLogger) FatalWithCtx(ctx context.Context, text string, fields ...gplog.Field) {
-	d.core.Fatal(text, d.buildFields(ctx, fields)...)
+func (d *zapLogger) FatalWithCtx(ctx context.Context, text string, keyvals ...any) {
+	d.core.Fatal(text, d.buildFields(ctx, keyvals)...)
 }
 
-func (d *zapLogger) buildFields(ctx context.Context, gpFields []gplog.Field) []zap.Field {
-	// Estimate capacity: gpFields + all possible context keys
-	capacity := len(gpFields)
+func (d *zapLogger) buildFields(ctx context.Context, keyvals []any) []zap.Field {
+	// Estimate capacity: keyvals pairs + all possible context keys
+	capacity := len(keyvals) / 2
 	if ctx != nil && len(d.keys) > 0 {
 		capacity += len(d.keys)
 	}
@@ -242,8 +242,16 @@ func (d *zapLogger) buildFields(ctx context.Context, gpFields []gplog.Field) []z
 
 	zapFields := make([]zap.Field, 0, capacity)
 
-	for _, f := range gpFields {
-		zapFields = append(zapFields, zap.Any(f.Key, f.Value))
+	for i := 0; i < len(keyvals); i += 2 {
+		key, ok := keyvals[i].(string)
+		if !ok {
+			key = fmt.Sprintf("%v", keyvals[i])
+		}
+		var val any
+		if i+1 < len(keyvals) {
+			val = keyvals[i+1]
+		}
+		zapFields = append(zapFields, zap.Any(key, val))
 	}
 
 	if ctx != nil {

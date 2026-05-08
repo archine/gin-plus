@@ -20,81 +20,81 @@ func GetLogger() Logger {
 }
 
 // Info logs an info level message.
-func Info(text string, fields ...Field) {
+func Info(text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.Info(text, fields...)
+	defaultLogger.Info(text, keyvals...)
 }
 
 // Debug logs a debug level message.
-func Debug(text string, fields ...Field) {
+func Debug(text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.Debug(text, fields...)
+	defaultLogger.Debug(text, keyvals...)
 }
 
 // Warn logs a warning level message.
-func Warn(text string, fields ...Field) {
+func Warn(text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.Warn(text, fields...)
+	defaultLogger.Warn(text, keyvals...)
 }
 
 // Error logs an error level message.
-func Error(text string, fields ...Field) {
+func Error(text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.Error(text, fields...)
+	defaultLogger.Error(text, keyvals...)
 }
 
 // Fatal logs a fatal level message and exits the application.
-func Fatal(text string, fields ...Field) {
+func Fatal(text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.Fatal(text, fields...)
+	defaultLogger.Fatal(text, keyvals...)
 }
 
-// InfoWithCtx logs an info level message with fields.
-func InfoWithCtx(ctx context.Context, text string, fields ...Field) {
+// InfoWithCtx logs an info level message with keyvals.
+func InfoWithCtx(ctx context.Context, text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.InfoWithCtx(ctx, text, fields...)
+	defaultLogger.InfoWithCtx(ctx, text, keyvals...)
 }
 
-// DebugWithCtx logs a debug level message with fields.
-func DebugWithCtx(ctx context.Context, text string, fields ...Field) {
+// DebugWithCtx logs a debug level message with keyvals.
+func DebugWithCtx(ctx context.Context, text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.DebugWithCtx(ctx, text, fields...)
+	defaultLogger.DebugWithCtx(ctx, text, keyvals...)
 }
 
-// WarnWithCtx logs a warning level message with fields.
-func WarnWithCtx(ctx context.Context, text string, fields ...Field) {
+// WarnWithCtx logs a warning level message with keyvals.
+func WarnWithCtx(ctx context.Context, text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.WarnWithCtx(ctx, text, fields...)
+	defaultLogger.WarnWithCtx(ctx, text, keyvals...)
 }
 
-// ErrorWithCtx logs an error level message with fields.
-func ErrorWithCtx(ctx context.Context, text string, fields ...Field) {
+// ErrorWithCtx logs an error level message with keyvals.
+func ErrorWithCtx(ctx context.Context, text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.ErrorWithCtx(ctx, text, fields...)
+	defaultLogger.ErrorWithCtx(ctx, text, keyvals...)
 }
 
-// FatalWithCtx logs a fatal level message with fields and exits the application.
-func FatalWithCtx(ctx context.Context, text string, fields ...Field) {
+// FatalWithCtx logs a fatal level message with keyvals and exits the application.
+func FatalWithCtx(ctx context.Context, text string, keyvals ...any) {
 	if defaultLogger == nil {
 		panic("application log is not initialized")
 	}
-	defaultLogger.FatalWithCtx(ctx, text, fields...)
+	defaultLogger.FatalWithCtx(ctx, text, keyvals...)
 }
