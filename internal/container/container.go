@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/archine/gin-plus/v4/component/mvc"
-	"github.com/archine/gin-plus/v4/util/strutil"
 )
 
 // AutowireField represents a field metadata for dependency injection.
@@ -52,7 +51,7 @@ func NewContainer() *Container {
 // RegisterBeanDef registers a bean definition that requires full lifecycle management.
 func (c *Container) RegisterBeanDef(name string, def *BeanDef) {
 	if name == "" {
-		name = strutil.FirstToLower(def.OriginType.Name())
+		name = def.OriginType.String()
 	}
 
 	c.mu.Lock()
@@ -162,9 +161,10 @@ func (c *Container) GetAllBeansByType(typ reflect.Type) ([]any, bool) {
 
 // RegisterBean registers a pre-instantiated object as a singleton bean.
 // It allows mapping the instance to specific interface types for dependency injection.
+// If no explicit name is provided, the container uses package.structName as the default.
 func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Type) {
-	if name == "" || instance == nil {
-		panic("[IOC] registration failed: bean name and instance cannot be empty")
+	if instance == nil {
+		panic("[IOC] registration failed: instance cannot be empty")
 	}
 
 	beanTyp := reflect.TypeOf(instance)
@@ -173,6 +173,9 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	}
 
 	structType := beanTyp.Elem()
+	if name == "" {
+		name = structType.String()
+	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

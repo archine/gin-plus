@@ -6,7 +6,7 @@ import "github.com/archine/gin-plus/v4/component/config"
 // Any struct implementing this interface can be recognized and managed as a bean.
 type AbstractBean interface {
 	// BeanName returns the unique name of the bean.
-	// If the returned name is empty, the container will use the struct name with the first letter in lowercase as the default.
+	// If the returned name is empty, the container will use package.structName as the default.
 	// This name is used for bean identification and dependency injector.
 	BeanName() string
 
@@ -32,7 +32,7 @@ func (b *Bean) BeanName() string {
 	return ""
 }
 
-func (b *Bean) Condition(cfg config.Provider) bool {
+func (b *Bean) Condition(cp config.Provider) bool {
 	return true
 }
 
