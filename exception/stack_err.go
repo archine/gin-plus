@@ -12,17 +12,16 @@ import (
 //   - %+v: error message with full stack trace (same as Full)
 //   - %q: quoted error message
 type StackError struct {
-	msg string // Direct message (set via NewStackError).
 	err error  // Wrapped error (set via WrapWithStack).
 	st  string // Captured stack trace.
 }
 
 // Error returns the error message without stack trace.
 func (s *StackError) Error() string {
-	if s.err != nil {
-		return s.err.Error()
+	if s == nil {
+		return ""
 	}
-	return s.msg
+	return s.err.Error()
 }
 
 // Full returns the error detail followed by the captured stack trace.
@@ -30,22 +29,25 @@ func (s *StackError) Error() string {
 // When the wrapped error supports Full (e.g. WrapError), its full
 // representation is used so no information is lost.
 func (s *StackError) Full() string {
-	var detail string
-	if s.err != nil {
-		detail = fullError(s.err)
-	} else {
-		detail = s.msg
+	if s == nil {
+		return ""
 	}
-	return detail + "\n" + s.st
+	return s.err.Error() + "\n" + s.st
 }
 
 // StackTrace returns the captured stack trace.
 func (s *StackError) StackTrace() string {
+	if s == nil {
+		return ""
+	}
 	return s.st
 }
 
 // Unwrap returns the wrapped error for errors.Is / errors.As.
 func (s *StackError) Unwrap() error {
+	if s == nil {
+		return nil
+	}
 	return s.err
 }
 
@@ -65,22 +67,10 @@ func (s *StackError) Format(f fmt.State, verb rune) {
 	}
 }
 
-// NewStackError creates a StackError with a message and captures the current stack trace.
-// The trace captures up to 16 frames starting from the caller's location.
-// By default, it skips the NewStackError frame itself (skip=1).
-func NewStackError(msg string, skip ...int) *StackError {
-	s := 1
-	if len(skip) > 0 {
-		s = skip[0]
-	}
-	st := CaptureStackTrace(s, 16)
-	return &StackError{msg: msg, st: st.Full()}
-}
-
 // WrapWithStack adds a stack trace to an existing error.
 // Returns nil if err is nil.
 // If err is already a *StackError, it is returned as-is to avoid redundant nesting.
-func WrapWithStack(err error, skip ...int) *StackError {
+func WrapWithStack(err error, skip ...int) error {
 	if err == nil {
 		return nil
 	}
