@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/gplog/zapper"
+	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/internal/server"
 	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
@@ -44,13 +46,15 @@ type App struct {
 	loggerFunc       func(cp config.Provider) gplog.Logger
 	initialized      atomic.Bool
 	banner           string
+	shutdownSignal   *shutdownSignal
 }
 
 // New creates a new instance of the App with optional configurations.
 func New() *App {
 	a := &App{
-		eventManager: newEventManager(),
-		server:       server.NewGinServer(),
+		eventManager:   newEventManager(),
+		server:         server.NewGinServer(),
+		shutdownSignal: newShutdownSignal(),
 	}
 
 	return a
@@ -134,12 +138,25 @@ func (a *App) initialize() {
 
 // refreshContainer refreshes the bean container.
 func (a *App) refreshContainer() {
+	a.registerInfrastructureBeans()
 	a.eventManager.triggerContainerRefreshBefore()
 
 	sysctr.Container.Refresh()
 	gplog.Info("Bean container refreshed successfully")
 
 	a.eventManager.triggerContainerRefreshAfter()
+}
+
+func (a *App) registerInfrastructureBeans() {
+	if _, exist := ioc.GetBean[ShutdownSignal]("ginPlusShutdownSignal"); exist {
+		return
+	}
+
+	ioc.RegisterBean(
+		"GinPlusShutdownSignal",
+		a.shutdownSignal,
+		reflect.TypeFor[ShutdownSignal](),
+	)
 }
 
 // startServer extracts the server startup logic for better readability
@@ -174,6 +191,7 @@ func (a *App) waitForShutdown() {
 	<-stopSignalCh
 
 	gplog.Info("Received shutdown signal, starting graceful shutdown...")
+	a.shutdownSignal.close()
 
 	if err := a.server.Shutdown(func(ctx context.Context) {
 		a.eventManager.triggerOnStopped(ctx)
