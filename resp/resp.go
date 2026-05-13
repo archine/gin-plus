@@ -176,7 +176,12 @@ func Error(ctx *gin.Context, err error) {
 		return
 	}
 
-	gplog.ErrorWithCtx(ctx.Request.Context(), fmt.Sprintf("%+v", err))
+	var stackErr *exception.StackError
+	if errors.As(err, &stackErr) {
+		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.Full())
+	} else {
+		gplog.ErrorWithCtx(ctx.Request.Context(), fmt.Sprintf("%+v", err))
+	}
 
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {
