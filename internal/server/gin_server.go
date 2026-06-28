@@ -102,7 +102,7 @@ func (s *GinServer) Run() error {
 	serve := http.Server{
 		Addr:                         fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port),
 		Handler:                      engine,
-		DisableGeneralOptionsHandler: true,
+		DisableGeneralOptionsHandler: s.conf.DisablePassOptions,
 		ReadTimeout:                  s.conf.ReadTimeout,
 		WriteTimeout:                 s.conf.WriteTimeout,
 		ReadHeaderTimeout:            s.conf.ReadHeaderTimeout,
