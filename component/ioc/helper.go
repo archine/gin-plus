@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
-	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 
 	"github.com/archine/gin-plus/v4/internal/container"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
@@ -34,20 +34,20 @@ func RegisterBeanDef(instance any) {
 	}
 
 	var beanName string
+	var conditionFunc func(config.Provider) bool
 	if ib, ok := instance.(bean.AbstractBean); ok {
-		if !ib.Condition(sysconf.Provider) {
-			return
-		}
 		beanName = ib.BeanName()
+		conditionFunc = ib.Condition
 	}
 
 	def := &container.BeanDef{
+		Condition:  conditionFunc,
 		Type:       typ,
 		Value:      instance,
 		OriginType: typ.Elem(),
 	}
 
-	sysctr.Container.RegisterBeanDef(beanName, def)
+	sysctr.BeanRegistry.RegisterBeanDef(beanName, def)
 }
 
 // RegisterBean registers an already instantiated bean instance into the IOC container.

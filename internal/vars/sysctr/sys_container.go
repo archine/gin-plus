@@ -5,5 +5,6 @@ import (
 )
 
 var (
-	Container = container.NewContainer() // Container is the global IOC container
+	BeanRegistry = container.NewBeanDefinitionRegistry() // BeanRegistry stores candidate bean definitions before refresh
+	Container    = container.NewContainer()              // Container is the global IOC container
 )

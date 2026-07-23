@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/mvc"
 )
 
@@ -21,11 +22,12 @@ type AutowireField struct {
 
 // BeanDef represents the definition and lifecycle state of a bean.
 type BeanDef struct {
-	ready          bool             // Initialization status
-	Value          any              // Actual instance (must be a pointer)
-	Type           reflect.Type     // Full type information (e.g., *UserService)
-	OriginType     reflect.Type     // The underlying struct type (e.g., UserService)
-	AutowireFields []*AutowireField // Fields identified for injection
+	ready          bool                       // Initialization status
+	Condition      func(config.Provider) bool // Optional refresh-time registration guard
+	Value          any                        // Actual instance (must be a pointer)
+	Type           reflect.Type               // Full type information (e.g., *UserService)
+	OriginType     reflect.Type               // The underlying struct type (e.g., UserService)
+	AutowireFields []*AutowireField           // Fields identified for injection
 }
 
 // Container manages the registration, dependency injection, and lifecycle of beans.
@@ -46,25 +48,6 @@ func NewContainer() *Container {
 		beans:       make(map[string]*BeanDef),
 		typeMapping: make(map[reflect.Type][]string),
 	}
-}
-
-// RegisterBeanDef registers a bean definition that requires full lifecycle management.
-func (c *Container) RegisterBeanDef(name string, def *BeanDef) {
-	if name == "" {
-		name = def.OriginType.String()
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Optimization: Include type details in panic for easier debugging
-	if old, exists := c.beans[name]; exists {
-		panic(fmt.Sprintf("[IOC] bean name conflict: '%s' is already registered as %v, cannot register %v",
-			name, old.Type, def.Type))
-	}
-
-	c.beans[name] = def
-	c.typeMapping[def.OriginType] = append(c.typeMapping[def.OriginType], name)
 }
 
 // LookupType checks if a specific type (or its pointer element) is registered.
@@ -168,7 +151,7 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	}
 
 	beanTyp := reflect.TypeOf(instance)
-	if beanTyp.Kind() != reflect.Ptr || beanTyp.Elem().Kind() != reflect.Struct {
+	if beanTyp.Kind() != reflect.Pointer || beanTyp.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("[IOC] registration failed: expected struct pointer, got %T", instance))
 	}
 
@@ -210,17 +193,32 @@ func (c *Container) RegisterBean(name string, instance any, itypes ...reflect.Ty
 	}
 }
 
-// Refresh triggers the dependency injection process for all uninitialized beans.
-// It should be invoked once after all beans are registered.
-func (c *Container) Refresh() {
-	c.once.Do(func() {
-		ctrlType := reflect.TypeFor[mvc.AbstractController]()
+// Refresh builds the effective bean graph and triggers dependency injection.
+// It should be invoked after configuration is initialized and all bean definitions are registered.
+func (c *Container) Refresh(cp config.Provider, registry *BeanDefinitionRegistry) {
+	if cp == nil {
+		panic("[IOC] config provider is not initialized before container refresh")
+	}
+	if registry == nil {
+		panic("[IOC] bean definition registry is not initialized")
+	}
 
-		for beanName, beanDef := range c.beans {
-			if beanDef.ready {
+	c.once.Do(func() {
+		defs := registry.DrainDefs()
+
+		for beanName, beanDef := range defs {
+			if beanDef.Condition != nil && !beanDef.Condition(cp) {
+				delete(defs, beanName)
 				continue
 			}
 
+			c.mu.Lock()
+			c.registerBeanDefLocked(beanName, beanDef)
+			c.mu.Unlock()
+		}
+
+		ctrlType := reflect.TypeFor[mvc.AbstractController]()
+		for beanName, beanDef := range defs {
 			// Parse tags and prepare AutowireFields
 			analyzeDefinition(beanDef)
 
@@ -235,4 +233,13 @@ func (c *Container) Refresh() {
 		// Perform additional initialization (e.g., MVC routing)
 		initializeBeans(c, ctrlType)
 	})
+}
+
+func (c *Container) registerBeanDefLocked(name string, def *BeanDef) {
+	if old, exists := c.beans[name]; exists {
+		panic(fmt.Sprintf("[IOC] bean name conflict: '%s' is already registered as %v, cannot register %v",
+			name, old.Type, def.Type))
+	}
+	c.beans[name] = def
+	c.typeMapping[def.OriginType] = append(c.typeMapping[def.OriginType], name)
 }

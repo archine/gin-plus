@@ -141,7 +141,7 @@ func (a *App) refreshContainer() {
 	a.registerInfrastructureBeans()
 	a.eventManager.triggerContainerRefreshBefore()
 
-	sysctr.Container.Refresh()
+	sysctr.Container.Refresh(sysconf.Provider, sysctr.BeanRegistry)
 	gplog.Info("Bean container refreshed successfully")
 
 	a.eventManager.triggerContainerRefreshAfter()

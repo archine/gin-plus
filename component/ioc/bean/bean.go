@@ -11,7 +11,7 @@ type AbstractBean interface {
 	BeanName() string
 
 	// Condition decides whether this bean should be registered.
-	// The container calls Condition at registration time, passing a config.Provider.
+	// The container calls Condition at refresh time, passing an initialized config.Provider.
 	// Return true to register the bean; return false to skip registration.
 	// The default implementation should return true.
 	Condition(cfg config.Provider) bool
