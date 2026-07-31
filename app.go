@@ -142,8 +142,9 @@ func (a *App) refreshContainer() {
 	a.eventManager.triggerContainerRefreshBefore()
 
 	sysctr.Container.Refresh(sysconf.Provider, sysctr.BeanRegistry)
-	gplog.Info("Bean container refreshed successfully")
+	sysctr.BeanRegistry = nil // Clear registry reference to avoid further registration after refresh
 
+	gplog.Info("Bean container refreshed successfully")
 	a.eventManager.triggerContainerRefreshAfter()
 }
 

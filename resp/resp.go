@@ -39,10 +39,10 @@ type Resp interface {
 
 // PaginationResult represents a paginated response.
 type PaginationResult struct {
-	Total     int64 `json:"total"`      // Total count of items.
-	PageSize  int   `json:"page_size"`  // Number of items per page.
-	PageIndex int   `json:"page_index"` // Index of the current page.
-	Data      any   `json:"data"`       // Data for the current page.
+	Total     int64 `json:"total,omitempty"`      // Total count of items.
+	PageSize  int   `json:"page_size,omitempty"`  // Number of items per page.
+	PageIndex int   `json:"page_index,omitempty"` // Index of the current page.
+	Data      any   `json:"data"`                 // Data for the current page.
 }
 
 // Result represents a standard response structure.

@@ -43,12 +43,6 @@ type Config struct {
 	// This is useful if you want to use a custom logging middleware or handler.
 	DisableDefaultLogger bool `mapstructure:"disable-default-logger"`
 
-	// DisablePassOptions disables the automatic handling of OPTIONS requests.
-	// If true, the server will not automatically respond to OPTIONS requests.
-	// This is useful if you want to handle OPTIONS requests manually or use a custom middleware.
-	// Default: false
-	DisablePassOptions bool `mapstructure:"disable-pass-options"`
-
 	// SkipLogPaths is a list of paths that should be skipped by the default logger middleware.
 	// Requests to these paths will not be logged.
 	SkipLogPaths []string `mapstructure:"skip-log-paths"`

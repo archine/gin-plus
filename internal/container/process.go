@@ -48,9 +48,9 @@ func analyzeDefinition(def *BeanDef) {
 		// Parse optional flag: `autowire:"name,optional"` or `autowire:",optional"`
 		beanName := autowireTag
 		optional := false
-		if idx := strings.Index(autowireTag, ","); idx >= 0 {
-			beanName = strings.TrimSpace(autowireTag[:idx])
-			option := strings.TrimSpace(autowireTag[idx+1:])
+		if before, after, ok := strings.Cut(autowireTag, ","); ok {
+			beanName = strings.TrimSpace(before)
+			option := strings.TrimSpace(after)
 			if option != "" && option != "optional" {
 				panic(fmt.Sprintf("field '%s' has unsupported autowire option '%s'; only 'optional' is supported", field.Name, option))
 			}

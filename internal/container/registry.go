@@ -40,13 +40,7 @@ func (r *BeanDefinitionRegistry) RegisterBeanDef(name string, def *BeanDef) {
 	r.definitions[name] = def
 }
 
-// DrainDefs returns all currently registered bean definitions and clears the registry.
+// DrainDefs returns all currently registered bean definitions
 func (r *BeanDefinitionRegistry) DrainDefs() map[string]*BeanDef {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	defs := r.definitions
-	r.definitions = make(map[string]*BeanDef)
-
-	return defs
+	return r.definitions
 }
