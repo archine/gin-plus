@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -28,6 +29,7 @@ func NewFileProvider() Provider {
 	}
 
 	v := viper.New()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 	v.SetConfigFile(configFile)
 
