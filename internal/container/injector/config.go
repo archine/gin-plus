@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/internal/container/util"
 	"github.com/go-viper/mapstructure/v2"
-
-	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/spf13/cast"
 )
 
@@ -38,81 +37,102 @@ var (
 	)
 )
 
-// WireConfigValue resolves the tag expression, looks up the config value, and sets the field.
-func WireConfigValue(fieldValue reflect.Value, fieldType reflect.Type, tagValue string) error {
-	if !strings.HasPrefix(tagValue, "${") || !strings.HasSuffix(tagValue, "}") {
-		return fmt.Errorf("invalid config tag value: %s, must be in the format ${key:default}", tagValue)
+// ValueExpr is the parsed form of a `value:"${key:default}"` tag.
+type ValueExpr struct {
+	Key      string // Config key to look up
+	Default  string // Fallback literal used when the key is absent; empty means "keep the zero value"
+	Required bool   // Set by the "?" sentinel (`${key:?}`): an absent key fails start-up
+}
+
+// ParseValueExpr parses a value tag of the form ${key}, ${key:default} or ${key:?}.
+func ParseValueExpr(tag string) (ValueExpr, error) {
+	if !strings.HasPrefix(tag, "${") || !strings.HasSuffix(tag, "}") {
+		return ValueExpr{}, fmt.Errorf("invalid value tag '%s', expected format ${key:default}", tag)
 	}
 
-	content := tagValue[2 : len(tagValue)-1]
-	parts := strings.SplitN(content, ":", 2)
-
-	key := strings.TrimSpace(parts[0])
-	defaultVal := ""
-	if len(parts) > 1 {
-		defaultVal = strings.TrimSpace(parts[1])
+	key, def, _ := strings.Cut(tag[2:len(tag)-1], ":")
+	expr := ValueExpr{Key: strings.TrimSpace(key), Default: strings.TrimSpace(def)}
+	if expr.Key == "" {
+		return ValueExpr{}, fmt.Errorf("invalid value tag '%s', config key is empty", tag)
 	}
+	if expr.Default == "?" {
+		expr.Default, expr.Required = "", true
+	}
+	return expr, nil
+}
 
-	val := sysconf.Provider.Get(key)
+// WireConfigValue looks up expr in cp and assigns the converted value to fieldValue.
+// fieldValue must be addressable; unexported fields are supported.
+func WireConfigValue(cp config.Provider, fieldValue reflect.Value, expr ValueExpr) error {
+	val := cp.Get(expr.Key)
 	if val == nil {
-		// "?" is the required-value sentinel: `value:"${key:?}"` means the key must
-		// be present in config; start-up fails if it is absent.
-		if defaultVal == "?" {
-			return fmt.Errorf("required config key '%s' is missing", key)
-		}
-		if defaultVal == "" {
+		switch {
+		case expr.Required:
+			return fmt.Errorf("required config key '%s' is missing", expr.Key)
+		case expr.Default == "":
 			return nil
 		}
-		val = defaultVal
+		val = expr.Default
 	}
 
-	return setField(fieldValue, fieldType, val)
+	if err := setField(fieldValue, val); err != nil {
+		return fmt.Errorf("config key '%s': %w", expr.Key, err)
+	}
+	return nil
 }
 
 // setField is the single dispatch point: it resolves the concrete target type and
 // routes to the appropriate converter. The target type drives all decisions — no
 // speculative parsing is done before we know what we are converting into.
-func setField(fieldValue reflect.Value, fieldType reflect.Type, prepareSetValue any) error {
+func setField(fieldValue reflect.Value, val any) error {
+	fieldType := fieldValue.Type()
 	actualType := fieldType
 	isPtr := fieldType.Kind() == reflect.Pointer
 	if isPtr {
 		actualType = fieldType.Elem()
 	}
 
-	converted, err := dispatchConvert(actualType, prepareSetValue)
+	result, err := convert(actualType, val)
 	if err != nil {
 		return err
 	}
 
-	if converted != nil {
-		if isPtr {
-			ptr := reflect.New(actualType)
-			ptr.Elem().Set(reflect.ValueOf(converted))
-			util.DirectSetValue(fieldValue, ptr)
-		} else {
-			util.DirectSetValue(fieldValue, reflect.ValueOf(converted))
-		}
-		return nil
-	}
-
-	// Fall through to mapstructure for struct / map / slice-of-struct, etc.
-	// JSON pre-parsing happens here, where we actually need it.
-	// Always pass the dereferenced type so decodeComplex never sees a pointer.
-	result, err := decodeComplex(actualType, prepareSetValue)
-	if err != nil {
-		return err
-	}
 	if isPtr {
-		util.DirectSetValue(fieldValue, result.Addr())
-	} else {
-		util.DirectSetValue(fieldValue, result)
+		ptr := reflect.New(actualType)
+		ptr.Elem().Set(result)
+		result = ptr
 	}
-
+	util.DirectSetValue(fieldValue, result)
 	return nil
 }
 
-// dispatchConvert converts val to the basic/primitive target type.
+// convert produces a value of exactly targetType (never a pointer).
+// Basic kinds go through cast; the result is converted to named types such as
+// `type Env string`. Anything cast cannot produce directly (structs, maps, slices
+// of structs or of named elements) is decoded by mapstructure.
+func convert(targetType reflect.Type, val any) (reflect.Value, error) {
+	converted, err := dispatchConvert(targetType, val)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	if converted != nil {
+		rv := reflect.ValueOf(converted)
+		if rv.Type() == targetType {
+			return rv, nil
+		}
+		if rv.Type().ConvertibleTo(targetType) {
+			return rv.Convert(targetType), nil
+		}
+		// e.g. []string → []Env is not convertible; let mapstructure decode element-wise.
+	}
+
+	return decodeComplex(targetType, val)
+}
+
+// dispatchConvert converts val to the basic/primitive kind of targetType.
 // Returns (nil, nil) to signal "not a basic type — caller should use decodeComplex".
+// The returned value has the unnamed type of the kind (e.g. string for `type Env string`).
 func dispatchConvert(targetType reflect.Type, val any) (any, error) {
 	// Named types based on reflect.Type identity
 	if targetType == timeType {

@@ -1,9 +1,19 @@
 package stream
 
 import (
-	"fmt"
+	"io"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	// dataReplacer splits multi-line data into consecutive "data:" lines. CR, LF and CRLF are
+	// all line terminators in SSE, so any of them would otherwise end the field early.
+	dataReplacer = strings.NewReplacer("\r\n", "\ndata: ", "\r", "\ndata: ", "\n", "\ndata: ")
+
+	// eventReplacer drops line terminators from event names, which cannot span lines.
+	eventReplacer = strings.NewReplacer("\r", "", "\n", "")
 )
 
 // Writer represents a Server-Sent Events writer.
@@ -34,18 +44,31 @@ func NewWriter(ctx *gin.Context) *Writer {
 		panic("ctx cannot be nil")
 	}
 
-	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
-	ctx.Writer.Header().Set("Cache-Control", "no-cache")
-	ctx.Writer.Header().Set("Connection", "keep-alive")
-	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	h := ctx.Writer.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	// Disable proxy buffering (nginx), otherwise events are delivered in batches.
+	h.Set("X-Accel-Buffering", "no")
 
 	return &Writer{ctx: ctx}
 }
 
-// WriteEvent writes a single SSE event.
+// WriteEvent writes a single SSE event. Line breaks in data are preserved.
 func (w *Writer) WriteEvent(event, data string) error {
-	_, err := fmt.Fprintf(w.ctx.Writer, "event: %s\ndata: %s\n\n", event, data)
-	if err != nil {
+	var b strings.Builder
+	b.Grow(len(event) + len(data) + 16)
+	if event != "" {
+		b.WriteString("event: ")
+		eventReplacer.WriteString(&b, event)
+		b.WriteByte('\n')
+	}
+	b.WriteString("data: ")
+	dataReplacer.WriteString(&b, data)
+	b.WriteString("\n\n")
+
+	// One write per event, so a failure never leaves a half-written frame behind.
+	if _, err := io.WriteString(w.ctx.Writer, b.String()); err != nil {
 		return err
 	}
 	w.ctx.Writer.Flush()
@@ -54,17 +77,17 @@ func (w *Writer) WriteEvent(event, data string) error {
 
 // WriteData writes data without an event name.
 func (w *Writer) WriteData(data string) error {
-	_, err := fmt.Fprintf(w.ctx.Writer, "data: %s\n\n", data)
-	if err != nil {
-		return err
-	}
-	w.ctx.Writer.Flush()
-	return nil
+	return w.WriteEvent("", data)
 }
 
 // WriteChars writes content character by character (for typewriter effect).
+// It stops with the context error as soon as the client disconnects.
 func (w *Writer) WriteChars(event, content string) error {
+	reqCtx := w.ctx.Request.Context()
 	for _, char := range content {
+		if err := reqCtx.Err(); err != nil {
+			return err
+		}
 		if err := w.WriteEvent(event, string(char)); err != nil {
 			return err
 		}
@@ -74,12 +97,10 @@ func (w *Writer) WriteChars(event, content string) error {
 
 // Typewriter sends content character by character (typewriter effect).
 func Typewriter(ctx *gin.Context, event string, content string) error {
-	writer := NewWriter(ctx)
-	return writer.WriteChars(event, content)
+	return NewWriter(ctx).WriteChars(event, content)
 }
 
 // Send sends content as a single SSE event.
 func Send(ctx *gin.Context, event string, content string) error {
-	writer := NewWriter(ctx)
-	return writer.WriteEvent(event, content)
+	return NewWriter(ctx).WriteEvent(event, content)
 }

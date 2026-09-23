@@ -5,87 +5,166 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/gplog"
 	"github.com/archine/gin-plus/v4/component/ioc"
 	"github.com/archine/gin-plus/v4/component/mvc"
-	"github.com/archine/gin-plus/v4/internal/vars/sysconf"
 	"github.com/archine/gin-plus/v4/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-// GinServer represents a Gin-based HTTP server with additional features
+// GinServer represents a Gin-based HTTP server with additional features.
+// Lifecycle: Init → Start → Shutdown, each invoked once by the application.
 type GinServer struct {
 	// conf holds the configuration for the Gin server
 	conf *Config
 
-	// server is the underlying HTTP server instance
+	// server is the underlying HTTP server instance, nil until Start succeeds
 	server *http.Server
 
 	// middlewares is a slice of Gin middleware functions that will be applied globally to all routes.
-	// Note: if server is running, this slice will be cleared after applying the middlewares to avoid memory leaks.
+	// It is released once applied to the engine.
 	middlewares []gin.HandlerFunc
 }
 
-// NewGinServer creates a new instance of GinServer with the provided configuration.
-// It initializes the server with the specified address and configuration.
+// NewGinServer creates an uninitialized GinServer; call Init before Start.
 func NewGinServer() *GinServer {
 	return &GinServer{}
 }
 
-// Init initializes the Gin server
-func (s *GinServer) Init() error {
+// Init loads and validates the server configuration from "gin-plus.server".
+func (s *GinServer) Init(cp config.Provider) error {
 	var conf Config
-	if err := sysconf.Provider.Unmarshal("gin-plus.server", &conf); err != nil {
-		return err
+	if err := cp.Unmarshal("gin-plus.server", &conf); err != nil {
+		return fmt.Errorf("load server config: %w", err)
+	}
+	if err := conf.normalize(); err != nil {
+		return fmt.Errorf("invalid server config: %w", err)
 	}
 
-	conf.Validate()
 	s.conf = &conf
-
 	return nil
 }
 
-// RegisterMiddleware registers a middleware to the Gin server
+// RegisterMiddleware registers global middlewares; they run after the built-in ones, in order.
 func (s *GinServer) RegisterMiddleware(middleware ...gin.HandlerFunc) {
 	s.middlewares = append(s.middlewares, middleware...)
 }
 
-// GetAddress returns the address the Gin server will listen on
-func (s *GinServer) GetAddress() string {
-	return fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port)
+// Address returns the address the server listens on (IPv6 hosts are bracketed).
+func (s *GinServer) Address() string {
+	return net.JoinHostPort(s.conf.Host, strconv.Itoa(s.conf.Port))
 }
 
-// GetName returns the name of the Gin server
-func (s *GinServer) GetName() string {
+// Name returns the configured application name.
+func (s *GinServer) Name() string {
 	return s.conf.Name
 }
 
-// Run starts the Gin server with the provided configuration.
-func (s *GinServer) Run() error {
+// ExitDelay returns the time budget for post-shutdown cleanup callbacks.
+func (s *GinServer) ExitDelay() time.Duration {
+	return s.conf.ExitDelay
+}
+
+// Start binds the listening socket synchronously and serves requests in the background.
+//
+// Binding errors (port in use, bad TLS key pair, ...) are returned directly, so a nil error
+// means the server is really accepting connections. Errors raised later by the serving loop
+// are delivered through the returned channel; it never receives anything on a regular Shutdown.
+func (s *GinServer) Start() (<-chan error, error) {
+	srv := &http.Server{
+		Handler:           s.newEngine(),
+		ReadTimeout:       s.conf.ReadTimeout,
+		WriteTimeout:      s.conf.WriteTimeout,
+		ReadHeaderTimeout: s.conf.ReadHeaderTimeout,
+		IdleTimeout:       s.conf.IdleTimeout,
+		// Route net/http internal errors (TLS handshake failures, handler panics, ...) into gplog.
+		ErrorLog: log.New(logWriter(gplog.Warn), "", 0),
+	}
+
+	useTLS := s.conf.TLS != nil && s.conf.TLS.Enable
+	if useTLS {
+		// Load the key pair up front so that a bad certificate fails start-up synchronously.
+		cert, err := tls.LoadX509KeyPair(s.conf.TLS.CertFile, s.conf.TLS.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load TLS key pair: %w", err)
+		}
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}
+	}
+
+	ln, err := net.Listen("tcp", s.Address())
+	if err != nil {
+		return nil, err
+	}
+	s.server = srv
+
+	errCh := make(chan error, 1)
+	go func() {
+		var err error
+		if useTLS {
+			// Empty file names: certificates come from TLSConfig. ServeTLS also enables HTTP/2.
+			err = srv.ServeTLS(ln, "", "")
+		} else {
+			err = srv.Serve(ln)
+		}
+		// Serve always returns a non-nil error; ErrServerClosed only reports a regular Shutdown.
+		if !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	return errCh, nil
+}
+
+// Shutdown gracefully stops the server within ShutdownTimeout. When the timeout elapses,
+// remaining connections are closed forcibly and the timeout error is returned.
+// It is a no-op if the server has never been started.
+func (s *GinServer) Shutdown() error {
+	if s.server == nil {
+		return nil
+	}
+
+	ctx := context.Background()
+	if s.conf.ShutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.conf.ShutdownTimeout)
+		defer cancel()
+	}
+
+	if err := s.server.Shutdown(ctx); err != nil {
+		_ = s.server.Close()
+		return fmt.Errorf("graceful shutdown: %w", err)
+	}
+	return nil
+}
+
+// newEngine builds the Gin engine: built-in middlewares (logger → recovery),
+// then user middlewares, then routes.
+func (s *GinServer) newEngine() *gin.Engine {
 	gin.SetMode(s.conf.Mode)
 	engine := gin.New()
 	engine.RemoveExtraSlash = true
+	// Let *gin.Context fall back to Request.Context() for Value/Deadline/Done/Err, so passing it
+	// as a context.Context sees values set upstream (e.g. trace ids) and client cancellation.
+	engine.ContextWithFallback = true
 	engine.MaxMultipartMemory = s.conf.MaxMultipartMemory
 
 	if !s.conf.DisableDefaultLogger {
 		logConf := gin.LoggerConfig{
-			Output:    &logWriter{},
+			Output:    logWriter(gplog.Info),
 			SkipPaths: s.conf.SkipLogPaths,
+			Formatter: consoleFormatter,
 		}
 		if gplog.GetLogger().GetFormat() == gplog.JSONFormat {
 			logConf.Formatter = jsonFormatter
-		} else {
-			logConf.Formatter = consoleFormatter
 		}
-
 		engine.Use(gin.LoggerWithConfig(logConf))
-	}
-
-	if !s.conf.DisableDefaultCors {
-		engine.Use(middleware.CORS())
 	}
 
 	if !s.conf.DisableDefaultRecovery {
@@ -97,123 +176,25 @@ func (s *GinServer) Run() error {
 		s.middlewares = nil
 	}
 
-	s.applyRoute(engine, s.conf.ContextPath, s.conf.EnableHealthCheck)
-
-	serve := http.Server{
-		Addr:                         fmt.Sprintf("%s:%d", s.conf.Host, s.conf.Port),
-		Handler:                      engine,
-		DisableGeneralOptionsHandler: false,
-		ReadTimeout:                  s.conf.ReadTimeout,
-		WriteTimeout:                 s.conf.WriteTimeout,
-		ReadHeaderTimeout:            s.conf.ReadHeaderTimeout,
-		IdleTimeout:                  s.conf.IdleTimeout,
-	}
-
-	errChan := make(chan error, 1)
-
-	if s.conf.TLS != nil && s.conf.TLS.Enable {
-		if s.conf.TLS.CertFile == "" || s.conf.TLS.KeyFile == "" {
-			return fmt.Errorf("TLS is enabled but cert file or key file is not provided")
-		}
-		serve.TLSConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12, // Ensure a minimum TLS version
-		}
-		go func() {
-			errChan <- serve.ListenAndServeTLS(s.conf.TLS.CertFile, s.conf.TLS.KeyFile)
-		}()
-	} else {
-		go func() {
-			errChan <- serve.ListenAndServe()
-		}()
-	}
-
-	select {
-	case err := <-errChan:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return err
-		}
-	case <-time.After(3 * time.Millisecond):
-		// wait a moment to ensure the server has started before logging
-		s.server = &serve
-	}
-
-	return nil
+	s.applyRoutes(engine)
+	return engine
 }
 
-// Shutdown gracefully stops the Gin server
-func (s *GinServer) Shutdown(closeFunc func(ctx context.Context)) error {
-	if s.server == nil {
-		return fmt.Errorf("server is not running")
-	}
-	if s.conf == nil {
-		return fmt.Errorf("server configuration is not initialized")
-	}
+// applyRoutes registers the optional health check and the routes of every controller bean,
+// in bean registration order, under the configured context path.
+func (s *GinServer) applyRoutes(engine *gin.Engine) {
+	baseRouter := engine.Group(s.conf.ContextPath)
 
-	shutdownCtx := context.Background()
-	if s.conf.ShutdownTimeout > 0 {
-		var cancelFunc context.CancelFunc
-		shutdownCtx, cancelFunc = context.WithTimeout(shutdownCtx, s.conf.ShutdownTimeout)
-		defer cancelFunc()
-	}
-
-	err := s.server.Shutdown(shutdownCtx)
-	if err != nil {
-		return err
-	}
-
-	s.server = nil
-
-	if closeFunc != nil {
-		closeCtx, cancel := context.WithTimeout(context.Background(), s.conf.ExitDelay)
-		defer cancel()
-
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			closeFunc(closeCtx)
-		}()
-
-		select {
-		case <-done:
-			// The close function completed successfully
-		case <-closeCtx.Done():
-			gplog.Warn(fmt.Sprintf("closeFunc timeout after %v", s.conf.ExitDelay))
-		}
-	}
-
-	return nil
-}
-
-// apply attaches all APIs to the Gin engine.
-// This function iterates through the registered routes and their methods,
-// It also optionally registers a health check endpoint if `enableHealth` is true.
-//
-// Args:
-//   - appCtx: The application context
-//   - engine: The Gin engine to which the routes will be applied.
-//   - contextPath: The base path for the APIs, which will be prefixed to all routes.
-//   - enableHealth: A boolean flag to enable or disable health check endpoints.
-//
-// Note: this function is system-internal and should not be used directly in application code.
-func (s *GinServer) applyRoute(engine *gin.Engine, contextPath string, enableHealth bool) {
-	baseRouter := engine.Group(contextPath)
-
-	if enableHealth {
+	if s.conf.EnableHealthCheck {
 		baseRouter.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
 	}
 
 	ctrls := ioc.GetAllBeansByType[mvc.AbstractController]()
-
-	if ctrls == nil {
-		return
-	}
-
 	for _, ctrl := range ctrls {
 		ctrl.SetRoutes(baseRouter)
 	}
 
-	gplog.Info(fmt.Sprintf("All routes have been applied to the Gin engine, parsed %d controllers", len(ctrls)))
-	gplog.Info(fmt.Sprintf("Application run with context path: '%s'", contextPath))
+	gplog.Info(fmt.Sprintf("Applied routes of %d controllers under context path '%s'", len(ctrls), s.conf.ContextPath))
 }

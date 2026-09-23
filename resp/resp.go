@@ -92,12 +92,7 @@ func InitResp(ctx *gin.Context) Resp {
 
 // BadRequest returns a business-related error.
 func BadRequest(ctx *gin.Context, format string, args ...any) {
-	var message string
-	if format == "" {
-		message = http.StatusText(http.StatusBadRequest)
-	} else {
-		message = fmt.Sprintf(format, args...)
-	}
+	message := formatMsg(http.StatusText(http.StatusBadRequest), format, args)
 	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, message, nil).To(http.StatusOK)
 }
 
@@ -108,41 +103,27 @@ func ParamValidation(ctx *gin.Context, obj any) bool {
 	if err == nil {
 		return true
 	}
-	gplog.ErrorWithCtx(ctx.Request.Context(), err.Error())
+	// Invalid input is a client mistake, not a server fault.
+	gplog.WarnWithCtx(ctx, "Parameter validation failed: "+err.Error())
 	InitResp(ctx).WithBasic(exception.DefaultBusinessCode, "Invalid parameters", nil).To(http.StatusOK)
 	return false
 }
 
 // Forbidden handles situations where access is forbidden.
 func Forbidden(ctx *gin.Context, format string, args ...any) {
-	var message string
-	if format == "" {
-		message = http.StatusText(http.StatusForbidden)
-	} else {
-		message = fmt.Sprintf(format, args...)
-	}
+	message := formatMsg(http.StatusText(http.StatusForbidden), format, args)
 	InitResp(ctx).WithBasic(exception.DefaultForbiddenCode, message, nil).To(http.StatusOK)
 }
 
 // NoLogin handles situations where the user is not logged in.
 func NoLogin(ctx *gin.Context, format string, args ...any) {
-	var message string
-	if format == "" {
-		message = "Not logged in"
-	} else {
-		message = fmt.Sprintf(format, args...)
-	}
+	message := formatMsg("Not logged in", format, args)
 	InitResp(ctx).WithBasic(exception.DefaultNoLoginCode, message, nil).To(http.StatusUnauthorized)
 }
 
 // LoginExpired handles cases where the user's login session has expired.
 func LoginExpired(ctx *gin.Context, format string, args ...any) {
-	var message string
-	if format == "" {
-		message = "Login expired"
-	} else {
-		message = fmt.Sprintf(format, args...)
-	}
+	message := formatMsg("Login expired", format, args)
 	InitResp(ctx).WithBasic(exception.DefaultTokenExpired, message, nil).To(http.StatusUnauthorized)
 }
 
@@ -158,36 +139,55 @@ func Json(ctx *gin.Context, data any) {
 
 // Code responds with a custom business code and message.
 func Code(ctx *gin.Context, bcode int, format string, args ...any) {
-	InitResp(ctx).WithBasic(bcode, fmt.Sprintf(format, args...), nil).To(http.StatusOK)
+	InitResp(ctx).WithBasic(bcode, formatMsg("", format, args), nil).To(http.StatusOK)
 }
 
-// Error responds with an error
+// Error responds with an error and logs it.
 //
-// The function first checks if the error is of type exception.StackError.
-// If it is, the stack trace is logged for debugging purposes, but the function
-// continues to check for other error types.
-//
-// If the error is a BusinessException, the function responds with the corresponding
-// business error code and message.
-//
-// If no specific error type is identified, a generic server error response is returned.
+// A BusinessException anywhere in the chain is an expected outcome: its code and message are
+// returned to the client and it is logged at Warn level. Anything else is logged at Error level
+// and answered with a generic DefaultSystemErrorCode, so internal details never leak to clients.
+// In both cases the log carries the full message chain and the stack trace, if one was captured.
 func Error(ctx *gin.Context, err error) {
 	if err == nil {
 		return
 	}
 
-	var stackErr *exception.StackError
-	if errors.As(err, &stackErr) {
-		gplog.ErrorWithCtx(ctx.Request.Context(), stackErr.Full())
-	} else {
-		gplog.ErrorWithCtx(ctx.Request.Context(), fmt.Sprintf("%+v", err))
-	}
-
 	var businessErr *exception.BusinessException
 	if errors.As(err, &businessErr) {
+		gplog.WarnWithCtx(ctx, errorDetail(err))
 		InitResp(ctx).WithBasic(businessErr.Code(), businessErr.Error(), nil).To(http.StatusOK)
 		return
 	}
 
+	gplog.ErrorWithCtx(ctx, errorDetail(err))
 	InitResp(ctx).WithBasic(exception.DefaultSystemErrorCode, "Internal Server Error", nil).To(http.StatusOK)
+}
+
+// formatMsg returns def when format is empty, and format verbatim when there are no args,
+// so a literal message containing '%' (e.g. "100% done") is never mangled by Sprintf.
+func formatMsg(def, format string, args []any) string {
+	switch {
+	case format == "":
+		return def
+	case len(args) == 0:
+		return format
+	default:
+		return fmt.Sprintf(format, args...)
+	}
+}
+
+// errorDetail renders err for logging without losing outer context.
+func errorDetail(err error) string {
+	// StackError and WrapError render their whole chain, stack included, with %+v.
+	if _, ok := err.(fmt.Formatter); ok {
+		return fmt.Sprintf("%+v", err)
+	}
+	// e.g. fmt.Errorf("...: %w", stackErr): the outer message may omit the root cause
+	// (WrapError.Error only keeps business messages), so append the full inner detail.
+	var stackErr *exception.StackError
+	if errors.As(err, &stackErr) {
+		return err.Error() + "\ncaused by: " + stackErr.Full()
+	}
+	return err.Error()
 }

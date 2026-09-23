@@ -1,77 +1,73 @@
 package exception
 
 import (
-    "runtime"
-    "strconv"
-    "strings"
+	"runtime"
+	"strconv"
+	"strings"
 )
 
-// MaximumStack defines the maximum number of stack frames to capture.
+// maximumStack defines the maximum number of stack frames to capture.
 const maximumStack = 32
 
-// CallerSkip defines the number of stack frames to skip, including the current method.
-const callerSkip = 3
-
-// Stack represents a stack of program counters.
+// Stack is a captured call stack. It keeps the raw program counters and resolves
+// frames on demand, so it can be rendered any number of times.
 type Stack struct {
-    frames *runtime.Frames
+	pcs []uintptr
 }
 
-// CaptureStackTrace captures a stack trace starting from the specified offset and retrieves up to the specified depth.
+// CaptureStackTrace captures up to depth frames (1-32, out-of-range values mean 32).
+// skipOffset is the number of frames to skip above the caller: 0 starts the trace at the
+// function calling CaptureStackTrace, 1 at its caller, and so on. Negative values mean 0.
 func CaptureStackTrace(skipOffset, depth int) *Stack {
-    // Adjust depth to a valid range, defaults to maximumStack if out of bounds.
-    if depth < 1 || depth > maximumStack {
-        depth = maximumStack
-    }
+	if depth < 1 || depth > maximumStack {
+		depth = maximumStack
+	}
+	if skipOffset < 0 {
+		skipOffset = 0
+	}
 
-    // Ensure skipOffset does not go below the base callerSkip.
-    if skipOffset < -callerSkip {
-        skipOffset = 0
-    }
-
-    pcs := make([]uintptr, depth)
-    n := runtime.Callers(callerSkip+skipOffset, pcs)
-    if n < depth {
-        pcs = pcs[:n]
-    }
-
-    return &Stack{frames: runtime.CallersFrames(pcs)}
+	pcs := make([]uintptr, depth)
+	// Skip runtime.Callers and CaptureStackTrace itself.
+	n := runtime.Callers(2+skipOffset, pcs)
+	return &Stack{pcs: pcs[:n]}
 }
 
-// Next returns the next frame in the stack trace,
-// and a boolean indicating whether there are more after it.
-func (s *Stack) Next() (runtime.Frame, bool) {
-    return s.frames.Next()
-}
-
-// Full returns the complete string representation of the stack trace
+// Full returns the stack trace, one "function\n\tfile:line" entry per frame.
+// Leading runtime frames are skipped: when captured while recovering a panic, they belong to
+// the panic machinery (runtime.gopanic, runtime.sigpanic, ...), and the trace should start
+// at the line that actually failed.
 func (s *Stack) Full() string {
-    var builder strings.Builder
-    builder.Grow(512)
-
-    for {
-        frame, more := s.Next()
-        builder.WriteString(frame.Function)
-        builder.WriteByte('\n')
-        builder.WriteByte('\t')
-        builder.WriteString(frame.File)
-        builder.WriteByte(':')
-        builder.WriteString(strconv.Itoa(frame.Line))
-        if !more {
-            break
-        }
-        builder.WriteByte('\n')
-    }
-    return builder.String()
+	var builder strings.Builder
+	builder.Grow(512)
+	frames := runtime.CallersFrames(s.pcs)
+	for more := len(s.pcs) > 0; more; {
+		var frame runtime.Frame
+		frame, more = frames.Next()
+		if builder.Len() == 0 && more && strings.HasPrefix(frame.Function, "runtime.") {
+			continue
+		}
+		if builder.Len() > 0 {
+			builder.WriteByte('\n')
+		}
+		builder.WriteString(frame.Function)
+		builder.WriteString("\n\t")
+		builder.WriteString(frame.File)
+		builder.WriteByte(':')
+		builder.WriteString(strconv.Itoa(frame.Line))
+	}
+	return builder.String()
 }
 
-// FirstFrame returns the first frame in the stack trace.
+// FirstFrame returns the "file:line" of the first frame outside the runtime (see Full),
+// or "" if nothing was captured.
 func (s *Stack) FirstFrame() string {
-    frame, _ := s.Next()
-    var sb strings.Builder
-    sb.Grow(128)
-    sb.WriteString(frame.File)
-    sb.WriteByte(':')
-    sb.WriteString(strconv.Itoa(frame.Line))
-    return sb.String()
+	frames := runtime.CallersFrames(s.pcs)
+	for more := len(s.pcs) > 0; more; {
+		var frame runtime.Frame
+		frame, more = frames.Next()
+		if !more || !strings.HasPrefix(frame.Function, "runtime.") {
+			return frame.File + ":" + strconv.Itoa(frame.Line)
+		}
+	}
+	return ""
 }

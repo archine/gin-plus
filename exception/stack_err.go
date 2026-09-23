@@ -32,7 +32,7 @@ func (s *StackError) Full() string {
 	if s == nil {
 		return ""
 	}
-	return s.err.Error() + "\n" + s.st
+	return fullError(s.err) + "\n" + s.st
 }
 
 // StackTrace returns the captured stack trace.
@@ -68,21 +68,23 @@ func (s *StackError) Format(f fmt.State, verb rune) {
 }
 
 // WrapWithStack adds a stack trace to an existing error.
+// The trace starts at the caller of WrapWithStack; skip optionally drops that many more
+// frames, for helpers wrapping errors on behalf of their own callers.
 // Returns nil if err is nil.
-// If err is already a *StackError, it is returned as-is to avoid redundant nesting.
+// If err already carries a *StackError, it is returned unchanged: the innermost trace is the
+// most precise one, and re-wrapping would only duplicate it.
 func WrapWithStack(err error, skip ...int) error {
 	if err == nil {
 		return nil
 	}
-	var se *StackError
-	if errors.As(err, &se) {
-		return se
+	if _, ok := errors.AsType[*StackError](err); ok {
+		return err
 	}
 
-	s := 1
+	s := 0
 	if len(skip) > 0 {
 		s = skip[0]
 	}
-	st := CaptureStackTrace(s, 16)
-	return &StackError{err: err, st: st.Full()}
+	// +1 skips WrapWithStack itself.
+	return &StackError{err: err, st: CaptureStackTrace(1+s, 16).Full()}
 }

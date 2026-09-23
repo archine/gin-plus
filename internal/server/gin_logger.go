@@ -9,16 +9,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// logWriter implements gin.LoggerOutput interface
-type logWriter struct{}
+// logWriter adapts a gplog level function to io.Writer, e.g. logWriter(gplog.Info).
+// It bridges writers such as the Gin logger output and http.Server.ErrorLog into gplog.
+type logWriter func(text string, keyvals ...any)
 
-func (l *logWriter) Write(p []byte) (n int, err error) {
-	s := strings.TrimSpace(string(p))
-	if s == "" {
-		return 0, nil
+func (w logWriter) Write(p []byte) (int, error) {
+	// Always report the full length: a short write would make callers treat it as an error.
+	if s := strings.TrimSpace(string(p)); s != "" {
+		w(s)
 	}
-
-	gplog.Info(s)
 	return len(p), nil
 }
 
@@ -58,10 +57,13 @@ var jsonFormatter = func(param gin.LogFormatterParams) string {
 		"req_method", param.Method,
 	}
 
-	if param.Keys != nil {
-		for k, v := range param.Keys {
-			keyvals = append(keyvals, k.(string), v)
+	// Keys is map[any]any since Gin 1.12; non-string keys are stringified instead of asserted.
+	for k, v := range param.Keys {
+		key, ok := k.(string)
+		if !ok {
+			key = fmt.Sprint(k)
 		}
+		keyvals = append(keyvals, key, v)
 	}
 
 	switch {

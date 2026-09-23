@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/version-v4-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.23-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
+![](https://img.shields.io/badge/version-v4-green.svg) &nbsp; ![](https://img.shields.io/badge/version-go1.26-green.svg) &nbsp;  ![](https://img.shields.io/badge/builder-success-green.svg) &nbsp;
 
 # Gin-Plus
 

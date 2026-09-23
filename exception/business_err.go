@@ -1,5 +1,7 @@
 package exception
 
+import "fmt"
+
 const (
 	// DefaultBusinessCode is the default business error code, set to 10400.
 	DefaultBusinessCode = 10400
@@ -37,6 +39,12 @@ func (b *BusinessException) WithCode(code int) *BusinessException {
 	return &BusinessException{code: code, msg: b.msg}
 }
 
+// NewBusinessErr creates a BusinessException with DefaultBusinessCode.
 func NewBusinessErr(msg string) *BusinessException {
 	return &BusinessException{code: DefaultBusinessCode, msg: msg}
+}
+
+// NewBusinessErrF creates a BusinessException with DefaultBusinessCode and a formatted message.
+func NewBusinessErrF(format string, args ...any) *BusinessException {
+	return &BusinessException{code: DefaultBusinessCode, msg: fmt.Sprintf(format, args...)}
 }

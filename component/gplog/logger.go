@@ -9,7 +9,8 @@ const (
 
 // Logger defines the logging interface for the application.
 // Usage example:
-// 	log.Info("user logged in", "user_id", 123, "ip", "1.2.3.4")
+//
+//	log.Info("user logged in", "user_id", 123, "ip", "1.2.3.4")
 type Logger interface {
 	GetFormat() string
 	Info(text string, keyvals ...any)

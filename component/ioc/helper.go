@@ -1,81 +1,56 @@
 package ioc
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
-	"github.com/archine/gin-plus/v4/component/config"
 	"github.com/archine/gin-plus/v4/component/ioc/bean"
-
 	"github.com/archine/gin-plus/v4/internal/container"
 	"github.com/archine/gin-plus/v4/internal/vars/sysctr"
 )
 
-// RegisterBeanDef registers a bean definition in the IoC container registry.
-// It accepts a struct pointer as input and extracts its type information to create a BeanDef.
-// If the struct implements the AbstractBean interface, it uses the provided bean name.
-// If no explicit name is provided, the container uses package.structName as the default.
-// If the input is nil or not a struct pointer, it panics.
+// RegisterBeanDef registers a candidate bean, typically from an init function.
+// The bean is instantiated by the caller but becomes effective only when the container
+// refreshes: its Condition is evaluated, then `value` / `autowire` fields are injected
+// and BeanPostConstruct is invoked after those of its dependencies.
 //
-// Parameters:
-//   - instance: a struct pointer to be registered.
+// If instance implements bean.AbstractBean, its BeanName and Condition are honored;
+// an empty name falls back to package.StructName.
 //
-// Note:
-//   - The function will panic if the input is nil or not a struct pointer.
-//   - If a bean with the specified name already exists, an error will be returned.
+// Panics if instance is not a non-nil struct pointer, if the name is already taken,
+// or if the container has already been refreshed.
 func RegisterBeanDef(instance any) {
-	if instance == nil {
-		return
+	def, err := container.NewBeanDef("", instance)
+	if err != nil {
+		panic("[BeanRegistry] registration failed: " + err.Error())
 	}
 
-	typ := reflect.TypeOf(instance)
-	if typ.Kind() != reflect.Pointer || typ.Elem().Kind() != reflect.Struct {
-		panic(fmt.Sprintf("[BeanRegistry] registration failed: '%s' is not a struct pointer", typ.String()))
+	if ab, ok := instance.(bean.AbstractBean); ok {
+		if name := ab.BeanName(); name != "" {
+			def.Name = name
+		}
+		def.Condition = ab.Condition
 	}
 
-	var beanName string
-	var conditionFunc func(config.Provider) bool
-	if ib, ok := instance.(bean.AbstractBean); ok {
-		beanName = ib.BeanName()
-		conditionFunc = ib.Condition
-	}
-
-	def := &container.BeanDef{
-		Condition:  conditionFunc,
-		Type:       typ,
-		Value:      instance,
-		OriginType: typ.Elem(),
-	}
-
-	sysctr.BeanRegistry.RegisterBeanDef(beanName, def)
+	sysctr.BeanRegistry.Register(def)
 }
 
-// RegisterBean registers an already instantiated bean instance into the IOC container.
-// Parameters:
-//   - name: the bean name for registration.
-//   - instance: a pointer to the struct instance that has already been instantiated.
-//   - itypes: optional interface types that the object implements, used for type-based lookup.
+// RegisterBean registers an already initialized instance as a singleton bean, effective immediately.
+// The instance is neither injected nor post-constructed. It is resolvable by name, by its struct
+// type and by every interface it implements. An empty name falls back to package.StructName.
 //
-// Note:
-//   - According to the IOC container design, all beans registered by this method are singletons.
-//   - If a bean with the specified name already exists, an error will be returned.
-//   - During registration, type-to-bean-name mappings are automatically established to support type-based bean retrieval.
-func RegisterBean(name string, instance any, itypes ...reflect.Type) {
-	sysctr.Container.RegisterBean(name, instance, itypes...)
+// Panics if instance is not a non-nil struct pointer or if the name is already taken.
+func RegisterBean(name string, instance any) {
+	sysctr.Container.RegisterBean(name, instance)
 }
 
-// GetBean retrieves a bean from the IoC container by its name and returns it as a pointer of the specified type.
-// If the bean does not exist, it returns nil.
-//
-// Parameters:
-//   - name: the name of the bean to retrieve.
-//
-// Returns:
-//   - a pointer to the bean of type T, or nil if the bean does not exist.
+// GetBean retrieves a bean by name. It returns false if the bean does not exist
+// or is not of type T.
 func GetBean[T any](name string) (T, bool) {
-	var zero T
 	raw, exist := sysctr.Container.GetBean(name)
 	if !exist {
+		var zero T
 		return zero, false
 	}
 
@@ -83,17 +58,18 @@ func GetBean[T any](name string) (T, bool) {
 	return val, ok
 }
 
-// GetBeanByType retrieves a bean from the IoC container by its type and returns it as a pointer of the specified type.
-// If the bean does not exist, it returns nil.
+// GetBeanByType retrieves the single bean assignable to T (a struct pointer or an interface).
+// It returns false if no bean matches.
 //
-// Returns:
-//   - a pointer to the bean of type T, or false if the bean does not exist.
+// Panics if several beans match T: the lookup is ambiguous, which is a programming error.
+// Use GetBean with an explicit name or GetAllBeansByType instead.
 func GetBeanByType[T any]() (T, bool) {
 	var zero T
-	typ := reflect.TypeFor[T]()
-
-	raw, exist := sysctr.Container.GetBeanByType(typ)
-	if !exist {
+	raw, err := sysctr.Container.GetBeanByType(reflect.TypeFor[T]())
+	if err != nil {
+		if errors.Is(err, container.ErrAmbiguousBean) {
+			panic(fmt.Sprintf("[IOC] %v", err))
+		}
 		return zero, false
 	}
 
@@ -101,16 +77,11 @@ func GetBeanByType[T any]() (T, bool) {
 	return val, ok
 }
 
-// GetAllBeansByType retrieves all beans from the IoC container that match the specified type and returns them as a slice of pointers of the specified type.
-// If no beans match the specified type, it returns nil.
-//
-// Returns:
-//   - a slice of pointers to beans of type T, or nil if no beans match the specified type.
+// GetAllBeansByType retrieves all beans assignable to T in registration order.
+// It returns nil if no bean matches.
 func GetAllBeansByType[T any]() []T {
-	typ := reflect.TypeFor[T]()
-
-	rawList, exist := sysctr.Container.GetAllBeansByType(typ)
-	if !exist || len(rawList) == 0 {
+	rawList := sysctr.Container.GetAllBeansByType(reflect.TypeFor[T]())
+	if len(rawList) == 0 {
 		return nil
 	}
 
@@ -120,6 +91,5 @@ func GetAllBeansByType[T any]() []T {
 			result = append(result, val)
 		}
 	}
-
 	return result
 }

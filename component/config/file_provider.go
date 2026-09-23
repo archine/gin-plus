@@ -1,9 +1,8 @@
 package config
 
 import (
-	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -12,35 +11,59 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	// ConfigFileEnv is the environment variable holding the configuration file path.
+	ConfigFileEnv = "GIN_PLUS_CONFIG_FILE"
+	// DefaultConfigFile is used when ConfigFileEnv is not set.
+	DefaultConfigFile = "app.yml"
+)
+
+// decodeOption lets Unmarshal honor both mapstructure and json struct tags.
+var decodeOption viper.DecoderConfigOption = func(dc *mapstructure.DecoderConfig) {
+	dc.TagName = "mapstructure,json"
+}
+
 // FileProvider is a Viper-based configuration implementation for loading local configuration files.
-// 1. Checks the GIN_PLUS_CONFIG_FILE environment variable first
-// 2. If not set, checks for the '-c' command-line flag
-// 3. Defaults to 'app.yml' in the current directory if neither is specified
+// Keys can be overridden by environment variables: the key upper-cased with '.' and '-'
+// replaced by '_', e.g. gin-plus.server.context-path -> GIN_PLUS_SERVER_CONTEXT_PATH.
+// Overrides apply to the Get* methods and Unmarshal("", obj), see Unmarshal.
 type FileProvider struct {
 	v *viper.Viper
 }
 
-// NewFileProvider creates a new file-based configuration provider
+// NewFileProvider creates a file-based configuration provider from the file named by the
+// GIN_PLUS_CONFIG_FILE environment variable, or 'app.yml' in the working directory if unset.
+//
+// It panics if the file cannot be loaded, since it runs before the logger is available.
 func NewFileProvider() Provider {
-	configFile := os.Getenv("GIN_PLUS_CONFIG_FILE") // Check environment variable first
-	if configFile == "" {
-		flag.StringVar(&configFile, "c", "app.yml", "sets the configuration file path, default app.yml")
-		flag.Parse()
+	path := os.Getenv(ConfigFileEnv)
+	if path == "" {
+		path = DefaultConfigFile
 	}
 
-	v := viper.New()
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	p, err := NewFileProviderAt(path)
+	if err != nil {
+		panic(err.Error())
+	}
+	return p
+}
+
+// NewFileProviderAt creates a file-based configuration provider from the given path.
+// The format is inferred from the file extension (yml, yaml, json, toml, ...).
+func NewFileProviderAt(path string) (Provider, error) {
+	// BindStruct makes Unmarshal also look up env overrides for keys absent from the file.
+	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
-	v.SetConfigFile(configFile)
+	v.SetConfigFile(path)
 
 	if err := v.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("failed to read configuration file: %s, %s", configFile, err.Error()))
+		return nil, fmt.Errorf("failed to read configuration file [%s]: %w", path, err)
 	}
 
-	lc := &FileProvider{v: v}
-
-	log.Printf("Successfully loaded configuration from file: [%s]", configFile)
-	return lc
+	// The application logger is built from this configuration, so the standard logger is used here.
+	slog.Info("Successfully loaded configuration", "file", path)
+	return &FileProvider{v: v}, nil
 }
 
 func (f *FileProvider) Get(key string) any {
@@ -115,6 +138,8 @@ func (f *FileProvider) GetFloat64(key string) float64 {
 	return f.v.GetFloat64(key)
 }
 
+// Sub returns a sub-configuration for the given key.
+// Note: environment overrides do not apply to the returned Provider.
 func (f *FileProvider) Sub(key string) Provider {
 	sub := f.v.Sub(key)
 	if sub == nil {
@@ -123,13 +148,12 @@ func (f *FileProvider) Sub(key string) Provider {
 	return &FileProvider{v: sub}
 }
 
+// Unmarshal decodes the value at key (the whole configuration if key is empty) into obj.
+// Note: with a non-empty key the file content is decoded as is, environment overrides of
+// its nested keys do not apply (a viper limitation), use the Get* methods for those.
 func (f *FileProvider) Unmarshal(key string, obj any) error {
 	if key == "" {
-		return f.v.Unmarshal(obj, func(dc *mapstructure.DecoderConfig) {
-			dc.TagName = "mapstructure,json"
-		})
+		return f.v.Unmarshal(obj, decodeOption)
 	}
-	return f.v.UnmarshalKey(key, obj, func(dc *mapstructure.DecoderConfig) {
-		dc.TagName = "mapstructure,json"
-	})
+	return f.v.UnmarshalKey(key, obj, decodeOption)
 }

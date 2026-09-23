@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -38,30 +36,30 @@ const (
 	ServerMode
 )
 
+// shutdownSignalBeanName is the bean name of the ShutdownSignal; inject it by type instead.
+const shutdownSignalBeanName = "gin-plus.shutdownSignal"
+
 type App struct {
-	state            atomic.Bool
+	used             atomic.Bool // Guards Run: an App is single-use because the container refreshes once
+	running          atomic.Bool // True while Run is in progress
 	eventManager     *eventManager
 	server           *server.GinServer
 	confProviderFunc func() config.Provider
 	loggerFunc       func(cp config.Provider) gplog.Logger
-	initialized      atomic.Bool
 	banner           string
 	shutdownSignal   *shutdownSignal
 }
 
-// New creates a new instance of the App with optional configurations.
+// New creates a new App; configure it with With before calling Run.
 func New() *App {
-	a := &App{
+	return &App{
 		eventManager:   newEventManager(),
 		server:         server.NewGinServer(),
 		shutdownSignal: newShutdownSignal(),
 	}
-
-	return a
 }
 
 // With adds options to the App instance.
-// This method allows you to configure the App instance with various options.
 func (a *App) With(opts ...Option) *App {
 	for _, opt := range opts {
 		opt(a)
@@ -69,137 +67,148 @@ func (a *App) With(opts ...Option) *App {
 	return a
 }
 
-// IsRunning returns whether the application is currently running
+// IsRunning reports whether Run is in progress.
 func (a *App) IsRunning() bool {
-	return a.state.Load()
+	return a.running.Load()
 }
 
-// Run starts the application in the specified mode.
-// Args:
-//   - mode: The run mode of the application (InitializeMode, ContainerMode, or ServerMode).
+// Run starts the application in the specified mode and blocks until it finishes.
+// In ServerMode that is after a graceful shutdown triggered by SIGINT / SIGTERM.
+//
+// Failures are handled by the framework, callers never need to deal with start-up errors:
+//   - before the logger is installed (invalid mode, config or logger factory), Run panics
+//     with the cause, since there is nothing to log it with;
+//   - afterwards, the cause is logged and the process exits with status 1.
+//     Resources acquired before the failure are released first (see shutdown).
+//
+// An App can only be run once; subsequent calls log a warning and return immediately.
 func (a *App) Run(mode RunMode) {
-	if !a.state.CompareAndSwap(false, true) {
-		gplog.Warn("Application is already running")
+	if mode < InitializeMode || mode > ServerMode {
+		panic(fmt.Sprintf("gin-plus: unknown run mode %d", mode))
+	}
+	if !a.used.CompareAndSwap(false, true) {
+		gplog.Warn("Application is already running or has run, ignore this call")
 		return
 	}
+	a.running.Store(true)
+	defer a.running.Store(false)
 
 	printBanner(a.banner)
 	a.banner = ""
 
 	a.initialize()
-
-	switch mode {
-	case InitializeMode:
-		// do nothing
-	case ContainerMode:
-		a.refreshContainer()
-	case ServerMode:
-		a.refreshContainer()
-		a.startServer()
-	default:
-		gplog.Warn("Unknown run mode, defaulting to ServerMode")
-		a.refreshContainer()
-		a.startServer()
-	}
-}
-
-// initialize initializes the application configuration and logger.
-// This method is called automatically when the application starts.
-// It's safe to call multiple times - subsequent calls are no-ops.
-func (a *App) initialize() {
-	// Fast path: already initialized
-	if a.initialized.Load() {
+	if mode == InitializeMode {
 		return
 	}
 
-	// Initialize config provider
+	err := a.refreshContainer()
+	if err == nil && mode == ServerMode {
+		err = a.serve()
+	}
+	if err != nil {
+		gplog.Error("Application run failed: " + err.Error())
+		// os.Exit skips deferred calls; that is fine because serve has already released its resources.
+		os.Exit(1)
+	}
+}
+
+// initialize loads the configuration and installs the logger.
+// It panics on failure because the logger is not available yet.
+func (a *App) initialize() {
 	if a.confProviderFunc == nil {
 		a.confProviderFunc = config.NewFileProvider
 	}
-	sysconf.Provider = a.confProviderFunc()
-	a.eventManager.triggerConfigLoaded(sysconf.Provider)
+	cp := a.confProviderFunc()
+	if cp == nil {
+		panic("gin-plus: config provider function returned nil")
+	}
+	sysconf.Provider = cp
+	a.eventManager.triggerConfigLoaded(cp)
 
-	// Initialize logger
 	if a.loggerFunc == nil {
 		a.loggerFunc = func(cp config.Provider) gplog.Logger {
 			return zapper.NewLogger(cp)
 		}
 	}
-	logger := a.loggerFunc(sysconf.Provider)
+	logger := a.loggerFunc(cp)
+	if logger == nil {
+		panic("gin-plus: logger function returned nil")
+	}
 	gplog.SetLogger(logger)
 
-	// Clear function references to allow GC
-	a.confProviderFunc = nil
-	a.loggerFunc = nil
+	// Release the factories, they are never used again.
+	a.confProviderFunc, a.loggerFunc = nil, nil
 
-	a.initialized.Store(true)
 	gplog.Info("Application configuration and logger initialized")
 }
 
-// refreshContainer refreshes the bean container.
-func (a *App) refreshContainer() {
-	a.registerInfrastructureBeans()
+// refreshContainer builds the bean graph.
+func (a *App) refreshContainer() error {
+	// Framework-owned beans; the shutdown signal is injectable through the ShutdownSignal interface.
+	ioc.RegisterBean(shutdownSignalBeanName, a.shutdownSignal)
 	a.eventManager.triggerContainerRefreshBefore()
 
-	sysctr.Container.Refresh(sysconf.Provider, sysctr.BeanRegistry)
-	sysctr.BeanRegistry = nil // Clear registry reference to avoid further registration after refresh
+	// Drain closes the registry, so late ioc.RegisterBeanDef calls fail with a clear message.
+	if err := sysctr.Container.Refresh(sysconf.Provider, sysctr.BeanRegistry.Drain()); err != nil {
+		return err
+	}
 
 	gplog.Info("Bean container refreshed successfully")
 	a.eventManager.triggerContainerRefreshAfter()
+	return nil
 }
 
-func (a *App) registerInfrastructureBeans() {
-	if _, exist := ioc.GetBean[ShutdownSignal]("ginPlusShutdownSignal"); exist {
-		return
+// serve starts the HTTP server and blocks until a shutdown signal or a fatal serving error.
+func (a *App) serve() error {
+	if err := a.server.Init(sysconf.Provider); err != nil {
+		return err
 	}
 
-	ioc.RegisterBean(
-		"GinPlusShutdownSignal",
-		a.shutdownSignal,
-		reflect.TypeFor[ShutdownSignal](),
-	)
-}
+	// Subscribe before starting, so a signal arriving during start-up leads to a graceful
+	// shutdown instead of killing the process with half-initialized resources.
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-// startServer extracts the server startup logic for better readability
-func (a *App) startServer() {
-	if err := a.server.Init(); err != nil {
-		gplog.Error("Starting server failed: " + err.Error())
-		return
-	}
-
-	serverName := a.server.GetName()
-	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d",
-		serverName, a.server.GetAddress(), os.Getpid()))
-
+	name := a.server.Name()
+	gplog.Info(fmt.Sprintf("Starting %s using Gin-Engine on %s with PID %d", name, a.server.Address(), os.Getpid()))
 	a.eventManager.triggerOnStarting()
 
 	startTime := time.Now()
-	if err := a.server.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		gplog.Error("Starting " + serverName + " failed: " + err.Error())
-		return
+	serveErr, err := a.server.Start()
+	if err != nil {
+		// OnStarting may already have acquired resources; release them before reporting.
+		return errors.Join(fmt.Errorf("start %s: %w", name, err), a.shutdown())
 	}
 
 	a.eventManager.triggerOnStarted()
-	gplog.Info(fmt.Sprintf("Started %s in %v", serverName, time.Since(startTime)))
+	gplog.Info(fmt.Sprintf("Started %s in %v", name, time.Since(startTime)))
 
-	a.waitForShutdown()
+	var runErr error
+	select {
+	case <-sigCtx.Done():
+		gplog.Info("Received shutdown signal, starting graceful shutdown...")
+	case err = <-serveErr:
+		runErr = fmt.Errorf("%s stopped unexpectedly: %w", name, err)
+	}
+	// Restore default signal handling: a second Ctrl+C now force-quits a stuck shutdown.
+	stop()
+
+	return errors.Join(runErr, a.shutdown())
 }
 
-// waitForShutdown handles graceful shutdown logic
-func (a *App) waitForShutdown() {
-	stopSignalCh := make(chan os.Signal, 1)
-	signal.Notify(stopSignalCh, syscall.SIGTERM, syscall.SIGINT)
-	<-stopSignalCh
-
-	gplog.Info("Received shutdown signal, starting graceful shutdown...")
+// shutdown releases everything in dependency order:
+//  1. close the ShutdownSignal, so long-lived handlers (SSE, websockets) can return;
+//  2. stop the HTTP server gracefully, waiting for in-flight requests;
+//  3. run OnStopped callbacks within the exit-delay budget, even if step 2 failed.
+func (a *App) shutdown() error {
 	a.shutdownSignal.close()
 
-	if err := a.server.Shutdown(func(ctx context.Context) {
-		a.eventManager.triggerOnStopped(ctx)
-	}); err != nil {
-		gplog.Warn("Graceful shutdown failed: " + err.Error())
-		return
+	err := a.server.Shutdown()
+	if err != nil {
+		gplog.Warn(err.Error())
 	}
 
-	gplog.Info("Application shutdown completed successfully")
+	a.eventManager.triggerOnStopped(a.server.ExitDelay())
+	gplog.Info("Application shutdown completed")
+	return err
 }

@@ -40,7 +40,8 @@ func WithMiddleware(middlewares ...gin.HandlerFunc) Option {
 }
 
 // WithEvent registers application lifecycle events.
-// Events are managed by the event manager and triggered during app lifecycle.
+// This is the only way to take part in the lifecycle: beans implementing AppEvent are
+// NOT enrolled automatically. Nil and duplicate events are ignored.
 func WithEvent(events ...AppEvent) Option {
 	return func(app *App) {
 		app.eventManager.register(events...)

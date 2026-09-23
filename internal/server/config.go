@@ -1,7 +1,11 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Config contains HTTP server related configuration options.
@@ -27,11 +31,6 @@ type Config struct {
 	// In debug mode, Gin provides more detailed logging and error information.
 	// Default: "release"
 	Mode string `mapstructure:"mode"`
-
-	// DisableDefaultCors disables the default CORS middleware.
-	// If true, the server will not apply the default CORS settings.
-	// This is useful if you want to handle CORS manually or use a custom middleware.
-	DisableDefaultCors bool `mapstructure:"disable-default-cors"`
 
 	// DisableDefaultRecovery disables the default recovery middleware.
 	// If true, the server will not recover from panics using the default recovery middleware.
@@ -81,14 +80,15 @@ type Config struct {
 	IdleTimeout time.Duration `mapstructure:"idle-timeout"`
 
 	// ShutdownTimeout specifies the maximum duration to wait for graceful server shutdown.
-	// During this period, the server will attempt to finish processing ongoing requests
-	// before forcefully terminating. A zero value means no timeout (wait indefinitely).
+	// During this period, the server will attempt to finish processing ongoing requests;
+	// once it elapses, remaining connections are closed forcibly.
+	// A zero value means no timeout (wait indefinitely).
 	// Default: 0 (no timeout)
 	ShutdownTimeout time.Duration `mapstructure:"shutdown-timeout"`
 
-	// ExitDelay is the duration to wait before the application process exits after shutdown.
-	// This grace period allows for final cleanup tasks, log flushing, or external notifications.
-	// Useful for ensuring all resources are properly released before process termination.
+	// ExitDelay is the time budget for OnStopped callbacks once the HTTP server has stopped.
+	// Callbacks receive a context bound to this budget; when it runs out, shutdown proceeds
+	// without waiting for them, so a stuck cleanup can never block process exit.
 	// Default: 3s
 	ExitDelay time.Duration `mapstructure:"exit-delay"`
 
@@ -117,12 +117,17 @@ type TLSConfig struct {
 	KeyFile string `mapstructure:"key-file"`
 }
 
-func (c *Config) Validate() {
+// normalize fills unset options with defaults and rejects explicitly invalid ones.
+// Zero values are treated as "unset"; anything else that is out of range is a
+// configuration mistake and fails start-up instead of being silently corrected.
+func (c *Config) normalize() error {
 	if c.Name == "" {
 		c.Name = "GinPlusApp"
 	}
-	if c.Port <= 0 || c.Port > 65535 {
+	if c.Port == 0 {
 		c.Port = 4006
+	} else if c.Port < 0 || c.Port > 65535 {
+		return fmt.Errorf("invalid port %d, must be within 1-65535", c.Port)
 	}
 	if c.Host == "" {
 		c.Host = "0.0.0.0"
@@ -130,15 +135,21 @@ func (c *Config) Validate() {
 	if c.ContextPath == "" {
 		c.ContextPath = "/"
 	}
-	if c.Mode == "" {
-		c.Mode = "release"
-	} else if c.Mode != "debug" && c.Mode != "release" && c.Mode != "test" {
-		c.Mode = "release"
+	switch c.Mode {
+	case "":
+		c.Mode = gin.ReleaseMode
+	case gin.DebugMode, gin.ReleaseMode, gin.TestMode:
+	default:
+		return fmt.Errorf("invalid mode '%s', must be one of debug, release, test", c.Mode)
 	}
 	if c.MaxMultipartMemory <= 0 {
-		c.MaxMultipartMemory = 8388608 // 8MB
+		c.MaxMultipartMemory = 8 << 20 // 8MB
 	}
 	if c.ExitDelay <= 0 {
 		c.ExitDelay = 3 * time.Second
 	}
+	if c.TLS != nil && c.TLS.Enable && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
+		return errors.New("TLS is enabled but cert-file or key-file is not provided")
+	}
+	return nil
 }
