@@ -155,17 +155,7 @@ func (s *GinServer) newEngine() *gin.Engine {
 	engine.ContextWithFallback = true
 	engine.MaxMultipartMemory = s.conf.MaxMultipartMemory
 
-	if !s.conf.DisableDefaultLogger {
-		logConf := gin.LoggerConfig{
-			Output:    logWriter(gplog.Info),
-			SkipPaths: s.conf.SkipLogPaths,
-			Formatter: consoleFormatter,
-		}
-		if gplog.GetLogger().GetFormat() == gplog.JSONFormat {
-			logConf.Formatter = jsonFormatter
-		}
-		engine.Use(gin.LoggerWithConfig(logConf))
-	}
+	engine.Use(middleware.Logger(s.conf.SkipLogPaths))
 
 	if !s.conf.DisableDefaultRecovery {
 		engine.Use(middleware.Recovery())

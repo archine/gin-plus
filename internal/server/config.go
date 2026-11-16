@@ -37,13 +37,12 @@ type Config struct {
 	// This is useful if you want to handle panics manually or use a custom recovery middleware
 	DisableDefaultRecovery bool `mapstructure:"disable-default-recovery"`
 
-	// DisableDefaultLogger disables the default Gin logger middleware.
-	// If true, the server will not log requests using the default logger.
-	// This is useful if you want to use a custom logging middleware or handler.
-	DisableDefaultLogger bool `mapstructure:"disable-default-logger"`
-
-	// SkipLogPaths is a list of paths that should be skipped by the default logger middleware.
-	// Requests to these paths will not be logged.
+	// SkipLogPaths is a list of routes excluded from the default request log.
+	// Each entry is compared verbatim against the route template Gin matched, so both
+	// "/health" and "/user/:id" (which covers every value of that parameter) work.
+	// The value is the template as registered, i.e. it includes ContextPath when that is
+	// not "/". The query string never takes part in matching. Requests that match no route,
+	// and therefore end in 404, are always logged.
 	SkipLogPaths []string `mapstructure:"skip-log-paths"`
 
 	// MaxMultipartMemory sets the maximum memory (in bytes) for multipart form parsing.
