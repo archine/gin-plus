@@ -181,7 +181,12 @@ func (c *Container) registerLocked(def *BeanDef) error {
 	}
 	c.beans[def.Name] = def
 	c.order = append(c.order, def)
-	clear(c.typeCache) // Drop snapshots rather than patch them: any of them may now be incomplete
+	// Drop snapshots rather than patch them: any of them may now be incomplete.
+	// This is cheap in practice: registrations happen before the lookups that fill the cache,
+	// so the map is usually empty here and clear() is skipped entirely.
+	if len(c.typeCache) > 0 {
+		clear(c.typeCache)
+	}
 	return nil
 }
 
